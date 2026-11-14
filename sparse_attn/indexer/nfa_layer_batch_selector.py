@@ -1462,12 +1462,18 @@ if _has_triton():
     @triton.jit
     def _l1_far_compact_packed_body(
         SCORES, row, far_end,
-        KT: tl.constexpr, K: tl.constexpr, K_PAD: tl.constexpr,
+        KT: tl.constexpr, KT_PAD: tl.constexpr,
+        K: tl.constexpr, K_PAD: tl.constexpr,
         FAR_WIDTH: tl.constexpr, FAR_WIDTH_PAD: tl.constexpr,
         LOG2_K: tl.constexpr,
     ):
         """far 前缀与前 K 个全局 -inf 后缀位置做精确二路归并。"""
-        local = tl.arange(0, FAR_WIDTH_PAD)
+        # tl.topk 要求排序宽度不小于 K；窄前缀扩到 KT_PAD，但 load mask
+        # 仍严格限制在原 FAR_WIDTH/far_end 活跃区，不读取省略后缀。
+        if FAR_WIDTH_PAD < K_PAD:
+            local = tl.arange(0, KT_PAD)
+        else:
+            local = tl.arange(0, FAR_WIDTH_PAD)
         mask = (local < FAR_WIDTH) & (local < far_end) & (local < KT)
         s = tl.load(SCORES + row * KT + local,
                     mask=mask, other=float("-inf"))
@@ -1512,12 +1518,13 @@ if _has_triton():
     @triton.jit
     def _l1_far_compact_topk_body(
         SCORES, OUT, row, far_end,
-        KT: tl.constexpr, K: tl.constexpr, K_PAD: tl.constexpr,
+        KT: tl.constexpr, KT_PAD: tl.constexpr,
+        K: tl.constexpr, K_PAD: tl.constexpr,
         FAR_WIDTH: tl.constexpr, FAR_WIDTH_PAD: tl.constexpr,
         LOG2_K: tl.constexpr,
     ):
         top = _l1_far_compact_packed_body(
-            SCORES, row, far_end, KT=KT, K=K, K_PAD=K_PAD,
+            SCORES, row, far_end, KT=KT, KT_PAD=KT_PAD, K=K, K_PAD=K_PAD,
             FAR_WIDTH=FAR_WIDTH, FAR_WIDTH_PAD=FAR_WIDTH_PAD,
             LOG2_K=LOG2_K)
         top_idx = tl.arange(0, K_PAD)
@@ -1660,7 +1667,7 @@ if _has_triton():
             elif FAR_COMPACT and not TILED:
                 _l1_far_compact_topk_body(
                     FAR_TOPK, I_F, row, far_end,
-                    KT=KT, K=K_F, K_PAD=K_F_PAD,
+                    KT=KT, KT_PAD=KT_PAD, K=K_F, K_PAD=K_F_PAD,
                     FAR_WIDTH=FAR_WIDTH, FAR_WIDTH_PAD=FAR_WIDTH_PAD,
                     LOG2_K=LOG2_F)
             elif TILED:

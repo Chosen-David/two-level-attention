@@ -122,14 +122,15 @@ def _merge_topk(
 @triton.jit
 def _far_compact_test_kernel(
     SCORES, OUT, FAR_END,
-    KT: tl.constexpr, K: tl.constexpr, K_PAD: tl.constexpr,
+    KT: tl.constexpr, KT_PAD: tl.constexpr,
+    K: tl.constexpr, K_PAD: tl.constexpr,
     FAR_WIDTH: tl.constexpr, FAR_WIDTH_PAD: tl.constexpr,
     LOG2_K: tl.constexpr,
 ):
     row = tl.program_id(0)
     far_end = tl.load(FAR_END + row)
     _l1_far_compact_topk_body(
-        SCORES, OUT, row, far_end, KT=KT, K=K, K_PAD=K_PAD,
+        SCORES, OUT, row, far_end, KT=KT, KT_PAD=KT_PAD, K=K, K_PAD=K_PAD,
         FAR_WIDTH=FAR_WIDTH, FAR_WIDTH_PAD=FAR_WIDTH_PAD, LOG2_K=LOG2_K)
 
 
@@ -875,13 +876,105 @@ class L1TopKTiledTest(unittest.TestCase):
                     KT_PAD=triton.next_power_of_2(kt), K=k, K_PAD=k_pad,
                     num_warps=8)
                 _far_compact_test_kernel[(rows,)](
-                    scores, actual, far_end, KT=kt, K=k, K_PAD=k_pad,
+                    scores, actual, far_end, KT=kt,
+                    KT_PAD=triton.next_power_of_2(kt), K=k, K_PAD=k_pad,
                     FAR_WIDTH=far_width,
                     FAR_WIDTH_PAD=triton.next_power_of_2(far_width),
                     LOG2_K=k_pad.bit_length() - 1, num_warps=8)
                 torch.cuda.synchronize()
                 self.assertTrue(torch.equal(reference, actual),
                                 f"far compact K={k} 索引或顺序不同")
+
+    @unittest.skipUnless(torch.cuda.is_available(), "需要 CUDA")
+    def test_far_compact_narrow_prefix_matches_full_width(self):
+        """K 大于窄前缀排序宽度时仍须精确 Top-K，且不得读取 poison 后缀。"""
+        rows, kt = 8, 517
+        torch.manual_seed(20261114)
+        scores = torch.randint(
+            -32, 33, (rows, kt), device="cuda").to(torch.bfloat16) / 8
+        scores[0] = float("-inf")
+        scores[1, 0] = float("nan")
+        scores[2, 0] = float("inf")
+        scores[3, 0] = float("-inf")
+        scores[4, 0] = 0.0
+        scores[5, 0] = -0.0
+        scores[6, 0] = torch.tensor(
+            [-63], dtype=torch.int16, device="cuda").view(torch.bfloat16)[0]
+        for far_width in (1, 2, 4, 64):
+            far_end = torch.tensor(
+                [0, 1, min(3, far_width), min(7, far_width),
+                 min(31, far_width), min(65, far_width),
+                 min(127, far_width), far_width],
+                dtype=torch.int32, device="cuda")
+            poison = torch.full_like(scores, float("nan"))
+            for row in range(rows):
+                end = int(far_end[row])
+                poison[row, :end] = scores[row, :end]
+            for k in (96, 128):
+                with self.subTest(far_width=far_width, k=k):
+                    k_pad = triton.next_power_of_2(k)
+                    reference = torch.empty(
+                        (rows, k), dtype=torch.int32, device="cuda")
+                    actual = torch.empty_like(reference)
+                    _far_full_test_kernel[(rows,)](
+                        poison, reference, far_end, KT=kt,
+                        KT_PAD=triton.next_power_of_2(kt), K=k, K_PAD=k_pad,
+                        num_warps=8)
+                    _far_compact_test_kernel[(rows,)](
+                        poison, actual, far_end, KT=kt,
+                        KT_PAD=triton.next_power_of_2(kt), K=k, K_PAD=k_pad,
+                        FAR_WIDTH=far_width,
+                        FAR_WIDTH_PAD=triton.next_power_of_2(far_width),
+                        LOG2_K=k_pad.bit_length() - 1, num_warps=8)
+                    torch.cuda.synchronize()
+                    self.assertTrue(
+                        torch.equal(reference, actual),
+                        f"far compact width={far_width} K={k} 索引或顺序不同")
+
+    @unittest.skipUnless(torch.cuda.is_available(), "需要 CUDA")
+    def test_far_compact_short_row_k_clamped_to_kt(self):
+        """生产 k_f=min(96,KT) 的短行也必须满足排序宽度不小于 K。"""
+        rows, kt, k = 8, 21, 21
+        torch.manual_seed(20261115)
+        scores = torch.randint(
+            -32, 33, (rows, kt), device="cuda").to(torch.bfloat16) / 8
+        scores[0] = float("-inf")
+        scores[1, 0] = float("nan")
+        scores[2, 0] = float("inf")
+        scores[3, 0] = float("-inf")
+        scores[4, 0] = 0.0
+        scores[5, 0] = -0.0
+        scores[6, 0] = torch.tensor(
+            [-63], dtype=torch.int16, device="cuda").view(torch.bfloat16)[0]
+        for far_width in (1, 2, 4, 16, 21):
+            far_end = torch.tensor(
+                [0, 1, min(3, far_width), min(7, far_width),
+                 min(15, far_width), min(17, far_width),
+                 min(20, far_width), far_width],
+                dtype=torch.int32, device="cuda")
+            poison = torch.full_like(scores, float("nan"))
+            for row in range(rows):
+                end = int(far_end[row])
+                poison[row, :end] = scores[row, :end]
+            with self.subTest(far_width=far_width, kt=kt, k=k):
+                k_pad = triton.next_power_of_2(k)
+                kt_pad = triton.next_power_of_2(kt)
+                self.assertGreaterEqual(kt_pad, k_pad)
+                reference = torch.empty(
+                    (rows, k), dtype=torch.int32, device="cuda")
+                actual = torch.empty_like(reference)
+                _far_full_test_kernel[(rows,)](
+                    poison, reference, far_end, KT=kt, KT_PAD=kt_pad,
+                    K=k, K_PAD=k_pad, num_warps=8)
+                _far_compact_test_kernel[(rows,)](
+                    poison, actual, far_end, KT=kt, KT_PAD=kt_pad,
+                    K=k, K_PAD=k_pad, FAR_WIDTH=far_width,
+                    FAR_WIDTH_PAD=triton.next_power_of_2(far_width),
+                    LOG2_K=k_pad.bit_length() - 1, num_warps=8)
+                torch.cuda.synchronize()
+                self.assertTrue(
+                    torch.equal(reference, actual),
+                    f"短行 far compact width={far_width} 索引或顺序不同")
 
     @unittest.skipUnless(torch.cuda.is_available(), "需要 CUDA")
     def test_skipped_pool_does_not_read_scores_or_partial(self):
