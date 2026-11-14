@@ -2,7 +2,9 @@ from types import SimpleNamespace
 
 import pytest
 import torch
+from torch import nn
 
+from sparse_attn.patches import register_patch
 from sparse_attn.patches.glm4_moe_lite_flashinfer_patch import (
     FlashInferGLM4MoeLiteRuntime,
 )
@@ -10,6 +12,28 @@ from sparse_attn.patches.qwen3_flashinfer_patch import (
     FlashInferQwen3Runtime,
     _FlashInferMaskMetadata,
 )
+
+
+def test_glm_native_none_bypasses_sparse_registration():
+    class Glm4MoeLiteAttention(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.kv_a_proj_with_mqa = nn.Identity()
+            self.qk_head_dim = 256
+            self.qk_nope_head_dim = 192
+            self.qk_rope_head_dim = 64
+            self.v_head_dim = 256
+            self.scaling = 1.0
+            self.layer_idx = 0
+
+    model = nn.Module()
+    model.attn = Glm4MoeLiteAttention()
+    original_forward = model.attn.forward
+    args = SimpleNamespace(
+        method='none', nfa_far_skip_backend='legacy',
+        nfa_far_skip_cache='retain')
+    assert register_patch(model, args) == 0
+    assert model.attn.forward == original_forward
 
 
 def test_mask_metadata_supports_old_and_new_transformers_signatures():

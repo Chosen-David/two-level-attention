@@ -57,7 +57,7 @@ def register_patch(model: nn.Module, args, snapshot=None,
         raise ValueError(f"not support {args.method}")
     glm_targets = [m for m in model.modules() if _is_glm4_moe_lite_attn(m)]
     glm_forward = None
-    if glm_targets:
+    if glm_targets and args.method != 'none':
         if args.method != 'nfa':
             raise ValueError('GLM-4.7-Flash 仅支持 method=nfa 或原生 method=none')
         expected_layers = getattr(model.config, 'num_hidden_layers', None)
