@@ -1,4 +1,4 @@
-"""Qwen3-8B 256K/512K 纯官方 Quest/JSSA 性能入口。
+"""Qwen3-8B 32K–512K 纯官方 Quest/JSSA 性能入口。
 
 只复用 NFA 历史矩阵的扩展 RULER 输入文件与两点计时函数，不导入 NFA、
 旧 vendor 或 Torch 稀疏注意力实现。RoPE 按统一 near-far 政策显式配置并验证，
@@ -19,6 +19,7 @@ from benchmark.official_baselines.longbench_official import (
     sha256_file,
     sha256_ids,
     timed_pair,
+    validate_official_batch_size,
 )
 from benchmark.rope_policy import configure_rope, verify_runtime_rope
 
@@ -33,7 +34,8 @@ def parse_args():
     parser.add_argument("--output", required=True)
     parser.add_argument("--task", default="niah_multikey_2")
     parser.add_argument("--context-length", type=int, required=True,
-                        choices=(262144, 524288))
+                        choices=(32768, 65536, 131072, 262144, 524288))
+    parser.add_argument("--batch-size", type=int, choices=(1, 2, 4), default=1)
     parser.add_argument("--sample-index", type=int, default=2)
     parser.add_argument("--input-provenance", default="repeated-needle-body-extension",
                         choices=("repeated-needle-body-extension",))
@@ -79,15 +81,19 @@ def load_performance_input(args, tokenizer):
 
 
 def configure_long_context_rope(args, config):
-    """在构造官方引擎前应用并预检 256K/512K 的统一 YaRN 政策。"""
+    """32K 保持原生 RoPE；64K–512K 按 NFA 同一政策显式启用 YaRN。"""
     if config.model_type != "qwen3":
         raise ValueError("长上下文官方性能入口仅验收 Qwen3-8B")
+    use_yarn = args.context_length > 32768
     policy = configure_rope(
-        config, args.context_length, args.max_new_tokens, yarn=True,
+        config, args.context_length, args.max_new_tokens, yarn=use_yarn,
+        factor={
+            65536: 2.0, 131072: 4.0, 262144: 8.0, 524288: 16.0,
+        }.get(args.context_length),
     )
     preflight = verify_runtime_rope(config)
     args.model_config = config
-    args.quest_rope_mode = "hf-position-embeddings"
+    args.quest_rope_mode = "hf-position-embeddings" if use_yarn else "native"
     args.hf_overrides = {
         "rope_scaling": getattr(config, "rope_scaling", None),
         "max_position_embeddings": int(config.max_position_embeddings),
@@ -116,6 +122,7 @@ def source_receipt():
 
 def main():
     args = parse_args()
+    validate_official_batch_size(args)
     if args.max_new_tokens < 2 or args.repeats <= 0 or args.warmup_requests < 0:
         raise ValueError("要求 max-new-tokens>=2、repeats>0、warmup-requests>=0")
     if args.budget <= 0 or args.budget % args.quest_page_size:
@@ -130,19 +137,27 @@ def main():
     engine = OfficialEngine(args, len(ids) + args.max_new_tokens + 16)
     runtime_rope = verify_engine_rope(engine, args.method)
     engine.runtime["long_context_rope_policy"] = {
-        "quest": "HF Qwen3 YaRN position_embeddings exactly once before official Quest KV/attention",
-        "jssa": "patched-vLLM effective HF YaRN config; no hidden HF/Torch attention fallback",
-        "nfa_flashinfer_reference": "near-far-rope-32768-v1 with YaRN factor 8 at 256K and 16 at 512K",
+        "quest": (
+            "HF Qwen3 YaRN position_embeddings exactly once before official Quest KV/attention"
+            if args.context_length > 32768 else
+            "native 32K Qwen3 RoPE through official quest.apply_rope_in_place"
+        ),
+        "jssa": "patched-vLLM effective HF config; no hidden HF/Torch attention fallback",
+        "nfa_flashinfer_reference": (
+            "near-far-rope-32768-v1: native 32K; YaRN factor 2/4/8/16 "
+            "at 64K/128K/256K/512K"
+        ),
         "cross_arm_output_identity_required": False,
         "reason": "performance-only comparison with explicitly configured and runtime-verified RoPE",
     }
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
     payload = {
-        "schema": "qwen-official-long-context-performance-v1",
+        "schema": "qwen-official-long-context-performance-v2",
         "verification": "pending-independent-verification",
         "status": "in_progress",
         "method": args.method,
+        "batch_size": args.batch_size,
         "model_path": str(Path(args.model_path).resolve()),
         "source": source_receipt(),
         "context_length": args.context_length,

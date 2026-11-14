@@ -161,10 +161,21 @@ def git_identity(path, expected_commit):
     }
 
 
+def validate_official_batch_size(args):
+    """官方 Quest/JSSA 当前均为真实 B1 路径，禁止用串行请求冒充 batch。"""
+    batch_size = getattr(args, "batch_size", 1)
+    if batch_size != 1:
+        raise ValueError(
+            f"官方 {args.method} 当前仅支持 batch_size=1；拒绝用串行 B1 冒充 batch"
+        )
+    return batch_size
+
+
 class OfficialEngine:
     def __init__(self, args, max_model_len):
         self.args = args
-        self.runtime = {}
+        self.batch_size = validate_official_batch_size(args)
+        self.runtime = {"batch_size": self.batch_size}
         if args.method == "quest":
             self._init_quest(max_model_len)
         else:
@@ -203,6 +214,7 @@ class OfficialEngine:
         )
         extension = Path(quest_kernels.__file__).resolve()
         self.runtime = {
+            "batch_size": self.batch_size,
             "implementation": "official Quest CUDA _kernels and paged runtime",
             "patched_layers": n_patched,
             "budget": args.budget,
@@ -319,6 +331,7 @@ class OfficialEngine:
             },
         )
         self.runtime = {
+            "batch_size": self.batch_size,
             "implementation": "official JSSA patched-vLLM Triton FP8/indexed-attend",
             "budget": args.budget,
             "rank": args.jssa_rank,

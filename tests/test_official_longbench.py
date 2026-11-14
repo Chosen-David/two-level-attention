@@ -25,6 +25,7 @@ from benchmark.official_baselines.longbench_official import (
     sha256_file,
     sha256_ids,
     timed_pair,
+    validate_official_batch_size,
 )
 
 
@@ -326,13 +327,27 @@ class OfficialLongBenchIndependenceTest(unittest.TestCase):
             _tokenwise_prefill_chunk(norm.forward, heads, 17), norm(heads)
         ))
 
+    def test_official_batch_greater_than_one_fails_before_model_construction(self):
+        for method in ("quest", "jssa"):
+            for batch_size in (2, 4):
+                with self.subTest(method=method, batch_size=batch_size):
+                    args = SimpleNamespace(method=method, batch_size=batch_size)
+                    with self.assertRaisesRegex(ValueError, "仅支持 batch_size=1"):
+                        validate_official_batch_size(args)
+                    with self.assertRaisesRegex(ValueError, "仅支持 batch_size=1"):
+                        OfficialEngine(args, 100)
+
     def test_long_context_yarn_is_configured_before_engine_construction(self):
         from transformers import Qwen3Config
         from benchmark.official_baselines.long_context_official import (
             configure_long_context_rope,
         )
 
-        for context_length, expected_factor in ((262144, 8.0), (524288, 16.0)):
+        cases = (
+            (32768, None), (65536, 2.0), (131072, 4.0),
+            (262144, 8.0), (524288, 16.0),
+        )
+        for context_length, expected_factor in cases:
             for method in ("quest", "jssa"):
                 with self.subTest(context_length=context_length, method=method):
                     config = Qwen3Config(
@@ -349,15 +364,19 @@ class OfficialLongBenchIndependenceTest(unittest.TestCase):
                     )
                     policy, preflight = configure_long_context_rope(args, config)
                     self.assertIs(args.model_config, config)
-                    self.assertEqual(args.quest_rope_mode, "hf-position-embeddings")
                     self.assertEqual(
-                        args.hf_overrides["rope_scaling"]["factor"], expected_factor
+                        args.quest_rope_mode,
+                        "native" if expected_factor is None else "hf-position-embeddings",
+                    )
+                    scaling = args.hf_overrides["rope_scaling"]
+                    self.assertEqual(
+                        None if scaling is None else scaling["factor"], expected_factor
                     )
                     self.assertEqual(
                         args.hf_overrides["max_position_embeddings"],
-                        context_length + 33,
+                        40960 if expected_factor is None else context_length + 33,
                     )
-                    self.assertEqual(policy["requested_factor"], expected_factor)
+                    self.assertEqual(policy.get("requested_factor"), expected_factor)
                     self.assertEqual(preflight["status"], "verified")
                     self.assertEqual(preflight["requested_factor"], expected_factor)
 

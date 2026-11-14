@@ -368,6 +368,15 @@ Date: 2026-11-13
 - 最终官方LongBench/RULER、JSSA接口、NFA两点、Graph/cache/frozen七组聚焦回归普通和 `python -O` 均为 **104 passed、1 skipped、9 subtests passed**；五文件 `py_compile` 与 `git diff --check` PASS。以上均为主机/mock及轻量CUDA调度回归，不是Qwen3-8B真实B2/B4 eager/Graph模型smoke或性能验收。
 - 21:35本机双卡仍各有约23GB显存及compute app，对应rank0/1质量Python PID=430068/437834且宿主链仍在，未启动竞争性能任务。真实GPU B2/B4 smoke、AsyncTLS K2=1024两点入口和四方法48-cell矩阵仍未完成，不登记任何新TPOT，全部保持pending-independent-verification。
 
+### 2026-11-14 22:03：官方四长度 RoPE/batch 边界与 AsyncTLS K2=1024 干净两点入口
+
+- `long_context_official.py` 已扩展为32K/64K/128K/256K/512K，并显式增加 `--batch-size 1|2|4`。共享 `OfficialEngine` 与长上下文 `main()` 都在模型构造前调用统一batch门禁；Quest/JSSA当前只接受B1，B2/B4直接fail-closed，不用串行B1冒充batch。运行时和输出payload均记录真实 `batch_size`，schema升级为 `qwen-official-long-context-performance-v2`。
+- 四长度RoPE不再无条件YaRN：32K保持原生配置且Quest走官方 `apply_rope_in_place`；64K/128K/256K/512K分别使用YaRN factor 2/4/8/16，Quest在这些长度使用HF position embeddings且只应用一次。测试逐方法覆盖五个长度，核验构造前config、CPU preflight、Quest rope mode、max-position容量和实际factor。
+- 新增 `benchmark/efficiency/benchmark_asynctls_two_point.py`，只复用论文语义Graph runtime执行机制，明确标记“非官方TileLang、无真实异步offload”。预算在参数解析后及engine构造时双重固定为K2=1024、block64、K1=128，旧budget=512配置直接拒绝。输入、RoPE、固定33 token、warmup/repeats及 `T(33)-T(1)` host-wall公式与NFA/Quest/JSSA一致，TPOT不按batch归一化。
+- AsyncTLS逐行prefill到同一固定cache arena，随后真实B1/2/4 batched Graph decode；首token和历史均保留在GPU，request-wall停止后一次D2H并输出batch-major行。无逐步CUDA Event、显存profiler或逐步host token读取。首个decode请求允许一次冷warmup+capture，之后T(1)/T(33)复用同一Graph；每次正式首replay前恢复 `M_(t-1)`，receipt分别核验逐行prefill调用、仅cold warmup/capture的Python decode调用、capture/replay/fallback和逐行token数，禁止把Graph replay冒充Python backend调用。
+- 新增 `tests/test_asynctls_two_point.py` 并扩展官方RoPE/batch测试。首轮回归发现测试回执漏标冷capture，以及零decode步将 `[steps,batch]` 直接与首token按batch维拼接的形状错误；已分别修正测试身份和batch-major转置，未改变计时口径。最终八组相邻回归普通和 `python -O` 均为 **118 passed、1 skipped、19 subtests passed**，五文件 `py_compile` 与 `git diff --check` PASS；这些是主机/mock和轻量CUDA调度验收，不是AsyncTLS真实Qwen3 Graph smoke或性能数据。
+- 22:03本机GPU0/1仍有约25.4/27.3GB显存和compute app，rank0/1质量Python PID=430068/437834及宿主shell均存活，未启动竞争GPU测量。真实NFA B2/B4 eager/Graph smoke、AsyncTLS实机smoke和四方法48-cell矩阵仍待空闲卡验收；本轮没有任何新TPOT，结果继续保持pending-independent-verification。
+
 ### 阻塞与下一步
 
 1. Quest/NFA/FlashInfer 256K/512K正式3 repeats及LongBench16 clean性能均已闭集并通过结构复核，不重复测量；512K中位TPOT=83.8234/61.0523/40.1419ms，FlashInfer快于NFA的负排序保留，LongBench16 macro TPOT=11.3192/15.4917ms。
@@ -375,4 +384,4 @@ Date: 2026-11-13
 3. 两臂九rank全部有效完成后，依次运行新根 `_dispatch/harvest_full.py`、`audit_full.py`，只有 `rank_audit.json.status=PASS` 才能运行 `close_full.py` 做canonical合并和官方严格评分；最终重算16/16任务、3750/3750请求/臂、输入身份、真实停止、eager backend计数和逐文件SHA，当前不登记AVG16。
 4. 取得同一 vLLM 提交的官方 cu129 预编译 wheel，完成 patched-vLLM editable 安装并运行官方 JSSA kernel tests；若官方运行时无法获得或550驱动不支持，如实记录阻塞，不退回Torch，也不换不匹配wheel。
 5. 官方链收尾后清理旧Quest/JSSA vendor路由和文件，保留AsyncTLS；其他AI的GLM AsyncTLS/NFA保持不动。所有新结果落盘、官方评分、哈希manifest和不同owner独立验收前不宣称收官。
-6. 待本机质量链正常结束且双卡实测释放后，先做NFA B2/B4 eager/Graph真实模型smoke并核验逐行token、Graph capture/replay/fallback和receipt，再独占测量RULER MultiKey2四长度性能；并行补齐AsyncTLS K2=1024两点入口及Quest/JSSA四长度参数与B>1 fail-closed边界，不生成虚构TPOT。
+6. 官方Quest/JSSA四长度RoPE/batch边界与AsyncTLS K2=1024两点入口已完成主机验收；待本机质量链正常结束且双卡实测释放后，先做NFA B2/B4 eager/Graph和AsyncTLS B1/2/4 Graph真实模型smoke，核验逐行token、Graph capture/replay/fallback和receipt，再独占测量RULER MultiKey2四长度性能，不生成虚构TPOT。
