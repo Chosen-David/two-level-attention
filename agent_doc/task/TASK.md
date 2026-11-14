@@ -30,6 +30,8 @@
 
 ## 2026-11-10
 
+- [x] [TL-QWEN-VENDOR-HF-API-20261110] Quest/SparQ Qwen3 HF4/5 attention API兼容修复；真实CPU多步logit与cache回归通过，GPU/Graph未验。([详情](task_details/TL-QWEN-VENDOR-HF-API-20261110.md))
+
 - [x] [TL-RULER-DYNAMIC-GATE-SCAN-20261110] Qwen3-8B × RULER 32K/64K/128K × 11任务 sample0 首个 dynamic-gate 扫描33/33格、1188层完成，独立只读审计与46项 artifact 哈希复核通过；32K far-skip 5任务/9层、64K near-skip 8任务/21层、128K near-skip 11任务/121层，仅限 decision-only 首步机制观测，不作质量、全样本或性能结论。([详情](task_details/TL-RULER-DYNAMIC-GATE-SCAN-20261110.md)；[结果](../results/ruler_dynamic_gate_scan_20261110/record.json))
 
 - [x] [TL-NFA-OBS-ABLATION-20261106] O-GATE 12 plans/240请求/60份 raw Q/K 与 B-REPLAY 12 plans/240文档/69952 cells 全部独立验收通过；精简结果已入库，明确固定轨迹 CPU replay 非质量、性能或生产 bit-exact 证据，K2=1024 逻辑支持集对照 7248/7248 不相等。([详情](task_details/TL-NFA-OBS-ABLATION-20261106.md))

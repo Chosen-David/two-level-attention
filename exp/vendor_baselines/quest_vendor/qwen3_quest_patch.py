@@ -64,14 +64,30 @@ def _qwen3_quest_wrapper(
     q_len = hidden_states.shape[1]
 
     if q_len > 1 or self.layer_id < 2:
+        if cache_position is not None:
+            kwargs["cache_position"] = cache_position
         return self.flash_forward(
             hidden_states,
             position_embeddings,
             attention_mask,
             past_key_values,
-            cache_position,
             **kwargs,
         )
+
+    # HF 5 passes position_ids but no longer forwards cache_position.
+    # Keep direct sparse calls without either explicit position rejected.
+    if cache_position is None and kwargs.get("position_ids") is not None:
+        position_ids = kwargs["position_ids"]
+        if tuple(position_ids.shape) != (1, q_len):
+            raise ValueError("Quest requires one explicit position row")
+        if past_key_values is None:
+            raise ValueError("Quest requires a cache for position recovery")
+        previous_length = int(past_key_values.get_seq_length(self.layer_idx))
+        cache_position = torch.arange(
+            previous_length, previous_length + q_len, device=hidden_states.device)
+        if position_ids.dtype not in (torch.int32, torch.int64) or not torch.equal(
+                position_ids[0], cache_position):
+            raise ValueError("Quest position_ids must match contiguous cache positions")
 
     from sparse_attn.baseline_runtime import require_unmasked_decode
     require_unmasked_decode(hidden_states, attention_mask, past_key_values, cache_position)
@@ -91,6 +107,7 @@ def _qwen3_quest_wrapper(
     # 固定的 use_cache=True（decode 稀疏路径本就要求开 cache）。
     kwargs.pop("position_ids", None)
     kwargs.pop("use_cache", None)
+    kwargs.pop("output_attentions", None)
     # 官方 forward 返回 3 元组 (attn_output, attn_weights, past_key_value)；
     # Qwen3DecoderLayer 期望 self_attn 返回 2 元组 (hidden_states, _)。
     orig_q_proj = self.q_proj
@@ -120,6 +137,9 @@ def enable_quest(model, token_budget: int = 1024, chunk_size: int = 16) -> int:
     """把 model 内全部 Qwen3Attention 绑定官方 Quest forward。返回 patch 层数。"""
     if type(token_budget) is not int or type(chunk_size) is not int or token_budget <= 0 or chunk_size <= 0:
         raise ValueError('Quest budget/chunk_size must be positive integers')
+    # Reuse the Llama adapter's version bridge without changing vendored math.
+    from llama3_quest_patch import _install_rotary_signature_compat
+    _install_rotary_signature_compat()
     n_patched = 0
     layer_id = 0
 
