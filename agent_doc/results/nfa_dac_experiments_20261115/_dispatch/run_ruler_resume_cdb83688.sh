@@ -2,7 +2,7 @@
 set -euo pipefail
 GPU="${1:?usage: $0 <GPU> <LENGTH:METHOD:SUBSPACE:GATE> [...]}"
 shift
-WT=/tmp/nfa-dac-quality-20261115
+WT="${NFA_QUALITY_WT:-/tmp/nfa-dac-quality-20261115}"
 EXPECTED_HEAD=cdb83688c06f882b874e5aa20505057f1c13235d
 ROOT="$HOME/ak_verify_results/nfa_dac_ruler_formal_67f3b099_20261115"
 DATA="$HOME/sparse-bench/third_party/KVCache-Factory/data/RULER"

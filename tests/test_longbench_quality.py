@@ -2,12 +2,14 @@
 from copy import deepcopy
 
 import pytest
+import torch
 from transformers import AutoTokenizer
 
 from benchmark.efficiency.benchmark_longbench_quality import (
     _validate_quality_receipt,
     resolve_nfa_quality_config,
 )
+from sparse_attn.indexer.nfa_indexer import NFAIndexer
 from sparse_attn.scheduler.scheduler import StopStringMatcher
 
 
@@ -42,6 +44,39 @@ def test_nfa_quality_2x2_rejects_unknown_arm():
         resolve_nfa_quality_config("random", "off")
     with pytest.raises(ValueError, match="full/tail"):
         resolve_nfa_quality_config("tail", "tau0.05")
+
+
+@pytest.mark.parametrize("subspace_dim,ratio", [(16, 8), (32, 4), (64, 2)])
+def test_nfa_subspace_dimension_maps_to_real_low_frequency_indices(subspace_dim, ratio):
+    patch_args, _ = resolve_nfa_quality_config("tail", "off", subspace_dim)
+    assert patch_args.tia_level2_cmp_ratio == ratio
+    indexer = NFAIndexer(patch_args)
+    assert indexer.enable_subspace is True
+
+    delta = 64 // ratio
+    expected = torch.cat((
+        torch.arange(64 - delta, 64),
+        torch.arange(128 - delta, 128),
+    ))
+    indices = indexer._subspace_indices(torch.device("cpu"))
+    assert indices.numel() == subspace_dim
+    torch.testing.assert_close(indices, expected)
+
+
+def test_nfa_full_128_dimension_uses_real_full_path():
+    patch_args, _ = resolve_nfa_quality_config("full", "off", 128)
+    indexer = NFAIndexer(patch_args)
+    assert indexer.head_dim == 128
+    assert indexer.enable_subspace is False
+
+
+@pytest.mark.parametrize("subspace,subspace_dim", [
+    ("full", 16), ("full", 32), ("full", 64), ("tail", 128), ("tail", 48),
+])
+def test_nfa_subspace_dimension_rejects_inconsistent_or_unknown_config(
+        subspace, subspace_dim):
+    with pytest.raises(ValueError):
+        resolve_nfa_quality_config(subspace, "off", subspace_dim)
 
 
 def test_nfa_dynamic_gate_does_not_read_removed_default_static_mask(monkeypatch):

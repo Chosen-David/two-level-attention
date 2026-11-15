@@ -284,17 +284,21 @@ for arm, config in [
             configuration="tail32;gate off;near_tokens=off;" + config, generation_protocol="same as new A",
             evidence_status="missing", reuse_decision="old B covers only HotpotQA/GovReport under historical protocol",
             missing_work="run and independently audit")
-for dc in [16, 32, 64, 128]:
-    required = [("hotpotqa", "", 200), ("gov_report", "", 200), ("niah_multikey_2", 65536, 100)]
-    if dc != 128:
-        required += [("niah_multikey_2", 32768, 100), ("niah_multikey_2", 131072, 100)]
-    else:
-        required += [("niah_multikey_2", 32768, 100), ("niah_multikey_2", 131072, 100)]
+for dc, dimension_config in [
+    (16, "tail16;cmp_ratio8;enable_subspace=true"),
+    (32, "tail32;cmp_ratio4;enable_subspace=true"),
+    (64, "tail64;cmp_ratio2;enable_subspace=true"),
+    (128, "full128;enable_subspace=false"),
+]:
+    required = [("hotpotqa", "", 200), ("gov_report", "", 200),
+                ("niah_multikey_2", 65536, 100),
+                ("niah_multikey_2", 32768, 100),
+                ("niah_multikey_2", 131072, 100)]
     for dataset, length, count in required:
         source = "A2_tail32_gate_off" if dc == 32 else ("A1_full_gate_off" if dc == 128 else "")
         add(f"new_D_dc{dc}_{dataset}_{length or 'lb'}", "new_D_subspace_width", "Qwen3-8B", dataset, f"dc{dc}",
             context_length=length, sample_scope=f"n={count};same IDs as new A",
-            configuration=f"gate off;low-frequency dc{dc};obs256;near_tokens=off", generation_protocol="same as new A",
+            configuration=f"gate off;{dimension_config};obs256;near_tokens=off", generation_protocol="same as new A",
             evidence_status="missing", reuse_decision=f"cross-reference {source} only after runtime equivalence check" if source else "no matching complete result",
             missing_work="verify equivalence; no duplicate run" if source else "run quality plus 64K/128K L1/L2/decode performance as applicable")
 for tau in [0.01, 0.025, 0.05, 0.10, 0.20, "off"]:

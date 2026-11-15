@@ -61,6 +61,7 @@ def parse_args():
     parser.add_argument("--method", choices=("nfa", "flashinfer"), required=True)
     parser.add_argument("--execution", choices=("eager", "graph"), default="eager")
     parser.add_argument("--nfa-subspace", choices=("full", "tail"), default="tail")
+    parser.add_argument("--nfa-subspace-dim", type=int, choices=(16, 32, 64, 128), default=None)
     parser.add_argument("--nfa-gate", choices=("off", "on"), default="off")
     parser.add_argument("--model-path", default="/home/wangyuanshuo02/Qwen3-8B")
     parser.add_argument("--model-name", default="Qwen3-8B")
@@ -457,8 +458,11 @@ def main():
     select_ruler_rows(rows, args.shard_index, args.num_shards, args.sample_indices)
     if args.method == "nfa":
         args.nfa_patch_args, args.nfa_gate_config = resolve_nfa_quality_config(
-            args.nfa_subspace, args.nfa_gate)
-        arm = f"{args.nfa_subspace}_gate_{args.nfa_gate}"
+            args.nfa_subspace, args.nfa_gate, args.nfa_subspace_dim)
+        arm = (
+            f"{args.nfa_subspace}_gate_{args.nfa_gate}"
+            if args.nfa_subspace_dim in (None, 32, 128)
+            else f"tail{args.nfa_subspace_dim}_gate_{args.nfa_gate}")
     else:
         args.nfa_patch_args = args.nfa_gate_config = None
         arm = "fullkv"
