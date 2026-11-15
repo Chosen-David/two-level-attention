@@ -142,6 +142,22 @@ a_arms = {
     "A4_tail32_gate_on": "tail32;gate on;obs256;tau0.10",
     "FullKV": "dense FullKV reference",
 }
+ruler_audit_path = ROOT / "ruler_formal/_audits/pc31_32k_complete_audit.json"
+ruler_results = {}
+if ruler_audit_path.exists():
+    ruler_audit = json.loads(ruler_audit_path.read_text())
+    if (ruler_audit["status"] != "pass-production-side"
+            or ruler_audit["verification"] != "pending-independent-verification"):
+        raise ValueError("RULER production audit is not valid pending evidence")
+    ruler_results = {
+        (row["arm"], row["context_length"]): row for row in ruler_audit["results"]}
+ruler_arm_names = {
+    "A1_full_gate_off": "nfa_full_gate_off",
+    "A2_tail32_gate_off": "nfa_tail_gate_off",
+    "A3_full_gate_on": "nfa_full_gate_on",
+    "A4_tail32_gate_on": "nfa_tail_gate_on",
+    "FullKV": "flashinfer_fullkv",
+}
 for arm, config in a_arms.items():
     for dataset, length, count in quality_data:
         record_id = f"new_A_{arm}_{dataset}_{length or 'lb'}"
@@ -183,6 +199,25 @@ for arm, config in a_arms.items():
                 evidence_status="complete historical 200/200 but protocol mismatch: prefill dynamic GateConfig epsilon0.05 could skip regions",
                 reuse_decision="reference_only_not_consumable_as_gate_off; layer-skip=false only disabled removed static D-prime path",
                 missing_work="rerun with explicit prefill epsilon0 and verify all 36 decisions keep")
+        produced = ruler_results.get((ruler_arm_names[arm], length))
+        if produced is not None:
+            result_root = ROOT / "ruler_formal" / ruler_arm_names[arm] / f"L{length}"
+            manifest_path = result_root / f"quality_manifest_L{length}_s0of1.json"
+            manifest = json.loads(manifest_path.read_text())
+            if (manifest["rows"] != count
+                    or manifest["official_score"] != produced["official_score"]
+                    or manifest["prediction_sha256"] != produced["prediction_sha256"]):
+                raise ValueError(f"RULER result does not match production audit: {manifest_path}")
+            common.update(
+                input_identity=produced["ordered_input_sha256"],
+                result=json.dumps({
+                    "score_percent": produced["official_score"],
+                    "prediction_sha256": produced["prediction_sha256"],
+                    "producer": manifest["runtime"]["source"]["head"]}),
+                result_location=str(result_root.relative_to(REPO)),
+                evidence_status="complete new formal 100/100; production-side audit PASS; pending-independent-verification",
+                reuse_decision="new formal result; do not regenerate",
+                missing_work="independent owner verification")
         add(record_id, "new_A_2x2", "Qwen3-8B", dataset, arm, **common)
 for arm, config, source in [
     ("B_low32", "paired low-frequency16 RoPE pairs=32 scalars;gate off", "A2_tail32_gate_off"),
@@ -263,7 +298,7 @@ for method in ["flashinfer", "nfa_gate_on", "nfa_gate_off", "quest", "jssa", "as
 
 out = ROOT / "inventory.csv"
 with out.open("w", newline="", encoding="utf-8") as handle:
-    writer = csv.DictWriter(handle, fieldnames=FIELDS)
+    writer = csv.DictWriter(handle, fieldnames=FIELDS, lineterminator="\n")
     writer.writeheader()
     writer.writerows(rows)
 summary = {
@@ -286,10 +321,14 @@ for row in rows:
     summary["by_group"][row["target_group"]] = summary["by_group"].get(row["target_group"], 0) + 1
 new_a_rows = [row for row in rows if row["target_group"] == "new_A_2x2"]
 reused_a_rows = [row for row in new_a_rows if row["reuse_decision"].startswith("reuse as")]
+produced_a_rows = [row for row in new_a_rows if row["reuse_decision"] == "new formal result; do not regenerate"]
 request_counts = {(dataset, length): count for dataset, length, count in quality_data}
 reused_requests = sum(
     request_counts[(row["dataset_or_input"], row["context_length"] or "")]
     for row in reused_a_rows)
+produced_requests = sum(
+    request_counts[(row["dataset_or_input"], row["context_length"] or "")]
+    for row in produced_a_rows)
 summary.update(
     unique_ids=len({row["record_id"] for row in rows}),
     new_quality_rows=sum(row["target_group"] in {
@@ -297,9 +336,11 @@ summary.update(
         "new_D_subspace_width", "new_E_gate_threshold", "new_F_near_length"}
         for row in rows),
     new_A_reuse_rows=len(reused_a_rows),
-    new_A_missing_rows=len(new_a_rows) - len(reused_a_rows),
+    new_A_produced_rows=len(produced_a_rows),
+    new_A_missing_rows=len(new_a_rows) - len(reused_a_rows) - len(produced_a_rows),
     reused_requests=reused_requests,
-    remaining_new_A_requests=3500 - reused_requests,
+    produced_new_A_requests=produced_requests,
+    remaining_new_A_requests=3500 - reused_requests - produced_requests,
 )
 assert summary["unique_ids"] == len(rows)
 assert [row["record_id"] for row in reused_a_rows] == [
