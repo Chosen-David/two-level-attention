@@ -146,6 +146,41 @@ if ruler_audit_path.exists():
             produced["official_score"], produced["source_head"],
             f"ruler_formal/{arm}/L{length}", fullkv_score, delta, low, high)
 
+statsfix_audit_path = ROOT / "ruler_statsfix_2ddfd741/_audits/local_archive_reaudit.json"
+if statsfix_audit_path.exists():
+    statsfix_audit = load(statsfix_audit_path)
+    if statsfix_audit["status"] != "pass-production-side":
+        raise ValueError("statsfix RULER audit did not pass")
+    for produced in statsfix_audit["results"]:
+        arm = produced["arm"]
+        length = produced["context_length"]
+        if (arm, length) != ("nfa_tail_gate_off", 32768):
+            raise ValueError(f"unregistered statsfix cell: {arm} {length}")
+        reference = cells[("flashinfer_fullkv", length)]
+        if produced["ordered_input_sha256"] != reference["ordered_input_sha256"]:
+            raise ValueError("statsfix RULER paired input mismatch")
+        reference_root = ROOT / "ruler_formal/flashinfer_fullkv" / f"L{length}"
+        reference_manifest = load(
+            reference_root / f"quality_manifest_L{length}_s0of1.json")
+        reference_scores = load(reference_root / reference_manifest["scores"])
+        cell_root = ROOT / "ruler_statsfix_2ddfd741" / arm
+        candidate_scores = []
+        for shard in produced["shards"]:
+            manifest = load(cell_root / (
+                f"quality_manifest_L{length}_s{shard['shard_index']}of"
+                f"{produced['num_shards']}.json"))
+            candidate_scores.extend(load(cell_root / manifest["scores"]))
+        candidate_scores.sort(key=lambda row: row["source_index"])
+        if [row["_id"] for row in candidate_scores] != [row["_id"] for row in reference_scores]:
+            raise ValueError("statsfix RULER paired IDs mismatch")
+        delta, low, high = paired_ci(
+            [row["official_score"] for row in candidate_scores],
+            [row["official_score"] for row in reference_scores])
+        add("A2_tail32_gate_off_statsfix", "tail32", "off", "niah_multikey_2",
+            length, produced["rows"], produced["official_score"],
+            produced["source_head"], f"ruler_statsfix_2ddfd741/{arm}",
+            reference["recomputed_mean_score"], delta, low, high)
+
 with (ROOT / "quality_ablation.csv").open("w", newline="", encoding="utf-8") as handle:
     writer = csv.DictWriter(handle, fieldnames=FIELDS, lineterminator="\n")
     writer.writeheader()

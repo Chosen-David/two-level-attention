@@ -1,5 +1,6 @@
 """RULER 正式质量入口的主机侧人口、评分与完成回执测试。"""
 import hashlib
+import importlib.util
 import json
 from pathlib import Path
 from types import SimpleNamespace
@@ -7,6 +8,7 @@ from types import SimpleNamespace
 import pytest
 
 from benchmark.LongBench.run_cap_manifest import (
+    _ordered_digest_hash,
     input_ids_sha256,
     read_run_cap_manifest,
 )
@@ -177,3 +179,51 @@ def test_eos_on_token_128_is_not_misclassified_as_truncated(tmp_path):
     assert record["stop_reason"] == "eos"
     assert record["output_truncated"] is False
     assert manifest["rows"] == 1
+
+
+def test_sharded_ruler_audit_merges_in_source_order():
+    audit_path = (Path(__file__).parents[1]
+                  / "agent_doc/results/nfa_dac_experiments_20261115"
+                  / "_dispatch/audit_ruler_results.py")
+    spec = importlib.util.spec_from_file_location("ruler_shard_audit", audit_path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    def report(shard):
+        source_indices = list(range(shard, 6, 2))
+        hashes = [hashlib.sha256(str(idx).encode()).hexdigest()
+                  for idx in source_indices]
+        return {
+            "arm": "nfa_tail_gate_off",
+            "source_head": "2ddfd7416aedc03f0e43c6ea115c25c7212fa974",
+            "context_length": 32768,
+            "rows": len(source_indices),
+            "official_score": 50.0,
+            "recomputed_mean_score": 50.0,
+            "data_sha256": "d" * 64,
+            "prediction_sha256": str(shard) * 64,
+            "scores_sha256": str(shard + 2) * 64,
+            "shard_index": shard,
+            "num_shards": 2,
+            "source_indices": source_indices,
+            "per_sample_input_sha256": hashes,
+            "ordered_input_sha256": _ordered_digest_hash(hashes),
+            "max_input_tokens": 100 + shard,
+            "position_capacity": 40960,
+            "source_truncated_rows": 0,
+            "stop_reasons": {"max_new_tokens": len(source_indices)},
+            "gate_counts": {"keep": 36 * len(source_indices),
+                            "near": 0, "far": 0, "both": 0},
+            "manifest_path": f"shard{shard}.json",
+        }
+
+    merged = module.merge_audited_shards([report(1), report(0)], 6)
+    expected_hashes = [hashlib.sha256(str(idx).encode()).hexdigest()
+                       for idx in range(6)]
+    assert merged["rows"] == 6 and merged["official_score"] == 50.0
+    assert merged["source_indices"] == list(range(6))
+    assert merged["per_sample_input_sha256"] == expected_hashes
+    assert merged["ordered_input_sha256"] == _ordered_digest_hash(expected_hashes)
+    assert merged["gate_counts"]["keep"] == 216
+    with pytest.raises(ValueError, match="incomplete sharded cell"):
+        module.merge_audited_shards([report(0)], 6)

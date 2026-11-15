@@ -6,12 +6,14 @@ from pathlib import Path
 from transformers import AutoConfig
 
 from benchmark.efficiency.benchmark_ruler_quality import ruler_official_score
+from benchmark.LongBench.run_cap_manifest import _ordered_digest_hash
 from benchmark.rope_policy import configure_rope, verify_runtime_rope
 
 EXPECTED_HEADS = {
     "67f3b099073dd2d27fc0176b631eb9b4bd6a8214",
     "cdb83688c06f882b874e5aa20505057f1c13235d",
     "b70d8c08dcac64b5bfb4b86c78715a6956640e65",
+    "2ddfd7416aedc03f0e43c6ea115c25c7212fa974",
 }
 A_ARMS = {
     "nfa_full_gate_off": ("nfa", "full", "off"),
@@ -49,7 +51,10 @@ def load_json(path):
 
 
 def audit_cell(manifest_path, expected_rows):
-    arm = manifest_path.parent.parent.name
+    arm = next(
+        (parent.name for parent in manifest_path.parents if parent.name in ARMS),
+        manifest_path.parent.parent.name,
+    )
     assert arm in ARMS, (arm, manifest_path)
     method, subspace, gate = ARMS[arm]
     manifest = load_json(manifest_path)
@@ -57,7 +62,11 @@ def audit_cell(manifest_path, expected_rows):
     assert length in LENGTHS
     assert manifest["schema"] == "ruler-official-quality-manifest-v1"
     assert manifest["verification"] == "pending-independent-verification"
-    assert manifest["method"] == method and manifest["rows"] == expected_rows
+    shard_index = manifest["shard_index"]
+    num_shards = manifest["num_shards"]
+    assert 0 <= shard_index < num_shards
+    expected_shard_rows = len(range(shard_index, expected_rows, num_shards))
+    assert manifest["method"] == method and manifest["rows"] == expected_shard_rows
     assert manifest["max_new_tokens"] == 128 and manifest["min_new_tokens"] == 1
     runtime = manifest["runtime"]
     assert runtime["source"]["head"] in EXPECTED_HEADS
@@ -80,16 +89,25 @@ def audit_cell(manifest_path, expected_rows):
     scores = load_json(scores_path)
     runcap = load_json(runcap_path)
     count = len(predictions)
-    assert count == len(receipts) == len(scores) == expected_rows
-    assert runcap["status"] == "complete" and runcap["result_lines"] == expected_rows
+    assert count == len(receipts) == len(scores) == expected_shard_rows
+    assert runcap["status"] == "complete" and runcap["result_lines"] == expected_shard_rows
     assert runcap["result_sha256"] == manifest["prediction_sha256"]
-    assert runcap["n_samples"] == expected_rows
+    assert runcap["n_samples"] == expected_shard_rows
+    sharding = runcap.get("sample_sharding")
+    if sharding is not None:
+        assert sharding["algorithm"] == "source_order[rank::world_size]"
+        assert sharding["rank"] == shard_index and sharding["world_size"] == num_shards
+        assert sharding["source_samples"] == expected_rows
+        assert sharding["selected_samples"] == expected_shard_rows
+    else:
+        assert num_shards == 1 and "sample_selection" in runcap
     position_capacity = runcap["cap_treatment"]["capability"]
     assert position_capacity == max(length + 128, 40960)
     max_input_tokens = runcap["input_tokens"]["max"]
     assert max_input_tokens + manifest["max_new_tokens"] <= position_capacity
     assert runcap["truncated"]["count"] == 0
     input_hashes = set()
+    input_hashes_in_order = []
     source_indices = []
     gate_counts = {"keep": 0, "near": 0, "far": 0, "both": 0}
     stop_reasons = {}
@@ -109,6 +127,7 @@ def audit_cell(manifest_path, expected_rows):
         assert prediction["input"]["truncated"] is False
         assert prediction["max_new_tokens"] == 128 and prediction["min_new_tokens"] == 1
         input_hashes.add(prediction["input"]["input_ids_sha256"])
+        input_hashes_in_order.append(prediction["input"]["input_ids_sha256"])
         stop_reasons[receipt["stop_reason"]] = stop_reasons.get(receipt["stop_reason"], 0) + 1
         if method == "nfa":
             decisions = receipt["prefill_decisions"]
@@ -133,7 +152,14 @@ def audit_cell(manifest_path, expected_rows):
         else:
             assert receipt["page_size"] == 64 and receipt["prefill_append_calls"] == 36
             assert receipt["python_decode_append_calls"] == 36 * receipt["logical_decode_steps"]
-    assert sorted(source_indices) == list(range(expected_rows))
+    if sharding is not None:
+        expected_source_indices = list(range(shard_index, expected_rows, num_shards))
+    else:
+        expected_source_indices = runcap["sample_selection"]["source_indices"]
+    assert sorted(source_indices) == sorted(expected_source_indices)
+    assert len(set(source_indices)) == count
+    recomputed_mean = sum(row["official_score"] for row in scores) / count
+    assert abs(manifest["official_score"] - recomputed_mean) <= 1e-12
     if method == "nfa":
         config = runtime["nfa_selector_config"]
         assert config["subspace"] == subspace
@@ -164,9 +190,14 @@ def audit_cell(manifest_path, expected_rows):
         "context_length": length,
         "rows": count,
         "official_score": manifest["official_score"],
-        "recomputed_mean_score": sum(row["official_score"] for row in scores) / count,
+        "recomputed_mean_score": recomputed_mean,
         "data_sha256": manifest["data_sha256"],
         "prediction_sha256": manifest["prediction_sha256"],
+        "scores_sha256": manifest["scores_sha256"],
+        "shard_index": shard_index,
+        "num_shards": num_shards,
+        "source_indices": source_indices,
+        "per_sample_input_sha256": input_hashes_in_order,
         "input_ids_sha256": sorted(input_hashes),
         "ordered_input_sha256": runcap["input_identity"]["actual_input_ids"]["ordered_sha256"],
         "max_input_tokens": max_input_tokens,
@@ -178,6 +209,86 @@ def audit_cell(manifest_path, expected_rows):
         "runcap": "complete",
         "hashes": "pass",
         "manifest_path": str(manifest_path),
+    }
+
+
+def merge_audited_shards(reports, expected_rows):
+    """把逐分片审计结果按 source_index 重排为一个完整逻辑单元。"""
+    assert reports
+    num_shards_values = {report["num_shards"] for report in reports}
+    assert len(num_shards_values) == 1
+    num_shards = num_shards_values.pop()
+    if num_shards <= 1 or len(reports) != num_shards:
+        raise ValueError(
+            f"incomplete sharded cell: expected {num_shards} shards, got {len(reports)}")
+    reports = sorted(reports, key=lambda report: report["shard_index"])
+    assert [report["shard_index"] for report in reports] == list(range(num_shards))
+    for field in ("arm", "source_head", "context_length", "data_sha256",
+                  "position_capacity"):
+        assert len({report[field] for report in reports}) == 1, field
+    assert sum(report["rows"] for report in reports) == expected_rows
+
+    source_order = sorted(
+        (source_idx, input_sha)
+        for report in reports
+        for source_idx, input_sha in zip(
+            report["source_indices"], report["per_sample_input_sha256"])
+    )
+    assert [source_idx for source_idx, _ in source_order] == list(range(expected_rows))
+    ordered_hashes = [input_sha for _, input_sha in source_order]
+    stop_reasons = {}
+    for report in reports:
+        for reason, count in report["stop_reasons"].items():
+            stop_reasons[reason] = stop_reasons.get(reason, 0) + count
+    if reports[0]["gate_counts"] is None:
+        assert all(report["gate_counts"] is None for report in reports)
+        gate_counts = None
+    else:
+        gate_counts = {
+            key: sum(report["gate_counts"][key] for report in reports)
+            for key in ("keep", "near", "far", "both")
+        }
+    recomputed_mean = sum(
+        report["recomputed_mean_score"] * report["rows"] for report in reports
+    ) / expected_rows
+    manifest_mean = sum(
+        report["official_score"] * report["rows"] for report in reports
+    ) / expected_rows
+    assert abs(manifest_mean - recomputed_mean) <= 1e-12
+    max_input_tokens = max(report["max_input_tokens"] for report in reports)
+    return {
+        "arm": reports[0]["arm"],
+        "source_head": reports[0]["source_head"],
+        "context_length": reports[0]["context_length"],
+        "rows": expected_rows,
+        "official_score": manifest_mean,
+        "recomputed_mean_score": recomputed_mean,
+        "data_sha256": reports[0]["data_sha256"],
+        "prediction_sha256": [report["prediction_sha256"] for report in reports],
+        "scores_sha256": [report["scores_sha256"] for report in reports],
+        "num_shards": num_shards,
+        "source_indices": [source_idx for source_idx, _ in source_order],
+        "per_sample_input_sha256": ordered_hashes,
+        "input_ids_sha256": sorted(set(ordered_hashes)),
+        "ordered_input_sha256": _ordered_digest_hash(ordered_hashes),
+        "max_input_tokens": max_input_tokens,
+        "max_input_plus_new_tokens": max_input_tokens + 128,
+        "position_capacity": reports[0]["position_capacity"],
+        "source_truncated_rows": sum(report["source_truncated_rows"] for report in reports),
+        "stop_reasons": stop_reasons,
+        "gate_counts": gate_counts,
+        "runcap": "complete",
+        "hashes": "pass",
+        "manifest_path": [report["manifest_path"] for report in reports],
+        "shards": [{
+            "shard_index": report["shard_index"],
+            "rows": report["rows"],
+            "official_score": report["official_score"],
+            "prediction_sha256": report["prediction_sha256"],
+            "scores_sha256": report["scores_sha256"],
+            "ordered_input_sha256": report["ordered_input_sha256"],
+            "manifest_path": report["manifest_path"],
+        } for report in reports],
     }
 
 
@@ -208,13 +319,20 @@ def main():
     args = parser.parse_args()
     manifests = []
     for raw_root in args.roots:
-        manifests.extend(Path(raw_root).rglob("quality_manifest_L*_s0of1.json"))
+        manifests.extend(Path(raw_root).rglob("quality_manifest_L*_s*of*.json"))
     assert manifests, "no quality manifests found"
-    cells = {}
+    groups = {}
     for manifest_path in sorted(set(manifests)):
         key, report = audit_cell(manifest_path, args.rows)
-        assert key not in cells, f"duplicate cell {key}: {manifest_path} and {cells[key]['manifest_path']}"
-        cells[key] = report
+        groups.setdefault(key, []).append(report)
+    cells = {}
+    for key, reports in groups.items():
+        if len(reports) == 1:
+            assert reports[0]["num_shards"] == 1, (
+                f"incomplete sharded cell {key}: {reports[0]['manifest_path']}")
+            cells[key] = reports[0]
+        else:
+            cells[key] = merge_audited_shards(reports, args.rows)
     expected = {(arm, length) for arm in A_ARMS for length in LENGTHS}
     if args.cells == 15:
         assert set(cells) == expected, (sorted(expected - set(cells)), sorted(set(cells) - expected))
