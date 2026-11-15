@@ -75,11 +75,13 @@ def _assert_filtered_partial_bit_exact(
     assert candidate_token.dtype == torch.int32
 
 
-def _indexer(k1=4, near_pages=2, subspace='tail', l2_subspace='same'):
+def _indexer(k1=4, near_pages=2, subspace='tail', l2_subspace='same',
+             near_tokens='off'):
     args = nfa_args(subspace=subspace)
     args.tia_level1_topk = k1
     args.tia_level2_topk = 128
     args.nfa_near_pages = near_pages
+    args.nfa_near_tokens = near_tokens
     args.nfa_swa_size = GEOMETRY.window
     args.nfa_near_len = GEOMETRY.near
     args.nfa_l2_subspace = l2_subspace
@@ -89,7 +91,7 @@ def _indexer(k1=4, near_pages=2, subspace='tail', l2_subspace='same'):
 def _make_cache(req_ids, lengths, skip_states, *, k1=4,
                 near_pages=2, num_kv_heads=1, max_physical_pages=64,
                 max_blocks=16, max_visible_len=640, subspace='tail',
-                l2_subspace='same', n_layers=1):
+                l2_subspace='same', n_layers=1, near_tokens='off'):
     cache = GraphReadyPagedRegionCache(
         n_layers, GEOMETRY, max_requests=8, max_physical_pages=max_physical_pages,
         max_blocks=max_blocks,
@@ -109,7 +111,8 @@ def _make_cache(req_ids, lengths, skip_states, *, k1=4,
         cache.freeze(
             request_id, [skip_far] * n_layers, [skip_near] * n_layers)
     attention = SimpleNamespace(
-        indexer=_indexer(k1, near_pages, subspace, l2_subspace), scaling=1.0)
+        indexer=_indexer(
+            k1, near_pages, subspace, l2_subspace, near_tokens), scaling=1.0)
     return cache, attention, generator
 
 
@@ -179,6 +182,118 @@ def test_current_query_not_previous_frame_query():
     assert sum(192 <= token < 256 for token in previous_ids) == 60
     assert not any(64 <= token < 128 for token in previous_ids)
     assert current_ids != previous_ids
+
+
+def _make_fixed_quota_cache(near_tokens=16, skip_state=(False, False)):
+    cache, attention, generator = _make_cache(
+        [2], [448], [skip_state], k1=4, near_pages=2,
+        near_tokens=near_tokens)
+    cache.remove_request(2)
+    cache.add_request(2)
+    keys = torch.zeros(
+        1, 1, 448, HEAD_DIM, dtype=torch.bfloat16, device='cuda')
+    keys[:, :, 4:256, 48] = 8
+    keys[:, :, 256:384, 48] = 1
+    cache.write_prefill(0, 2, keys, torch.zeros_like(keys))
+    cache.freeze(2, [skip_state[0]], [skip_state[1]])
+    _plan_and_write(cache, [2], generator)
+    query = torch.zeros(
+        1, 2, HEAD_DIM, dtype=torch.bfloat16, device='cuda')
+    query[..., 48] = 1
+    return cache, attention, query
+
+
+def _select_fixed_quota(cache, attention, query):
+    select_topk_for_layer_batched(cache, 0, [2], query, attention=attention)
+    ids = _logical_ids(cache, 2, 0)
+    return (sum(4 <= token < 256 for token in ids),
+            sum(256 <= token < 384 for token in ids), ids)
+
+
+def test_numeric_near_token_quota_changes_real_l2_selection():
+    off_cache, off_attention, off_query = _make_fixed_quota_cache('off')
+    off_far, off_near, off_ids = _select_fixed_quota(
+        off_cache, off_attention, off_query)
+    assert (off_far, off_near, len(off_ids)) == (60, 0, 128)
+
+    cache, attention, query = _make_fixed_quota_cache(16)
+    far, near, ids = _select_fixed_quota(cache, attention, query)
+    assert (far, near, len(ids)) == (44, 16, 128)
+    assert ids == sorted(set(ids))
+
+
+@pytest.mark.parametrize('skip_state,expected', [
+    ((False, False), (44, 16, 128)),
+    ((True, False), (0, 60, 128)),
+    ((False, True), (44, 0, 112)),
+    ((True, True), (0, 0, 68)),
+])
+def test_numeric_near_token_quota_skip_budget_semantics(skip_state, expected):
+    cache, attention, query = _make_fixed_quota_cache(16, skip_state)
+    far, near, ids = _select_fixed_quota(cache, attention, query)
+    assert (far, near, len(ids)) == expected
+
+
+def test_numeric_near_token_quota_capture_replay_matches_eager():
+    cache, attention, query = _make_fixed_quota_cache(16)
+    _select_fixed_quota(cache, attention, query)
+    expected = _logical_ids(cache, 2, 0)
+    stream = torch.cuda.Stream()
+    stream.wait_stream(torch.cuda.current_stream())
+    with torch.cuda.stream(stream):
+        for _ in range(2):
+            _select_fixed_quota(cache, attention, query)
+    torch.cuda.current_stream().wait_stream(stream)
+    graph = torch.cuda.CUDAGraph()
+    with torch.cuda.graph(graph):
+        select_topk_for_layer_batched(
+            cache, 0, [2], query, attention=attention)
+    graph.replay()
+    assert _logical_ids(cache, 2, 0) == expected
+    _select_fixed_quota(cache, attention, query)
+    assert _logical_ids(cache, 2, 0) == expected
+
+
+@pytest.mark.parametrize('capacity', [16384, 65728])
+def test_region_filter_topk_bit_exact_with_mono_reference(capacity):
+    """区域过滤 + tiled Top-K 必须与原始 mono 区间 Top-K 逐位一致。"""
+    m, hkv, r, width = 3, 2, 4097, 128
+    generator = torch.Generator(device='cuda').manual_seed(20261115)
+    cand = torch.stack([
+        torch.randperm(capacity, generator=generator, device='cuda')[:r]
+        for _ in range(m * hkv)
+    ]).view(m, hkv, r).to(torch.int32).contiguous()
+    logits = torch.randn(
+        m, hkv, r, generator=generator, dtype=torch.bfloat16,
+        device='cuda').contiguous()
+    logits[..., :64] = 0.25
+    logits[..., :8] = 0.0
+    logits[..., 8:16] = -0.0
+    logits[..., 16:24] = float('nan')
+    logits[..., 24:32] = float('inf')
+    logits[..., 32:40] = float('-inf')
+    cand[..., 40:48] = capacity - 1
+    lower = torch.tensor([64, 0, 0], dtype=torch.int64, device='cuda')
+    upper = torch.tensor([4096, 64, capacity], dtype=torch.int64,
+                         device='cuda')
+    quota = torch.tensor([96, 32, 0], dtype=torch.int64, device='cuda')
+
+    reference = torch.empty(m, hkv, width, dtype=torch.int32, device='cuda')
+    reference_count = torch.empty(m, hkv, dtype=torch.int32, device='cuda')
+    token_bits = 32 if capacity >= 65536 else 16
+    selector_ops._nfa_filtered_topk_kernel[(m * hkv,)](
+        logits, cand, lower, upper, quota, reference, reference_count, r,
+        R_PAD=triton.next_power_of_2(r), S=capacity, K=width,
+        SINK=4, META_GROUP=hkv, TOKEN_BITS=token_bits, num_warps=8)
+
+    filtered = torch.empty_like(logits)
+    selector_ops._nfa_region_filter_logits_kernel[(m * hkv, triton.cdiv(r, 256))](
+        logits, cand, lower, upper, quota, filtered, r,
+        TILE=256, META_GROUP=hkv, num_warps=4)
+    actual = selector_ops._nfa_filtered_topk(
+        filtered, cand, lower, upper, quota, capacity, width, sink=4)
+    torch.testing.assert_close(actual.indices, reference, rtol=0, atol=0)
+    torch.testing.assert_close(actual.counts, reference_count, rtol=0, atol=0)
 
 
 @pytest.mark.parametrize('subspace,l2_subspace,l1_dim,fine_dim,selected_block', [
@@ -542,6 +657,88 @@ def test_fixed_stats_grid_owner_writes_and_refreshes_latest_block(
                 msg=f'decode value mismatch at step {step}')
         if step == 0:
             cache.commit_step()
+
+
+def test_incremental_stats_keep_independent_history_per_layer():
+    # 首步各层全量重建，第二步只更新最新块。若所有层共享一份持久统计，
+    # layer0 的历史前缀会保留首步最后一层的数据，而不是本层真实 KV。
+    cache, attention, generator = _make_cache(
+        [2], [448], [(False, False)], k1=2, near_pages=0, n_layers=2)
+    query = torch.randn(
+        1, 2, HEAD_DIM, generator=generator,
+        dtype=torch.bfloat16, device='cuda')
+    dims = attention.indexer._subspace_indices(query.device).long()
+
+    for step in range(2):
+        cache.new_step([2])
+        cache.plan_common([2])
+        for layer_idx in range(2):
+            keys = torch.randn(
+                1, 1, 1, HEAD_DIM, generator=generator,
+                dtype=torch.bfloat16, device='cuda')
+            values = torch.randn_like(keys)
+            select_topk_for_layer_batched(
+                cache, layer_idx, [2], query, attention=attention,
+                decode_write=(
+                    keys, values, cache.slot_mapping_for_layer(layer_idx)[:1]))
+
+        length = int(cache.planned_lengths_buf[0])
+        kt = (length + PAGE - 1) // PAGE
+        tokens = torch.arange(length, device=query.device)
+        assert {(key[0], key[1]) for key in cache._nfa_page_stats_persistent} == {
+            (0, 1), (1, 1)}
+        for layer_idx in range(2):
+            physical = cache.block_table_buf[layer_idx, 2, tokens // PAGE]
+            keys = cache.layers[layer_idx].kv_pool_k[
+                physical[None, :], 0, 0, tokens % PAGE][..., dims]
+            padded = keys.new_zeros((kt * PAGE, dims.numel()))
+            padded[:length] = keys
+            coarse = padded.view(kt, PAGE, dims.numel())
+            buffers = cache._nfa_page_stats_persistent[
+                (layer_idx, 1, dims.numel(), torch.bfloat16, True)]
+            torch.testing.assert_close(
+                buffers[0][0, 2, :kt, 0], coarse.amin(dim=1),
+                rtol=0, atol=0, msg=f'min step={step} layer={layer_idx}')
+            torch.testing.assert_close(
+                buffers[1][0, 2, :kt, 0], coarse.amax(dim=1),
+                rtol=0, atol=0, msg=f'max step={step} layer={layer_idx}')
+        if step == 0:
+            cache.commit_step()
+
+
+def test_eager_full_path_stats_grid_change_refreshes_current_q(monkeypatch):
+    # 首步 4 路 stats、稳态 1 路 stats 会改变融合 kernel 的 Q program
+    # 起点。禁用外层 call-plan 后，内层 compiled-plan 也必须重新特化，
+    # 否则第二步没有任何 Q CTA，q_full 会静默保留上一帧。
+    monkeypatch.setattr(
+        selector_ops, '_store_eager_selector_call_plan',
+        lambda *args, **kwargs: None)
+    cache, attention, generator = _make_cache(
+        [2], [4500], [(False, False)], k1=2, near_pages=0,
+        max_blocks=80, max_physical_pages=100, subspace='tail')
+    queries = [torch.randn(
+        1, 2, HEAD_DIM, generator=generator,
+        dtype=torch.bfloat16, device='cuda') for _ in range(2)]
+    for step, query in enumerate(queries):
+        cache.new_step([2])
+        cache.plan_common([2])
+        keys = torch.randn(
+            1, 1, 1, HEAD_DIM, generator=generator,
+            dtype=torch.bfloat16, device='cuda')
+        values = torch.randn_like(keys)
+        select_topk_for_layer_batched(
+            cache, 0, [2], query, attention=attention,
+            decode_write=(keys, values, cache.slot_mapping_for_layer(0)[:1]))
+        if step == 0:
+            cache.commit_step()
+
+    workspace = cache._nfa_selector_workspace
+    q_full = next(value for key, value in workspace.items()
+                  if isinstance(key, tuple) and key[0] == 'q_full')
+    dims = attention.indexer._subspace_indices(query.device).long()
+    expected = queries[-1][0][:, dims].float()
+    torch.testing.assert_close(q_full[0], expected, rtol=0, atol=0)
+    assert not torch.equal(q_full[0], queries[0][0][:, dims].float())
 
 
 def test_eager_launch_plan_survives_alternating_region_modes(monkeypatch):

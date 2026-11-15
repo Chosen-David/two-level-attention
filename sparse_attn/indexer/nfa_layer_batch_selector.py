@@ -781,6 +781,98 @@ if _has_triton():
             TOKEN_BITS=TOKEN_BITS)
 
     @triton.jit
+    def _nfa_region_filter_logits_kernel(
+        LOGITS, CAND, LOW, HIGH, QUOTA, OUT, R,
+        TILE: tl.constexpr, META_GROUP: tl.constexpr,
+    ):
+        """在区域 partial Top-K 前过滤候选，避免另一区域耗尽局部 K。"""
+        h = tl.program_id(0)
+        tile = tl.program_id(1)
+        b = 0 if META_GROUP == 0 else h // META_GROUP
+        offs = tile * TILE + tl.arange(0, TILE)
+        mask = offs < R
+        token = tl.load(CAND + h * R + offs, mask=mask, other=0)
+        logits = tl.load(LOGITS + h * R + offs, mask=mask,
+                         other=float("-inf"))
+        score = logits.to(tl.float32)
+        good = (mask & (token >= tl.load(LOW + b))
+                & (token < tl.load(HIGH + b))
+                & (tl.load(QUOTA + b) > 0)
+                & (score == score) & (score != float("-inf")))
+        tl.store(OUT + h * R + offs,
+                 tl.where(good, logits, float("-inf")), mask=mask)
+
+    @triton.jit
+    def _nfa_fixed_quota_regions_kernel(
+        LENGTHS, SKIP_FAR, SKIP_NEAR, VALID_REQ,
+        FAR_LOW, FAR_HIGH, FAR_QUOTA, NEAR_LOW, NEAR_HIGH, NEAR_QUOTA,
+        SINK: tl.constexpr, SWA: tl.constexpr, NEAR_LEN: tl.constexpr,
+        PAGE: tl.constexpr, K2: tl.constexpr, NT_NEAR: tl.constexpr,
+        SINK_POOL_LO: tl.constexpr, BS: tl.constexpr, B: tl.constexpr,
+        MAX_REQ: tl.constexpr, LAYER_OFFSET: tl.constexpr,
+    ):
+        """恢复旧 HF 双池配额；far 短缺可让渡 near，near 短缺不回补。"""
+        row = tl.program_id(0)
+        req = row % B
+        layer = row // B
+        req_id = tl.load(VALID_REQ + req).to(tl.int32)
+        length = tl.load(LENGTHS + req).to(tl.int32)
+        skip_far = tl.load(
+            SKIP_FAR + (layer + LAYER_OFFSET) * MAX_REQ + req_id) != 0
+        skip_near = tl.load(
+            SKIP_NEAR + (layer + LAYER_OFFSET) * MAX_REQ + req_id) != 0
+
+        lo = tl.maximum(0, length - SWA)
+        lower = SINK_POOL_LO * BS
+        upper = tl.maximum(lower, lo)
+        sink_hi = tl.minimum(length, SINK)
+        swa_hi = tl.maximum(sink_hi, length - SWA)
+        far_blk = (tl.maximum(length - SWA - NEAR_LEN, 0) // PAGE) * PAGE
+        far_hi = tl.minimum(swa_hi, tl.maximum(sink_hi, far_blk))
+
+        base_quota = tl.maximum(
+            tl.minimum(length, K2) - SINK - (length - lo), 0)
+        near_reservation = tl.minimum(NT_NEAR, base_quota)
+        far_quota = tl.maximum(base_quota - near_reservation, 0)
+        far_low = tl.where(skip_far, far_hi, lower)
+        far_high = tl.where(skip_far, far_hi, far_hi)
+        far_quota = tl.minimum(far_quota, tl.maximum(far_high - far_low, 0))
+        # 与旧 HF 的 k2_near=K2_mid-k2_far 一致：far 为空或被跳过时，
+        # near 获得剩余预算；near 自身为空时预算不再转回 far。
+        near_quota = tl.maximum(base_quota - far_quota, 0)
+        near_low = far_hi
+        near_high = tl.where(skip_near, far_hi, upper)
+        near_quota = tl.minimum(
+            near_quota, tl.maximum(near_high - near_low, 0))
+
+        tl.store(FAR_LOW + row, far_low)
+        tl.store(FAR_HIGH + row, far_high)
+        tl.store(FAR_QUOTA + row, far_quota)
+        tl.store(NEAR_LOW + row, near_low)
+        tl.store(NEAR_HIGH + row, near_high)
+        tl.store(NEAR_QUOTA + row, near_quota)
+
+    @triton.jit
+    def _nfa_concat_region_middle_kernel(
+        FAR, FAR_COUNT, NEAR, NEAR_COUNT, OUT, COUNT,
+        K: tl.constexpr,
+    ):
+        """far/near 区间天然有序且不重叠，直接拼接 canonical middle。"""
+        row = tl.program_id(0)
+        offs = tl.arange(0, K)
+        far_count = tl.load(FAR_COUNT + row).to(tl.int32)
+        near_count = tl.load(NEAR_COUNT + row).to(tl.int32)
+        near_offs = offs - far_count
+        far = tl.load(FAR + row * K + offs, mask=offs < far_count, other=0)
+        near = tl.load(NEAR + row * K + near_offs,
+                       mask=(near_offs >= 0) & (near_offs < near_count), other=0)
+        active = offs < far_count + near_count
+        tl.store(OUT + row * K + offs, tl.where(offs < far_count, far, near),
+                 mask=active)
+        tl.store(OUT + row * K + offs, 0, mask=~active)
+        tl.store(COUNT + row, far_count + near_count)
+
+    @triton.jit
     def _prepare_q_body(
         pid, Q_SRC, REQ_IDS, SCALES, DIM_IDX, OUT, S0, S1, S2,
         HQ: tl.constexpr, D: tl.constexpr, DQ: tl.constexpr,
@@ -1914,8 +2006,10 @@ def _page_stats_all_layers(cache, req_ids, n_layers, dims, bs, pad, lengths,
     if l != 1:
         raise FallbackRequired(
             'shared page-stat scratch requires one layer per selector call')
-    # 层间严格串行，p_min/p_max 只服务于当前层；所有层共享同一个
-    # [1, max_requests, kt_cap, hk, dim] 物理 Buffer，kernel 内 layer 恒为 0。
+    # 当前层的 L1 消费虽然严格串行，增量 decode 却只刷新最新块；历史前缀
+    # 必须按层持久化，否则下一步会沿用上一层 decode 的整块统计。
+    # 每个物理 Buffer 仍为 [1, max_requests, kt_cap, hk, dim]，kernel 内
+    # layer 恒为 0，layer_offset 由下面的 persistent key 隔离。
     stats_l = 1
     stats_m = stats_l * b
     kt_cap = pad // bs
@@ -1940,7 +2034,7 @@ def _page_stats_all_layers(cache, req_ids, n_layers, dims, bs, pad, lengths,
     persistent = getattr(cache, '_nfa_page_stats_persistent', None)
     if persistent is None:
         persistent = cache._nfa_page_stats_persistent = {}
-    key = (dim_numel, out_dtype, need_sum)
+    key = (layer_offset, stats_l, dim_numel, out_dtype, need_sum)
     buffers = persistent.get(key)
     if buffers is None:
         p_shape = (1, cache.max_requests, kt_cap, hk, dim_numel)
@@ -2064,13 +2158,15 @@ def _fused_fine_scores_paged(
 
 
 def _nfa_filtered_topk(logits, cand_idx2, lower, upper, quota, capacity, width,
-                       sink, layer_offset=0, workspace=None):
+                       sink, layer_offset=0, workspace=None, name='middle'):
     """将 grouped-Q Logits 直接转换为 canonical ``TokenSelection``。"""
     m, hkv, r = cand_idx2.shape
+    prefix = '' if name == 'middle' else f'{name}_'
     out = _workspace_empty(
-        workspace, 'middle_indices', (m, hkv, width), torch.int32, logits.device)
+        workspace, f'{prefix}middle_indices', (m, hkv, width),
+        torch.int32, logits.device)
     count = _workspace_empty(
-        workspace, 'middle_counts', (m, hkv), torch.int32, logits.device)
+        workspace, f'{prefix}middle_counts', (m, hkv), torch.int32, logits.device)
     token_bits = 32 if capacity >= 65536 else 16
     # 两种 token 域都按 2048 候选并行局部 Top-K，再精确归并；mono kernel
     # 保留为 bit-exact reference，避免长序列退化为单 CTA 的 16384-wide 排序。
@@ -2078,12 +2174,12 @@ def _nfa_filtered_topk(logits, cand_idx2, lower, upper, quota, capacity, width,
     ntiles = triton.cdiv(r, tile)
     tail = r - (ntiles - 1) * tile
     partial_score = _workspace_empty(
-        workspace, 'filtered_topk_partial_score', (m, hkv, ntiles, width),
-        torch.bfloat16, logits.device)
+        workspace, f'{prefix}filtered_topk_partial_score',
+        (m, hkv, ntiles, width), torch.bfloat16, logits.device)
     partial_token = _workspace_empty(
-        workspace, 'filtered_topk_partial_token', (m, hkv, ntiles, width),
-        torch.int32, logits.device)
-    _fast_launch(workspace, ('filtered_topk_partial', layer_offset),
+        workspace, f'{prefix}filtered_topk_partial_token',
+        (m, hkv, ntiles, width), torch.int32, logits.device)
+    _fast_launch(workspace, (f'{prefix}filtered_topk_partial', layer_offset),
                  _nfa_filtered_topk_partial_kernel, (m * hkv, ntiles),
         logits, cand_idx2, partial_score, partial_token, quota, r,
         TILE=tile, NTILES=ntiles,
@@ -2091,7 +2187,7 @@ def _nfa_filtered_topk(logits, cand_idx2, lower, upper, quota, capacity, width,
         S=capacity, K=width, META_GROUP=hkv, TOKEN_BITS=token_bits,
         num_warps=16,
     )
-    _fast_launch(workspace, ('filtered_topk_merge', layer_offset),
+    _fast_launch(workspace, (f'{prefix}filtered_topk_merge', layer_offset),
                  _nfa_filtered_topk_merge_kernel, (m * hkv,),
         partial_score, partial_token, lower, upper, quota, out, count,
         NTILES=ntiles, MERGE_PAD=triton.next_power_of_2(ntiles * width),
@@ -2100,6 +2196,67 @@ def _nfa_filtered_topk(logits, cand_idx2, lower, upper, quota, capacity, width,
         META_GROUP=hkv, TOKEN_BITS=token_bits,
         num_warps=16,
     )
+    return TokenSelection(out, count)
+
+
+def _nfa_fixed_quota_topk(logits, cand_idx2, lengths, cache, valid_req,
+                          indexer, bs, capacity, width, n_layers,
+                          layer_offset=0, workspace=None):
+    """数值 nt 的真实双区间 L2；默认 off 不进入此路径。"""
+    m, hkv, r = cand_idx2.shape
+    if m != n_layers * lengths.numel():
+        raise ValueError('fixed-quota metadata must match selector rows')
+    device = logits.device
+
+    def metadata(name):
+        return _workspace_empty(
+            workspace, f'fixed_quota_{name}', (m,), torch.int64, device)
+
+    far_lower, far_upper, far_quota = (
+        metadata('far_lower'), metadata('far_upper'), metadata('far_quota'))
+    near_lower, near_upper, near_quota = (
+        metadata('near_lower'), metadata('near_upper'), metadata('near_quota'))
+    _fast_launch(
+        workspace, ('fixed_quota_regions', layer_offset),
+        _nfa_fixed_quota_regions_kernel, (m,),
+        lengths, cache.skip_far_layer_buf, cache.skip_near_layer_buf, valid_req,
+        far_lower, far_upper, far_quota, near_lower, near_upper, near_quota,
+        SINK=int(indexer.sink_tokens),
+        SWA=int(indexer.sliding_window_size),
+        NEAR_LEN=int(indexer.nt_near_len), PAGE=cache.geometry.page,
+        K2=int(indexer.args.tia_level2_topk),
+        NT_NEAR=int(indexer.nt_near_tokens),
+        SINK_POOL_LO=int(indexer._sink_pool_lo_blk), BS=bs,
+        B=lengths.numel(), MAX_REQ=cache.max_requests,
+        LAYER_OFFSET=layer_offset, num_warps=1)
+
+    region_logits = _workspace_empty(
+        workspace, 'fixed_quota_region_logits', (m, hkv, r),
+        torch.bfloat16, device)
+
+    def region_topk(name, lower, upper, quota):
+        _fast_launch(
+            workspace, ('fixed_quota_filter', name, layer_offset),
+            _nfa_region_filter_logits_kernel,
+            (m * hkv, triton.cdiv(r, 256)),
+            logits, cand_idx2, lower, upper, quota, region_logits, r,
+            TILE=256, META_GROUP=hkv, num_warps=4)
+        return _nfa_filtered_topk(
+            region_logits, cand_idx2, lower, upper, quota, capacity, width,
+            sink=int(indexer.sink_tokens), layer_offset=layer_offset,
+            workspace=workspace, name=f'{name}_middle')
+
+    far = region_topk('far', far_lower, far_upper, far_quota)
+    near = region_topk('near', near_lower, near_upper, near_quota)
+    out = _workspace_empty(
+        workspace, 'middle_indices', (m, hkv, width), torch.int32, device)
+    count = _workspace_empty(
+        workspace, 'middle_counts', (m, hkv), torch.int32, device)
+    _fast_launch(
+        workspace, ('fixed_quota_concat', layer_offset),
+        _nfa_concat_region_middle_kernel, (m * hkv,),
+        far.indices, far.counts, near.indices, near.counts, out, count,
+        K=width, num_warps=4)
     return TokenSelection(out, count)
 
 
@@ -2435,7 +2592,9 @@ def select_topk_for_layer_batched(cache, layer_idx, req_ids,
             # 防止配置或请求模式变化后误放旧计划。
             plan_geometry = call_plan[0]
             if (geometry[:31] == plan_geometry[:31]
-                    and geometry[32:] == plan_geometry[32:]):
+                    and geometry[32:-1] == plan_geometry[32:-1]):
+                # 末尾 stats-dirty 只特化内层 fused kernel；外层已录计划
+                # 可在增量统计下复用，不能因首步/稳态差异强制重录。
                 signature = cache.nfa_skip_signature(req_ids)
                 has_live_req = any(item is not None for item in signature)
                 region_mode = (cache.nfa_region_mode(signature, layer_idx)
@@ -2574,6 +2733,11 @@ def _layer_batched_select_impl(cache, req_ids, layer_indices,
         region_mode, middle_only,
         selection_output[0].data_ptr() if middle_only else 0,
         selection_output[1].data_ptr() if middle_only else 0,
+        indexer.nt_near_tokens,
+        # 页统计首建/稳态会改变 STATS_PROGRAMS、BLOCK_GROUP_STRIDE 和
+        # 融合 kernel 的 Q program 起点；必须纳入 compiled-plan 几何，
+        # 否则稳态较短 grid 会全部落入 stats 分支并沿用上一帧 Q。
+        bool(getattr(cache, '_nfa_stats_dirty', False)),
     )
     previous_geometry = workspace.get('_nfa_launch_geometry')
     if previous_geometry == geometry:
@@ -2764,10 +2928,16 @@ def _layer_batched_select_impl(cache, req_ids, layer_indices,
         tile=256, num_warps=4,
         layer_offset=layer_offset, workspace=workspace, bs=bs,
         k_f=k_f, k_n=k_n, pack_width=full_pack_width, region=region_mode)
-    middle = _nfa_filtered_topk(
-        logits, cand_idx2, lower, upper, quota, s_cap, width,
-        sink=int(indexer.sink_tokens), layer_offset=layer_offset,
-        workspace=workspace)
+    if indexer.nt_near_tokens is None:
+        middle = _nfa_filtered_topk(
+            logits, cand_idx2, lower, upper, quota, s_cap, width,
+            sink=int(indexer.sink_tokens), layer_offset=layer_offset,
+            workspace=workspace)
+    else:
+        middle = _nfa_fixed_quota_topk(
+            logits, cand_idx2, lengths, cache, valid_req_t, indexer, bs,
+            s_cap, width, n_layers, layer_offset=layer_offset,
+            workspace=workspace)
 
     # ---- final canonical union 或 disjoint middle 物理映射 ---------------
     if middle_only:
