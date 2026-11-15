@@ -1,0 +1,12 @@
+START host=set-hldy-kubernetes-pc02.mt gpu=2 arm=tail16_gate_off length=32768 sample=0 head=b70d8c08dcac64b5bfb4b86c78715a6956640e65 shell_pid=1788974 time=2026-11-15T22:21:38+08:00
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/5 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 5/5 [00:00<00:00, 185.21it/s]
+register qwen3 attn: [model.layers.0.self_attn]
+register iter91 rmsnorm: [model.layers.0.self_attn.q_norm]
+register iter91 rmsnorm: [model.layers.0.self_attn.k_norm]
+register iter91 rmsnorm: [model.layers.0.input_layernorm]
+register iter91 rmsnorm: [model.layers.0.post_attention_layernorm]
+register iter97 MLP SiLU+mul: [model.layers.0.mlp]
+[nfa:niah_multikey_2:L32768] 0 in=32082 out=128 score=0.000000
+[ALL DONE] /home/wangyuanshuo02/ak_verify_results/nfa_dac_subspace_smoke_b70d8c08_20261115/tail16_gate_off/L32768/quality_manifest_L32768_s0of1.json
+DONE host=set-hldy-kubernetes-pc02.mt gpu=2 arm=tail16_gate_off sample=0 time=2026-11-15T22:22:39+08:00

@@ -1,13 +1,16 @@
 {
   "schema": "nfa-dac-longbench-production-audit-v1",
   "source_head": "dfb750d71e2b8167ac31a97d5e7e3e87c0f7be5a",
+  "source_heads": [
+    "dfb750d71e2b8167ac31a97d5e7e3e87c0f7be5a"
+  ],
   "status": "pass-production-side",
   "verification": "pending-independent-verification",
   "formal_result": true,
   "rows_per_arm": 400,
-  "cells": 1,
-  "requests": 400,
-  "paired_input_identity": "single-arm",
+  "cells": 2,
+  "requests": 800,
+  "paired_input_identity": "pass",
   "length_policy": {
     "input_cap": 31500,
     "max_new_by_task": {
@@ -18,6 +21,51 @@
     "truncation": "official LongBench cap; per-row flags retained"
   },
   "results": [
+    {
+      "arm": "full_gate_off",
+      "source_head": "dfb750d71e2b8167ac31a97d5e7e3e87c0f7be5a",
+      "rows": 400,
+      "tasks": {
+        "hotpotqa": {
+          "rows": 200,
+          "official_score": 59.2,
+          "recomputed_mean_score": 59.203438899809846,
+          "prediction_sha256": "b4a0d33e7a4fdb3b4b676130c7995d87e6e61573527dd16a00b0bef74623e2a0",
+          "official_scores": "pred/hotpotqa-nfa_full_gate_off_eager_s0of1.official_scores.json",
+          "official_scores_sha256": "6febd3e711ccea6e78d93ca46a0c42ee53d651798e84c5d31c7aaeb46cfa9759",
+          "ordered_input_sha256": "be1da2fa86c93e321479e167d10cba804da0076be419879cfedc35703db12d08",
+          "runcap": "complete",
+          "max_input_tokens": 17667,
+          "max_input_plus_new_tokens": 17699,
+          "position_capacity": 40960,
+          "source_truncated_rows": 0,
+          "hashes": "pass"
+        },
+        "gov_report": {
+          "rows": 200,
+          "official_score": 32.16,
+          "recomputed_mean_score": 32.16172993715589,
+          "prediction_sha256": "980dc8d6b38d9230bc3aa787e8f75f007e1a335e9437591720ed059b20ba7bfe",
+          "official_scores": "pred/gov_report-nfa_full_gate_off_eager_s0of1.official_scores.json",
+          "official_scores_sha256": "505628c437c246cf2c47bdcbaaec4a912ad256bf89b22cebd2008b44516bc2a8",
+          "ordered_input_sha256": "cdf8eb4e8e259acc4c6ec2c307457f7ff920ea47748d9043b96650d9519e013d",
+          "runcap": "complete",
+          "max_input_tokens": 31512,
+          "max_input_plus_new_tokens": 32024,
+          "position_capacity": 40960,
+          "source_truncated_rows": 3,
+          "hashes": "pass"
+        }
+      },
+      "gate_counts": {
+        "keep": 14400,
+        "near": 0,
+        "far": 0,
+        "both": 0
+      },
+      "manifest_path": "agent_doc/results/nfa_dac_experiments_20261115/longbench_formal/full_gate_off/quality_manifest_s0of1.json",
+      "official_result_sha256": "b24f77c4949915ea3ae4cc188d0a32d0878035d5049405903d90553b21484160"
+    },
     {
       "arm": "tail_gate_off",
       "source_head": "dfb750d71e2b8167ac31a97d5e7e3e87c0f7be5a",
@@ -60,7 +108,7 @@
         "far": 0,
         "both": 0
       },
-      "manifest_path": "/tmp/nfa-dac-quality-20261115/agent_doc/results/nfa_dac_experiments_20261115/longbench_formal/tail_gate_off/quality_manifest_s0of1.json",
+      "manifest_path": "agent_doc/results/nfa_dac_experiments_20261115/longbench_formal/tail_gate_off/quality_manifest_s0of1.json",
       "official_result_sha256": "58e9ec7ab69f0adf86a0fba3249043dff1b8cf3bdfd979e3641c50668357e264"
     }
   ]

@@ -10,12 +10,25 @@ from benchmark.LongBench.eval import sample_score
 from benchmark.rope_policy import configure_rope
 from transformers import AutoConfig
 
-EXPECTED_HEAD = "dfb750d71e2b8167ac31a97d5e7e3e87c0f7be5a"
+EXPECTED_HEADS = {
+    "dfb750d71e2b8167ac31a97d5e7e3e87c0f7be5a",
+    "b70d8c08dcac64b5bfb4b86c78715a6956640e65",
+}
 ARMS = {
     "full_gate_off": ("full", "off"),
     "tail_gate_off": ("tail", "off"),
     "full_gate_on": ("full", "on"),
     "tail_gate_on": ("tail", "on"),
+    "tail16_gate_off": ("tail", "off"),
+    "tail64_gate_off": ("tail", "off"),
+}
+SUBSPACE_DIMS = {
+    "full_gate_off": 128,
+    "tail_gate_off": 32,
+    "full_gate_on": 128,
+    "tail_gate_on": 32,
+    "tail16_gate_off": 16,
+    "tail64_gate_off": 64,
 }
 TASKS = ("hotpotqa", "gov_report")
 MAX_NEW = {"hotpotqa": 32, "gov_report": 512}
@@ -46,7 +59,8 @@ def audit_arm(manifest_path, repo, position_capacity):
     require(manifest["method"] == "nfa", manifest_path)
     require(list(manifest["tasks"]) == list(TASKS), manifest_path)
     runtime = manifest["runtime"]
-    require(runtime["source"]["head"] == EXPECTED_HEAD, manifest_path)
+    source_head = runtime["source"]["head"]
+    require(source_head in EXPECTED_HEADS, manifest_path)
     empty_diff = hashlib.sha256(b"").hexdigest()
     require(runtime["source"]["source_diff_sha256"] == empty_diff, manifest_path)
     require(runtime["source"]["quality_source_diff_sha256"] == empty_diff, manifest_path)
@@ -64,7 +78,15 @@ def audit_arm(manifest_path, repo, position_capacity):
     require(config["near_tokens"] == "off" and config["near_len"] == 4096, manifest_path)
     require(config["near_method"] == "avg" and config["far_method"] == "minmax", manifest_path)
     require(config["sink_tokens"] == 4 and config["sliding_window_size"] == 128, manifest_path)
-    require(config["subspace_cmp_ratio"] == 4, manifest_path)
+    expected_dim = SUBSPACE_DIMS[arm]
+    expected_ratio = 4 if subspace == "full" else 128 // expected_dim
+    require(config["subspace_cmp_ratio"] == expected_ratio, manifest_path)
+    if "subspace_dim" in config:
+        require(config["subspace_dim"] == expected_dim, manifest_path)
+        require(config["enable_subspace"] is (subspace != "full"), manifest_path)
+    else:
+        require(source_head == "dfb750d71e2b8167ac31a97d5e7e3e87c0f7be5a", manifest_path)
+        require(expected_dim in {32, 128}, manifest_path)
     require(config["dynamic_gate_epsilon"] == 0.1 and config["dynamic_gate_rows"] == 256, manifest_path)
     require(config["boundary_bypass"] is True, manifest_path)
     require(config["enable_layer_skip"] is (gate == "on"), manifest_path)
@@ -88,7 +110,7 @@ def audit_arm(manifest_path, repo, position_capacity):
 
     report = {
         "arm": arm,
-        "source_head": EXPECTED_HEAD,
+        "source_head": source_head,
         "rows": 0,
         "tasks": {},
         "gate_counts": {"keep": 0, "near": 0, "far": 0, "both": 0},
@@ -112,7 +134,7 @@ def audit_arm(manifest_path, repo, position_capacity):
         require(runcap["max_new_tokens"] == MAX_NEW[task], runcap_path)
         require(runcap["effective_cap"] == 31500, runcap_path)
         require(runcap["method"] == f"nfa_{arm}_eager", runcap_path)
-        require(runcap["producer"]["git_commit"] == EXPECTED_HEAD, runcap_path)
+        require(runcap["producer"]["git_commit"] == source_head, runcap_path)
         max_input_tokens = runcap["input_tokens"]["max"]
         require(max_input_tokens + MAX_NEW[task] <= position_capacity, runcap_path)
         require(runcap["truncated"]["count"] == sum(
@@ -217,7 +239,9 @@ def main():
             del task["per_sample_input_sha256"]
     summary = {
         "schema": "nfa-dac-longbench-production-audit-v1",
-        "source_head": EXPECTED_HEAD,
+        "source_head": (reports[0]["source_head"]
+                        if len({report["source_head"] for report in reports}) == 1 else None),
+        "source_heads": sorted({report["source_head"] for report in reports}),
         "status": "pass-production-side",
         "verification": "pending-independent-verification",
         "formal_result": True,

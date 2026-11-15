@@ -11,13 +11,31 @@ from benchmark.rope_policy import configure_rope, verify_runtime_rope
 EXPECTED_HEADS = {
     "67f3b099073dd2d27fc0176b631eb9b4bd6a8214",
     "cdb83688c06f882b874e5aa20505057f1c13235d",
+    "b70d8c08dcac64b5bfb4b86c78715a6956640e65",
 }
-ARMS = {
+A_ARMS = {
     "nfa_full_gate_off": ("nfa", "full", "off"),
     "nfa_full_gate_on": ("nfa", "full", "on"),
     "nfa_tail_gate_off": ("nfa", "tail", "off"),
     "nfa_tail_gate_on": ("nfa", "tail", "on"),
     "flashinfer_fullkv": ("flashinfer", None, None),
+}
+ARMS = {
+    **A_ARMS,
+    "nfa_tail16_gate_off": ("nfa", "tail", "off"),
+    "nfa_tail64_gate_off": ("nfa", "tail", "off"),
+    "tail16_gate_off": ("nfa", "tail", "off"),
+    "tail64_gate_off": ("nfa", "tail", "off"),
+}
+SUBSPACE_DIMS = {
+    "nfa_full_gate_off": 128,
+    "nfa_full_gate_on": 128,
+    "nfa_tail_gate_off": 32,
+    "nfa_tail_gate_on": 32,
+    "nfa_tail16_gate_off": 16,
+    "nfa_tail64_gate_off": 64,
+    "tail16_gate_off": 16,
+    "tail64_gate_off": 64,
 }
 LENGTHS = (32768, 65536, 131072)
 
@@ -124,7 +142,15 @@ def audit_cell(manifest_path, expected_rows):
         assert config["near_tokens"] == "off" and config["near_len"] == 4096
         assert config["near_method"] == "avg" and config["far_method"] == "minmax"
         assert config["sink_tokens"] == 4 and config["sliding_window_size"] == 128
-        assert config["subspace_cmp_ratio"] == 4
+        expected_dim = SUBSPACE_DIMS[arm]
+        expected_ratio = 4 if subspace == "full" else 128 // expected_dim
+        assert config["subspace_cmp_ratio"] == expected_ratio
+        if "subspace_dim" in config:
+            assert config["subspace_dim"] == expected_dim
+            assert config["enable_subspace"] is (subspace != "full")
+        else:
+            assert runtime["source"]["head"] != "b70d8c08dcac64b5bfb4b86c78715a6956640e65"
+            assert expected_dim in {32, 128}
         assert config["level1_topk"] - config["near_pages"] == 96
         assert config["dynamic_gate_epsilon"] == 0.1
         assert config["dynamic_gate_rows"] == 256
@@ -189,7 +215,7 @@ def main():
         key, report = audit_cell(manifest_path, args.rows)
         assert key not in cells, f"duplicate cell {key}: {manifest_path} and {cells[key]['manifest_path']}"
         cells[key] = report
-    expected = {(arm, length) for arm in ARMS for length in LENGTHS}
+    expected = {(arm, length) for arm in A_ARMS for length in LENGTHS}
     if args.cells == 15:
         assert set(cells) == expected, (sorted(expected - set(cells)), sorted(set(cells) - expected))
     else:
