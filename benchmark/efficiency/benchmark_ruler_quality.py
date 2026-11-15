@@ -366,7 +366,9 @@ def run_quality(args, engine, rows, data_sha256):
                         "official_score": ruler_official_score(pred, row["outputs"]),
                         "scorer": "ruler-official-string_match_all",
                     }
-                    if record["output_truncated"] != (len(generated) == max_new_tokens):
+                    # EOS 与 max-new 同时落在最后一个 token 时，observe() 优先
+                    # 报告 EOS；长度达到预算本身不等于被 max-new 截断。
+                    if stop_reason == "max_new_tokens" and len(generated) != max_new_tokens:
                         raise RuntimeError("max-new 停止原因与实际生成长度不一致")
                     score_record = {
                         "_id": sample_id,

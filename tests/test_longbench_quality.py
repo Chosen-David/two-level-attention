@@ -25,6 +25,14 @@ def test_nfa_quality_2x2_uses_one_config_for_patch_and_prefill(subspace, gate):
     assert patch_args.tia_level2_cmp_ratio == 4
     assert patch_args.tia_level1_topk == 128
     assert patch_args.tia_level2_topk == 1024
+    assert patch_args.tia_block_size == 64
+    assert patch_args.nfa_near_pages == 32
+    assert patch_args.nfa_near_len == 4096
+    assert patch_args.nfa_sink_tokens == 4
+    assert patch_args.nfa_swa_size == 128
+    assert patch_args.nfa_near_method == "avg"
+    assert patch_args.nfa_far_method == "minmax"
+    assert patch_args.nfa_boundary_bypass is True
     assert gate_config.epsilon == (0.10 if gate == "on" else 0.0)
     assert gate_config.rows == 256
 

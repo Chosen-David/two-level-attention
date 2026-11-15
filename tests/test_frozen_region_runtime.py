@@ -277,6 +277,60 @@ def test_decode_uses_the_same_min_length_policy_for_first_and_graph_tokens(
     assert generated == [3, 3, 4]
 
 
+def test_decode_eos_on_final_budget_token_has_eos_precedence(monkeypatch):
+    class FakeScheduler:
+        def __init__(self, **kwargs):
+            self.next_tokens = {}
+            self.pending = []
+
+        def add_request(self, request_id):
+            self.request_id = request_id
+
+        def pop_ready_receipts(self):
+            receipts = self.pending
+            self.pending = []
+            return receipts
+
+        def flush_ready_receipts(self):
+            return self.pop_ready_receipts()
+
+    class FakeRunner:
+        def __init__(self, scheduler):
+            self.scheduler = scheduler
+            self.capture_count = 0
+            self.replay_count = 0
+            self.eager_fallback_count = 0
+
+        def step(self, model, cache, *, generated_counts, **kwargs):
+            token = 4 if generated_counts == 127 else 2
+            self.scheduler.pending.append((0, token))
+            self.eager_fallback_count += 1
+            cache.nfa_decode_steps += 1
+            return None, torch.tensor([token])
+
+    monkeypatch.setattr(
+        'sparse_attn.scheduler.scheduler.ContinuousBatchScheduler', FakeScheduler)
+    monkeypatch.setattr(
+        'sparse_attn.engine.graph_runner.session_graph_runner',
+        lambda model, cache, scheduler, **kwargs: FakeRunner(scheduler))
+
+    class FakeModel:
+        def parameters(self):
+            return iter([torch.empty(0)])
+
+    output = _decode_output(2)
+    output.past_key_values.nfa_decode_steps = 0
+    receipt = {}
+    generated, _ = decode_frozen_request(
+        FakeModel(), output, max_new_tokens=128, eos_ids={4},
+        capture_graph=False, receipt=receipt)
+    assert len(generated) == 128
+    assert generated[-1] == 4
+    assert receipt['stop_reason'] == 'eos'
+    assert receipt['logical_decode_steps'] == 127
+    assert receipt['submitted_decode_forwards'] == 127
+
+
 def test_suffix_is_fully_consumed_and_only_answer_tokens_are_returned(monkeypatch):
     class FakeScheduler:
         def __init__(self, **kwargs):

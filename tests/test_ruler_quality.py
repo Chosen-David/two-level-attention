@@ -80,7 +80,7 @@ class _FakeTokenizer:
 
 
 class _FakeEngine:
-    def __init__(self, *, fail_on_second=False, max_new_stop=False):
+    def __init__(self, *, fail_on_second=False, max_new_stop=False, eos_at_max=False):
         self.tokenizer = _FakeTokenizer()
         self.model = SimpleNamespace(
             config=SimpleNamespace(max_position_embeddings=32768 + 128))
@@ -89,6 +89,7 @@ class _FakeEngine:
         self.calls = 0
         self.fail_on_second = fail_on_second
         self.max_new_stop = max_new_stop
+        self.eos_at_max = eos_at_max
 
     def generate(self, ids, max_new_tokens, ignore_eos, min_new_tokens=0):
         assert max_new_tokens == 128
@@ -97,7 +98,8 @@ class _FakeEngine:
         self.calls += 1
         if self.fail_on_second and self.calls == 2:
             raise RuntimeError("injected generation failure")
-        generated = ids * max_new_tokens if self.max_new_stop else list(ids)
+        generated = (ids * max_new_tokens
+                     if self.max_new_stop or self.eos_at_max else list(ids))
         stop_reason = "max_new_tokens" if self.max_new_stop else "eos"
         self.request_receipts.append({
             "generated_tokens": len(generated),
@@ -164,3 +166,14 @@ def test_max_new_stop_is_explicitly_marked_truncated(tmp_path):
     assert record["generated_tokens"] == 128
     assert record["stop_reason"] == "max_new_tokens"
     assert record["output_truncated"] is True
+
+
+def test_eos_on_token_128_is_not_misclassified_as_truncated(tmp_path):
+    args = _args(tmp_path)
+    manifest = run_quality(
+        args, _FakeEngine(eos_at_max=True), _rows(1), "source-sha")
+    record = json.loads((tmp_path / manifest["prediction"]).read_text())
+    assert record["generated_tokens"] == 128
+    assert record["stop_reason"] == "eos"
+    assert record["output_truncated"] is False
+    assert manifest["rows"] == 1
