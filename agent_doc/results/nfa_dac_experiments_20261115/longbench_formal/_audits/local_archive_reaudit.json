@@ -1,0 +1,67 @@
+{
+  "schema": "nfa-dac-longbench-production-audit-v1",
+  "source_head": "dfb750d71e2b8167ac31a97d5e7e3e87c0f7be5a",
+  "status": "pass-production-side",
+  "verification": "pending-independent-verification",
+  "formal_result": true,
+  "rows_per_arm": 400,
+  "cells": 1,
+  "requests": 400,
+  "paired_input_identity": "single-arm",
+  "length_policy": {
+    "input_cap": 31500,
+    "max_new_by_task": {
+      "hotpotqa": 32,
+      "gov_report": 512
+    },
+    "runtime_position_capacity": 40960,
+    "truncation": "official LongBench cap; per-row flags retained"
+  },
+  "results": [
+    {
+      "arm": "tail_gate_off",
+      "source_head": "dfb750d71e2b8167ac31a97d5e7e3e87c0f7be5a",
+      "rows": 400,
+      "tasks": {
+        "hotpotqa": {
+          "rows": 200,
+          "official_score": 58.98,
+          "recomputed_mean_score": 58.97886598168854,
+          "prediction_sha256": "3295b7c23a0a41b2390e515a203816ea26c96a147b405e8bd3e8cb359f4635d0",
+          "official_scores": "pred/hotpotqa-nfa_tail_gate_off_eager_s0of1.official_scores.json",
+          "official_scores_sha256": "61613d4022a35280b7ed740ff7f91370cbeb4c7a24233e2a6109207e853469df",
+          "ordered_input_sha256": "be1da2fa86c93e321479e167d10cba804da0076be419879cfedc35703db12d08",
+          "runcap": "complete",
+          "max_input_tokens": 17667,
+          "max_input_plus_new_tokens": 17699,
+          "position_capacity": 40960,
+          "source_truncated_rows": 0,
+          "hashes": "pass"
+        },
+        "gov_report": {
+          "rows": 200,
+          "official_score": 31.74,
+          "recomputed_mean_score": 31.73763356959013,
+          "prediction_sha256": "3f16c54649f207792f0b61c11ac3a5336682101afe50b44e5be608d4ba0532d9",
+          "official_scores": "pred/gov_report-nfa_tail_gate_off_eager_s0of1.official_scores.json",
+          "official_scores_sha256": "91c4df9df15d240fef54375c6140f84bf6662f8d804dc9503c426b3f26d7d630",
+          "ordered_input_sha256": "cdf8eb4e8e259acc4c6ec2c307457f7ff920ea47748d9043b96650d9519e013d",
+          "runcap": "complete",
+          "max_input_tokens": 31512,
+          "max_input_plus_new_tokens": 32024,
+          "position_capacity": 40960,
+          "source_truncated_rows": 3,
+          "hashes": "pass"
+        }
+      },
+      "gate_counts": {
+        "keep": 14400,
+        "near": 0,
+        "far": 0,
+        "both": 0
+      },
+      "manifest_path": "/tmp/nfa-dac-quality-20261115/agent_doc/results/nfa_dac_experiments_20261115/longbench_formal/tail_gate_off/quality_manifest_s0of1.json",
+      "official_result_sha256": "58e9ec7ab69f0adf86a0fba3249043dff1b8cf3bdfd979e3641c50668357e264"
+    }
+  ]
+}

@@ -8,7 +8,10 @@ from transformers import AutoConfig
 from benchmark.efficiency.benchmark_ruler_quality import ruler_official_score
 from benchmark.rope_policy import configure_rope, verify_runtime_rope
 
-EXPECTED_HEAD = "67f3b099073dd2d27fc0176b631eb9b4bd6a8214"
+EXPECTED_HEADS = {
+    "67f3b099073dd2d27fc0176b631eb9b4bd6a8214",
+    "cdb83688c06f882b874e5aa20505057f1c13235d",
+}
 ARMS = {
     "nfa_full_gate_off": ("nfa", "full", "off"),
     "nfa_full_gate_on": ("nfa", "full", "on"),
@@ -39,7 +42,7 @@ def audit_cell(manifest_path, expected_rows):
     assert manifest["method"] == method and manifest["rows"] == expected_rows
     assert manifest["max_new_tokens"] == 128 and manifest["min_new_tokens"] == 1
     runtime = manifest["runtime"]
-    assert runtime["source"]["head"] == EXPECTED_HEAD
+    assert runtime["source"]["head"] in EXPECTED_HEADS
     assert runtime["source"]["source_diff_sha256"] == hashlib.sha256(b"").hexdigest()
     assert runtime["source"]["quality_source_diff_sha256"] == hashlib.sha256(b"").hexdigest()
     assert runtime["execution"] == "eager" and runtime["num_layers"] == 36
@@ -63,7 +66,11 @@ def audit_cell(manifest_path, expected_rows):
     assert runcap["status"] == "complete" and runcap["result_lines"] == expected_rows
     assert runcap["result_sha256"] == manifest["prediction_sha256"]
     assert runcap["n_samples"] == expected_rows
-    assert runcap["cap_treatment"]["capability"] == max(length + 128, 40960)
+    position_capacity = runcap["cap_treatment"]["capability"]
+    assert position_capacity == max(length + 128, 40960)
+    max_input_tokens = runcap["input_tokens"]["max"]
+    assert max_input_tokens + manifest["max_new_tokens"] <= position_capacity
+    assert runcap["truncated"]["count"] == 0
     input_hashes = set()
     source_indices = []
     gate_counts = {"keep": 0, "near": 0, "far": 0, "both": 0}
@@ -127,6 +134,7 @@ def audit_cell(manifest_path, expected_rows):
         assert runtime["page_size"] == 64 and runtime["flashinfer_version"] == "0.5.2"
     return (arm, length), {
         "arm": arm,
+        "source_head": runtime["source"]["head"],
         "context_length": length,
         "rows": count,
         "official_score": manifest["official_score"],
@@ -135,6 +143,10 @@ def audit_cell(manifest_path, expected_rows):
         "prediction_sha256": manifest["prediction_sha256"],
         "input_ids_sha256": sorted(input_hashes),
         "ordered_input_sha256": runcap["input_identity"]["actual_input_ids"]["ordered_sha256"],
+        "max_input_tokens": max_input_tokens,
+        "max_input_plus_new_tokens": max_input_tokens + manifest["max_new_tokens"],
+        "position_capacity": position_capacity,
+        "source_truncated_rows": runcap["truncated"]["count"],
         "stop_reasons": stop_reasons,
         "gate_counts": gate_counts if method == "nfa" else None,
         "runcap": "complete",
@@ -190,7 +202,7 @@ def main():
             assert len({report["ordered_input_sha256"] for report in length_cells}) == 1
     report = {
         "schema": "nfa-dac-ruler-matrix-production-audit-v1",
-        "source_head": EXPECTED_HEAD,
+        "source_heads": sorted({row["source_head"] for row in cells.values()}),
         "status": "pass-production-side",
         "verification": "pending-independent-verification",
         "formal_result": args.formal,

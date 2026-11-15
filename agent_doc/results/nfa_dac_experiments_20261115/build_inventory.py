@@ -158,6 +158,23 @@ ruler_arm_names = {
     "A4_tail32_gate_on": "nfa_tail_gate_on",
     "FullKV": "flashinfer_fullkv",
 }
+longbench_arm_names = {
+    "A1_full_gate_off": "full_gate_off",
+    "A2_tail32_gate_off": "tail_gate_off",
+    "A3_full_gate_on": "full_gate_on",
+    "A4_tail32_gate_on": "tail_gate_on",
+}
+longbench_results = {}
+longbench_audit_path = ROOT / "longbench_formal/_audits/local_archive_reaudit.json"
+if longbench_audit_path.exists():
+    longbench_audit = json.loads(longbench_audit_path.read_text())
+    if (longbench_audit["status"] != "pass-production-side"
+            or longbench_audit["verification"] != "pending-independent-verification"):
+        raise ValueError("LongBench production audit is not valid pending evidence")
+    for report in longbench_audit["results"]:
+        arm = next(key for key, value in longbench_arm_names.items() if value == report["arm"])
+        for task, produced in report["tasks"].items():
+            longbench_results[(arm, task)] = produced
 for arm, config in a_arms.items():
     for dataset, length, count in quality_data:
         record_id = f"new_A_{arm}_{dataset}_{length or 'lb'}"
@@ -199,6 +216,28 @@ for arm, config in a_arms.items():
                 evidence_status="complete historical 200/200 but protocol mismatch: prefill dynamic GateConfig epsilon0.05 could skip regions",
                 reuse_decision="reference_only_not_consumable_as_gate_off; layer-skip=false only disabled removed static D-prime path",
                 missing_work="rerun with explicit prefill epsilon0 and verify all 36 decisions keep")
+        longbench_produced = longbench_results.get((arm, dataset))
+        if longbench_produced is not None:
+            result_root = ROOT / "longbench_formal" / longbench_arm_names[arm]
+            manifest = json.loads((result_root / "quality_manifest_s0of1.json").read_text())
+            entry = manifest["tasks"][dataset]
+            if (entry["rows"] != count
+                    or entry["prediction_sha256"] != longbench_produced["prediction_sha256"]
+                    or manifest["runtime"]["source"]["head"] != longbench_audit["source_head"]):
+                raise ValueError(f"LongBench result does not match production audit: {result_root}")
+            common.update(
+                input_identity=longbench_produced["ordered_input_sha256"],
+                result=json.dumps({
+                    "score_percent": longbench_produced["official_score"],
+                    "prediction_sha256": longbench_produced["prediction_sha256"],
+                    "producer": manifest["runtime"]["source"]["head"],
+                    "source_truncated_rows": longbench_produced["source_truncated_rows"],
+                    "max_input_plus_new_tokens": longbench_produced["max_input_plus_new_tokens"],
+                    "position_capacity": longbench_produced["position_capacity"]}),
+                result_location=str(result_root.relative_to(REPO)),
+                evidence_status="complete new formal 200/200; production-side audit PASS; pending-independent-verification",
+                reuse_decision="new formal result; do not regenerate",
+                missing_work="independent owner verification")
         produced = ruler_results.get((ruler_arm_names[arm], length))
         if produced is not None:
             result_root = ROOT / "ruler_formal" / ruler_arm_names[arm] / f"L{length}"
