@@ -1,0 +1,37 @@
+{
+  "schema": "nfa-dac-inventory-summary-v1",
+  "verification": "pending-independent-verification",
+  "rows": 303,
+  "by_group": {
+    "new_C_historical_two_task": 10,
+    "new_B_historical_coordinate": 8,
+    "new_F_historical_two_task": 6,
+    "new_E_historical_gate": 4,
+    "mechanism_only": 1,
+    "GLM_NoPE": 14,
+    "old_performance_host_wall": 48,
+    "new_A_2x2": 25,
+    "new_B_coordinates": 30,
+    "new_C_regional": 12,
+    "new_D_subspace_width": 20,
+    "new_E_gate_threshold": 26,
+    "new_F_near_length": 9,
+    "new_performance_cuda_event": 90
+  },
+  "notes": [
+    "Historical summaries without raw artifacts are not consumable data.",
+    "Old host-wall and new CUDA-event performance are separate measurement groups.",
+    "Cross-references prohibit duplicate generation and require runtime equivalence checks.",
+    "Qwen3 LongBench NFA canonical rows used dynamic prefill epsilon0.05 despite static layer-skip=false; they are historical references, not new A2 gate-off/epsilon0.",
+    "nfa_near_tokens=off preserves L1 near/far page pools but allows free L2 token competition.",
+    "FlashInfer HotpotQA/GovReport rows are same-input FullKV references with page64 eager decode.",
+    "All reused Qwen3 LongBench rows remain pending independent verification by a different owner.",
+    "Old 113/125 were unreachable with No route to host on 2026-11-15."
+  ],
+  "unique_ids": 303,
+  "new_quality_rows": 122,
+  "new_A_reuse_rows": 2,
+  "new_A_missing_rows": 23,
+  "reused_requests": 400,
+  "remaining_new_A_requests": 3100
+}

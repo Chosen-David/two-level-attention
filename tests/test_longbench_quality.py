@@ -25,7 +25,7 @@ def test_nfa_quality_2x2_uses_one_config_for_patch_and_prefill(subspace, gate):
     assert patch_args.tia_level2_cmp_ratio == 4
     assert patch_args.tia_level1_topk == 128
     assert patch_args.tia_level2_topk == 1024
-    assert gate_config.epsilon == (0.10 if gate == "on" else 0.05)
+    assert gate_config.epsilon == (0.10 if gate == "on" else 0.0)
     assert gate_config.rows == 256
 
 
@@ -34,6 +34,44 @@ def test_nfa_quality_2x2_rejects_unknown_arm():
         resolve_nfa_quality_config("random", "off")
     with pytest.raises(ValueError, match="full/tail"):
         resolve_nfa_quality_config("tail", "tau0.05")
+
+
+def test_nfa_dynamic_gate_does_not_read_removed_default_static_mask(monkeypatch):
+    from sparse_attn import info
+
+    patch_args, _ = resolve_nfa_quality_config("tail", "on")
+
+    def unexpected_read(*args, **kwargs):
+        raise AssertionError("dynamic gate must not read legacy static D' mask")
+
+    monkeypatch.setattr(info, "_resolve_skip_content", unexpected_read)
+    snapshot = info.resolve_treatment_snapshot(patch_args)
+    assert snapshot.manifest["nfa_layer_skip_path"] is None
+    assert snapshot.skip_ids is None
+
+    monkeypatch.undo()
+    patch_args.nfa_layer_skip_path = "/definitely/missing/nfa-static-mask.json"
+    with pytest.raises(SystemExit, match="GATE-FAIL"):
+        info.resolve_treatment_snapshot(patch_args)
+
+
+def test_nfa_gate_off_receipt_requires_all_layers_to_keep():
+    receipt = _nfa_receipt("eager")
+    receipt.update(
+        gate_epsilon=0.0,
+        gate_counts={"keep": 36, "near": 0, "far": 0, "both": 0},
+        prefill_decisions={
+            str(layer): {"skip_near": False, "skip_far": False}
+            for layer in range(36)
+        },
+    )
+    _validate_quality_receipt(
+        "nfa", "eager", 36, 64, receipt, nfa_gate_epsilon=0.0)
+    receipt["gate_counts"]["far"] = 1
+    receipt["gate_counts"]["keep"] = 35
+    with pytest.raises(RuntimeError, match="gate-off"):
+        _validate_quality_receipt(
+            "nfa", "eager", 36, 64, receipt, nfa_gate_epsilon=0.0)
 
 
 def _nfa_receipt(execution):

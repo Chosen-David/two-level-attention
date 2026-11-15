@@ -374,14 +374,12 @@ class TreatmentSnapshot:
 def resolve_treatment_snapshot(args):
     """081：把全部文件型 treatment 配置一次解析并冻结为 TreatmentSnapshot。
 
-    有效值语义（D′ 掩码，081 修复身份缺口 ①②）：
-      - effective nfa_enable_layer_skip=True（缺省 True）且
-        nfa_layer_skip_path=None → 展开 DEFAULT_LAYER_SKIP_MASK_PATH
-        并解析其内容（默认配置的 manifest 从此含掩码内容身份，
-        而非恒 null 而可读名含 D）；
-      - nfa_enable_layer_skip=False → 无论路径是否声明都不解析、
-        manifest 记 null（身份按「实际消费」而非「argv 声明」——
-        修复 079 的反向不对称）。
+    有效值语义（D′ 掩码）：
+      - 当前 GraphReady NFA 使用 prefill GateConfig 的动态区域 decisions；
+        nfa_enable_layer_skip=True 且 path=None 不再读取已删除消费者的
+        DEFAULT_LAYER_SKIP_MASK_PATH，manifest/skip_ids 均记空；
+      - 仅显式声明 nfa_layer_skip_path 且 enable=True 时解析旧文件；
+        enable=False 时无论路径是否声明都不解析、manifest 记 null。
     投影基：声明即解析（与 NFAIndexer 运行时同口径），同一批 bytes
     同时求 SHA256 / shape / tensor。文件缺失/损坏一律 [GATE-FAIL]
     079 SystemExit fail closed（沿用 079 错误口径）——不允许静默关 D′
@@ -397,19 +395,16 @@ def resolve_treatment_snapshot(args):
     manifest = {}
     skip_ids = None
     basis_tensor = None
-    # ---- D′：有效值语义 ----
+    # GraphReady NFA 的区域 skip 由 prefill GateConfig 动态决定；旧 D′ 静态层
+    # 掩码消费者已删除。只有显式声明旧文件时才冻结其内容身份，不再把缺省
+    # enable_layer_skip=True 展开成对 DEFAULT_LAYER_SKIP_MASK_PATH 的无消费读取。
     enable_skip = bool(getattr(args, "nfa_enable_layer_skip", True))
-    if enable_skip:
-        mask_path = getattr(args, "nfa_layer_skip_path", None)
-        is_default = mask_path is None
-        if is_default:
-            mask_path = DEFAULT_LAYER_SKIP_MASK_PATH
-        ident, skip_list = _resolve_skip_content(mask_path,
-                                                 is_default=is_default)
+    mask_path = getattr(args, "nfa_layer_skip_path", None)
+    if enable_skip and mask_path is not None:
+        ident, skip_list = _resolve_skip_content(mask_path, is_default=False)
         manifest["nfa_layer_skip_path"] = ident
         skip_ids = frozenset(skip_list)
     else:
-        # 081②：enable=False 时路径声明不进身份（运行时不消费）
         manifest["nfa_layer_skip_path"] = None
     # ---- 投影基：声明即解析（单次 open，身份与 tensor 同 bytes）----
     bp = getattr(args, "nfa_proj_basis", None)

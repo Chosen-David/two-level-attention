@@ -77,8 +77,7 @@ def resolve_nfa_quality_config(subspace, gate):
     patch_args.nfa_enable_layer_skip = gate == "on"
     patch_args.nfa_dyn_dgate_eps = 0.10
     patch_args.nfa_dyn_dgate_rows = 256
-    gate_config = GateConfig(
-        epsilon=0.10 if gate == "on" else GateConfig().epsilon, rows=256)
+    gate_config = GateConfig(epsilon=0.10 if gate == "on" else 0.0, rows=256)
     return patch_args, gate_config
 
 
@@ -95,7 +94,7 @@ def source_receipt():
 
 
 def _validate_quality_receipt(method, execution, num_layers, max_new_tokens, receipt,
-                              *, nfa_visible_len=8192):
+                              *, nfa_visible_len=8192, nfa_gate_epsilon=None):
     generated = receipt["generated_tokens"]
     if not 1 <= generated <= max_new_tokens:
         raise RuntimeError("质量生成长度越界")
@@ -110,6 +109,17 @@ def _validate_quality_receipt(method, execution, num_layers, max_new_tokens, rec
         physical_steps = receipt["submitted_decode_forwards"]
         if physical_steps < steps:
             raise RuntimeError("NFA 质量请求实际提交数小于逻辑 decode 步数")
+        if nfa_gate_epsilon is not None:
+            if receipt["gate_epsilon"] != nfa_gate_epsilon:
+                raise RuntimeError("NFA 质量 gate epsilon 与配置不一致")
+            counts = receipt["gate_counts"]
+            if set(counts) != {"keep", "near", "far", "both"} or sum(counts.values()) != num_layers:
+                raise RuntimeError("NFA 质量 prefill gate decisions 未覆盖全部层")
+            decisions = receipt["prefill_decisions"]
+            if set(decisions) != {str(layer) for layer in range(num_layers)}:
+                raise RuntimeError("NFA 质量 prefill decision 层号不完整")
+            if nfa_gate_epsilon == 0 and counts["keep"] != num_layers:
+                raise RuntimeError("NFA gate-off 请求发生了真实区域 skip")
         if execution == "graph":
             buckets = (512, 1024, 2048, 4096)
             valid = tuple(width for width in buckets if width <= nfa_visible_len)
@@ -208,11 +218,27 @@ class RequestQualityEngine(RequestTwoPointEngine):
                 capture_graph=args.execution == "graph", min_new_tokens=min_new_tokens,
                 stop_strings=stop_strings, tokenizer=self.tokenizer,
                 prompt_ids=prompt.tolist(), receipt=receipt)
+            decisions = audit["decisions"]
+            counts = {name: 0 for name in ("keep", "near", "far", "both")}
+            for decision in decisions.values():
+                state = ("both" if decision["skip_near"] and decision["skip_far"]
+                         else "near" if decision["skip_near"]
+                         else "far" if decision["skip_far"] else "keep")
+                counts[state] += 1
+            receipt.update(
+                gate_epsilon=args.nfa_gate_config.epsilon,
+                gate_observation_rows=args.nfa_gate_config.rows,
+                gate_counts=counts,
+                prefill_decisions={
+                    str(layer): {key: bool(value) for key, value in decision.items()}
+                    for layer, decision in decisions.items()},
+            )
             torch.cuda.synchronize()
             elapsed = time.perf_counter() - started
             _validate_quality_receipt(
                 "nfa", args.execution, self.model.config.num_hidden_layers,
-                max_new_tokens, receipt, nfa_visible_len=args.visible_len)
+                max_new_tokens, receipt, nfa_visible_len=args.visible_len,
+                nfa_gate_epsilon=args.nfa_gate_config.epsilon)
             self.request_receipts.append(receipt)
             return generated, elapsed
         finally:
