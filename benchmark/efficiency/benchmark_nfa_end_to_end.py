@@ -117,7 +117,7 @@ def _enable_long_prefill_mlp_chunk(model):
         module.forward = MethodType(forward, module)
 
 
-def _load_model(args, max_new_tokens):
+def _load_model(args, max_new_tokens, patch_args=None):
     config = AutoConfig.from_pretrained(args.model_path)
     if config.model_type != 'qwen3':
         raise ValueError('this production benchmark currently requires Qwen3')
@@ -132,7 +132,7 @@ def _load_model(args, max_new_tokens):
         args.model_path, config=config, torch_dtype=torch.bfloat16).cuda().eval()
     verify_runtime_rope(model)
     if args.method == 'nfa':
-        patch_args = nfa_args()
+        patch_args = nfa_args() if patch_args is None else patch_args
         patched = register_patch(
             model, patch_args, resolve_treatment_snapshot(patch_args),
             rmsnorm_decode=True, mlp_silu_decode=True)
@@ -153,6 +153,18 @@ def _events():
 
 
 @contextmanager
+def _fa2_unpacked_position_ids():
+    """已知无 padding/非 packed 输入走原生 FA2 regular kernel，避免 packed 检测 D2H。"""
+    from transformers import modeling_flash_attention_utils as fa_utils
+    original = fa_utils._is_packed_sequence
+    fa_utils._is_packed_sequence = lambda position_ids, batch_size: False
+    try:
+        yield
+    finally:
+        fa_utils._is_packed_sequence = original
+
+
+@contextmanager
 def _fa2_no_packed_position_ids():
     """固定无 padding 输入避免 packed D2H；可选在 prefill 注意力后逐层卸载 KV。"""
     from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS
@@ -160,7 +172,6 @@ def _fa2_no_packed_position_ids():
     state = {'prefill_cache': None}
 
     def forward(module, query, key, value, *args, **kwargs):
-        kwargs.pop('position_ids', None)
         result = original(module, query, key, value, *args, **kwargs)
         cache = state['prefill_cache']
         if cache is not None:
@@ -169,11 +180,12 @@ def _fa2_no_packed_position_ids():
             layer.values = layer.values.to('cpu')
         return result
 
-    ALL_ATTENTION_FUNCTIONS['flash_attention_2'] = forward
-    try:
-        yield state
-    finally:
-        ALL_ATTENTION_FUNCTIONS['flash_attention_2'] = original
+    with _fa2_unpacked_position_ids():
+        ALL_ATTENTION_FUNCTIONS['flash_attention_2'] = forward
+        try:
+            yield state
+        finally:
+            ALL_ATTENTION_FUNCTIONS['flash_attention_2'] = original
 
 
 def _summary(step_ms, warmup):

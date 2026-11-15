@@ -6,8 +6,34 @@ from transformers import AutoTokenizer
 
 from benchmark.efficiency.benchmark_longbench_quality import (
     _validate_quality_receipt,
+    resolve_nfa_quality_config,
 )
 from sparse_attn.scheduler.scheduler import StopStringMatcher
+
+
+@pytest.mark.parametrize(
+    "subspace,gate",
+    [("full", "off"), ("tail", "off"), ("full", "on"), ("tail", "on")],
+)
+def test_nfa_quality_2x2_uses_one_config_for_patch_and_prefill(subspace, gate):
+    patch_args, gate_config = resolve_nfa_quality_config(subspace, gate)
+    assert patch_args.nfa_subspace == subspace
+    assert patch_args.nfa_enable_layer_skip is (gate == "on")
+    assert patch_args.nfa_dyn_dgate_eps == 0.10
+    assert patch_args.nfa_dyn_dgate_rows == 256
+    assert patch_args.nfa_near_tokens == "off"
+    assert patch_args.tia_level2_cmp_ratio == 4
+    assert patch_args.tia_level1_topk == 128
+    assert patch_args.tia_level2_topk == 1024
+    assert gate_config.epsilon == (0.10 if gate == "on" else 0.05)
+    assert gate_config.rows == 256
+
+
+def test_nfa_quality_2x2_rejects_unknown_arm():
+    with pytest.raises(ValueError, match="full/tail"):
+        resolve_nfa_quality_config("random", "off")
+    with pytest.raises(ValueError, match="full/tail"):
+        resolve_nfa_quality_config("tail", "tau0.05")
 
 
 def _nfa_receipt(execution):

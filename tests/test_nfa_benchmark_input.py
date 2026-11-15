@@ -94,3 +94,26 @@ def test_nfa_decode_elementwise_patches_are_execution_independent(
     monkeypatch.setattr(benchmark, 'register_patch', register_patch)
     assert benchmark._load_model(args, 512) is model
     assert captured == {'rmsnorm_decode': True, 'mlp_silu_decode': True}
+
+
+def test_load_model_uses_explicit_quality_patch_args(monkeypatch):
+    config = SimpleNamespace(model_type='qwen3', num_hidden_layers=36)
+    model = SimpleNamespace(cuda=lambda: model, eval=lambda: model)
+    args = SimpleNamespace(
+        model_path='stub', context_length=32768, method='nfa', execution='eager')
+    override = SimpleNamespace(nfa_subspace='full', nfa_enable_layer_skip=True)
+    captured = {}
+    monkeypatch.setattr(benchmark.AutoConfig, 'from_pretrained', lambda path: config)
+    monkeypatch.setattr(
+        benchmark.AutoModelForCausalLM, 'from_pretrained', lambda *args, **kwargs: model)
+    monkeypatch.setattr(benchmark, 'configure_rope', lambda *args, **kwargs: None)
+    monkeypatch.setattr(benchmark, 'verify_runtime_rope', lambda model: None)
+    monkeypatch.setattr(
+        benchmark, 'nfa_args', lambda: (_ for _ in ()).throw(AssertionError('default used')))
+    monkeypatch.setattr(benchmark, 'resolve_treatment_snapshot', lambda args: args)
+    monkeypatch.setattr(
+        benchmark, 'register_patch',
+        lambda model, args, snapshot, **kwargs: captured.update(args=args, snapshot=snapshot)
+        or config.num_hidden_layers)
+    assert benchmark._load_model(args, 512, patch_args=override) is model
+    assert captured == {'args': override, 'snapshot': override}

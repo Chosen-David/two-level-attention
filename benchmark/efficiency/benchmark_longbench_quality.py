@@ -53,6 +53,8 @@ def parse_args():
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--method", choices=("nfa", "flashinfer"), required=True)
     parser.add_argument("--execution", choices=("eager", "graph"), default="graph")
+    parser.add_argument("--nfa-subspace", choices=("full", "tail"), default="tail")
+    parser.add_argument("--nfa-gate", choices=("off", "on"), default="off")
     parser.add_argument("--model-path", default="/home/wangyuanshuo02/Qwen3-8B")
     parser.add_argument("--model-name", default="Qwen3-8B")
     parser.add_argument("--data-root", required=True)
@@ -65,6 +67,19 @@ def parse_args():
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--visible-len", type=int, default=8192)
     return parser.parse_args()
+
+
+def resolve_nfa_quality_config(subspace, gate):
+    """返回模型 patch 与 prefill 标定共用的同一份 2×2 配置。"""
+    if subspace not in {"full", "tail"} or gate not in {"off", "on"}:
+        raise ValueError("NFA 质量臂只支持 full/tail × gate off/on")
+    patch_args = nfa_args(subspace)
+    patch_args.nfa_enable_layer_skip = gate == "on"
+    patch_args.nfa_dyn_dgate_eps = 0.10
+    patch_args.nfa_dyn_dgate_rows = 256
+    gate_config = GateConfig(
+        epsilon=0.10 if gate == "on" else GateConfig().epsilon, rows=256)
+    return patch_args, gate_config
 
 
 def source_receipt():
@@ -132,6 +147,23 @@ def _validate_quality_receipt(method, execution, num_layers, max_new_tokens, rec
 class RequestQualityEngine(RequestTwoPointEngine):
     """逐请求独立资源的真实停止生成；返回形状与 OfficialEngine 一致。"""
 
+    def __init__(self, args, model, tokenizer, eos_ids):
+        super().__init__(args, model, tokenizer, eos_ids)
+        if args.method == "nfa":
+            selector = args.nfa_patch_args
+            self.runtime["nfa_selector_config"].update(
+                subspace=selector.nfa_subspace,
+                enable_layer_skip=selector.nfa_enable_layer_skip,
+                dynamic_gate_epsilon=selector.nfa_dyn_dgate_eps,
+                dynamic_gate_rows=selector.nfa_dyn_dgate_rows,
+                near_method=selector.nfa_near_method,
+                far_method=selector.nfa_far_method,
+                boundary_bypass=selector.nfa_boundary_bypass,
+            )
+            self.runtime["nfa_quality_arm"] = (
+                f"{'full' if selector.nfa_subspace == 'full' else 'tail32'}_"
+                f"gate_{'on' if selector.nfa_enable_layer_skip else 'off'}")
+
     def generate(self, ids, max_new_tokens, ignore_eos, stop_token_ids=None,
                  min_new_tokens=0, stop_strings=None):
         if max_new_tokens < 1:
@@ -154,7 +186,7 @@ class RequestQualityEngine(RequestTwoPointEngine):
     def _generate_nfa_quality(self, prompt, max_new_tokens, eos_ids,
                               min_new_tokens, stop_strings):
         args = self.args
-        patch_args = nfa_args()
+        patch_args = args.nfa_patch_args
         geometry = RegionGeometry(
             sink=patch_args.nfa_sink_tokens, near=patch_args.nfa_near_len,
             window=patch_args.nfa_swa_size, page=patch_args.tia_block_size,
@@ -167,7 +199,8 @@ class RequestQualityEngine(RequestTwoPointEngine):
         started = time.perf_counter()
         try:
             output, audit = prefill_frozen_request(
-                self.model, prompt.unsqueeze(0), GateConfig(), geometry, cache=cache)
+                self.model, prompt.unsqueeze(0), args.nfa_gate_config, geometry,
+                cache=cache)
             request_id = audit["request_id"]
             receipt = {}
             generated, _ = decode_frozen_request(
@@ -326,7 +359,14 @@ def main():
         raise ValueError("LongBench 对齐口径要求 max_length=31500")
     cap_gate_info = enforce_context_capability_gate(
         args.model_name, args.model_path, max_length, args.config_path)
-    args.quality_label = f"{args.method}_{args.execution}"
+    if args.method == "nfa":
+        args.nfa_patch_args, args.nfa_gate_config = resolve_nfa_quality_config(
+            args.nfa_subspace, args.nfa_gate)
+        arm = f"{args.nfa_subspace}_gate_{args.nfa_gate}"
+    else:
+        args.nfa_patch_args = args.nfa_gate_config = None
+        arm = "fullkv"
+    args.quality_label = f"{args.method}_{arm}_{args.execution}"
     args.quality_implementation = args.quality_label
     args.quality_producer_file = __file__
 
@@ -335,7 +375,9 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(args.model_path, trust_remote_code=True)
     load_args = SimpleNamespace(
         method=args.method, model_path=args.model_path, context_length=max_length)
-    model = _load_model(load_args, max(maxgen_cfg[task] for task in args.tasks))
+    model = _load_model(
+        load_args, max(maxgen_cfg[task] for task in args.tasks),
+        patch_args=args.nfa_patch_args)
     from benchmark.RULER.pred_ruler import _ruler_eos_ids
     eos_ids = _ruler_eos_ids(model, tokenizer)
     engine = RequestQualityEngine(args, model, tokenizer, eos_ids)
