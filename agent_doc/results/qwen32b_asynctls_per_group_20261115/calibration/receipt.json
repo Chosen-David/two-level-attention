@@ -1,0 +1,53 @@
+{
+  "schema": "qwen3-32b-asynctls-per-group-calibration-receipt-v1",
+  "status": "complete",
+  "verification": "pending-independent-verification",
+  "created_date": "2026-11-15",
+  "producer": {
+    "git_commit": "1cfed8481e87a62b3a705cd981049e8e699a1f81",
+    "script": "exp/vendor_baselines/asynctls_vendor/identify_channel.py",
+    "script_sha256": "2b5a34909122930d5479c24dcf17d66dedac1a40cec3881a60653d9b0f4db067",
+    "runtime_patch": "exp/vendor_baselines/asynctls_vendor/qwen3_asynctls_patch.py",
+    "runtime_patch_sha256": "26ce689acfada974b9a8d0b37bc64956e9f5a46b183485b2a4d4f6fd19d48e21"
+  },
+  "model": {
+    "name": "Qwen3-32B",
+    "path": "/home/wangyuanshuo02/models/huggingface.co/Qwen/Qwen3-32B",
+    "config_sha256": "97e295b63283935788fac5e4f8860862a56d4089538cafc93f0431f2ebe483bb",
+    "safetensors_index_sha256": "bed42c6c55274bc08a1f616bceb3bcb84b3f02cb6584c573bd18c6519291ecd0",
+    "num_hidden_layers": 64,
+    "num_attention_heads": 64,
+    "num_key_value_heads": 8,
+    "head_dim": 128
+  },
+  "protocol": {
+    "dataset": "qasper",
+    "data_path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/LongBench/qasper.jsonl",
+    "data_sha256": "29aa07d2a63f36f4fb8e8cd200a3428ee3126d750bde6af1c8f9bc41c2366854",
+    "selection": "first 8 source rows in source order",
+    "num_samples": 8,
+    "max_len_per_sample": 4096,
+    "dc": 32,
+    "dtype": "bfloat16",
+    "score": "per-KV-group mean of per-query-head max-abs Q, multiplied by per-KV-head max-abs K; top-32 channels sorted by index"
+  },
+  "command": "PYTHONPATH=/home/wangyuanshuo02/local_pylibs CUDA_VISIBLE_DEVICES=0 python -u -m exp.vendor_baselines.asynctls_vendor.identify_channel --model_path /home/wangyuanshuo02/models/huggingface.co/Qwen/Qwen3-32B --data_path /home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/LongBench --dataset qasper --num_samples 8 --max_len 4096 --dc 32 --output /home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen32b_asynctls_per_group_20261115/calibration/qwen3_32b_qasper_per_group.json",
+  "output": {
+    "path": "qwen3_32b_qasper_per_group.json",
+    "sha256": "0fc1c57319cebf6c1f6674f9c7239b33bd3d81d82211e5d73be1d5eaf6cb3cbb",
+    "schema": "asynctls-per-kv-group-channels-v1",
+    "layers": 64,
+    "kv_groups_per_layer": 8,
+    "channels_per_group": 32,
+    "total_channel_indices": 16384,
+    "indices_sorted_unique_in_0_127": true,
+    "current_loader_roundtrip": "PASS"
+  },
+  "log": {
+    "path": "calibration.log",
+    "sha256": "0a367d0f5f381a665d616265a05748c788b7ab1ca4f0fd53aa066a56e2646297",
+    "completed_layers": 64,
+    "saved_marker": true
+  },
+  "scope": "Calibration asset only; no LongBench quality or performance claim. Formal generation requires a separate real-model smoke and complete request receipts."
+}

@@ -1,0 +1,425 @@
+{
+  "schema": "qwen3-32b-asynctls-longbench-v1-progress-audit-v1",
+  "status": "partial",
+  "audit": "PASS",
+  "verification": "pending-independent-verification",
+  "created_utc": "2026-11-15T06:37:50.800898+00:00",
+  "scope": "仅审计快照发现时已 complete 的分片；不评分、不合并、不修改正式输出。",
+  "note": "生产侧独立进程复算，不冒充不同 owner 独立验收。",
+  "model": "Qwen3-32B",
+  "method": "asynctls_vendor",
+  "producer_commit": "1cfed8481e87a62b3a705cd981049e8e699a1f81",
+  "pred_sha256": "8be2ee032422ac8d0099a19f8ebc1ab66454d125892602b7fb7bc31dcf7ed81d",
+  "runner_sha256": "fcb1b67c3cb42567a4180b029006d0087d6cee7105edddf4e9e03b6ecdcfb1ff",
+  "auditor_sha256": "6e2b1675b15b16d6fea988ade3e18140a4b8ef06f8751545a48a288802e0c74d",
+  "treatment_sha256": "932711dc4efdbc6a4cdf800d318fcc503d65d89c25d9dbd03af01fcfe4760910",
+  "treatment_provenance": "由固定 runner CLI 只读重建；正式目录无 treatment sidecar，未补写。",
+  "complete_shards": 12,
+  "expected_shards": 32,
+  "finalized_predictions": 1150,
+  "expected_predictions": 3750,
+  "closed_tasks": [
+    "narrativeqa",
+    "qasper",
+    "multifieldqa_en",
+    "hotpotqa",
+    "2wikimqa",
+    "musique"
+  ],
+  "pending_shards": [
+    {
+      "task": "gov_report",
+      "rank": 0,
+      "state": "no-runcap"
+    },
+    {
+      "task": "gov_report",
+      "rank": 1,
+      "state": "no-runcap"
+    },
+    {
+      "task": "qmsum",
+      "rank": 0,
+      "state": "no-runcap"
+    },
+    {
+      "task": "qmsum",
+      "rank": 1,
+      "state": "no-runcap"
+    },
+    {
+      "task": "multi_news",
+      "rank": 0,
+      "state": "no-runcap"
+    },
+    {
+      "task": "multi_news",
+      "rank": 1,
+      "state": "no-runcap"
+    },
+    {
+      "task": "trec",
+      "rank": 0,
+      "state": "no-runcap"
+    },
+    {
+      "task": "trec",
+      "rank": 1,
+      "state": "no-runcap"
+    },
+    {
+      "task": "triviaqa",
+      "rank": 0,
+      "state": "no-runcap"
+    },
+    {
+      "task": "triviaqa",
+      "rank": 1,
+      "state": "no-runcap"
+    },
+    {
+      "task": "samsum",
+      "rank": 0,
+      "state": "no-runcap"
+    },
+    {
+      "task": "samsum",
+      "rank": 1,
+      "state": "no-runcap"
+    },
+    {
+      "task": "passage_count",
+      "rank": 0,
+      "state": "no-runcap"
+    },
+    {
+      "task": "passage_count",
+      "rank": 1,
+      "state": "no-runcap"
+    },
+    {
+      "task": "passage_retrieval_en",
+      "rank": 0,
+      "state": "no-runcap"
+    },
+    {
+      "task": "passage_retrieval_en",
+      "rank": 1,
+      "state": "no-runcap"
+    },
+    {
+      "task": "lcc",
+      "rank": 0,
+      "state": "no-runcap"
+    },
+    {
+      "task": "lcc",
+      "rank": 1,
+      "state": "no-runcap"
+    },
+    {
+      "task": "repobench-p",
+      "rank": 0,
+      "state": "no-runcap"
+    },
+    {
+      "task": "repobench-p",
+      "rank": 1,
+      "state": "no-runcap"
+    }
+  ],
+  "shards": [
+    {
+      "task": "narrativeqa",
+      "rank": 0,
+      "world_size": 2,
+      "path": "/home/wangyuanshuo02/ak_verify_results/qwen32b_asynctls_lb_v1_per_group_20261115/pred_r0/narrativeqa-asynctls_vendor_qwen3_32b_qasper_per_group_k1024_b64_kb128_h932711dc4e-20261115T01.jsonl",
+      "rows": 100,
+      "result_sha256": "5d265248d970eb4f1e40dbce169903a669ec45916fa33cb826dd4606326760e1",
+      "runcap_sha256": "c8c3b91d1420c484191e7ad87c17eaa527dff1ced134976312200f422f3dfffa",
+      "cap_identity_hash": "738c19489a",
+      "source_sha256": "6e5f045c9865a76b8722c0ae1635a3aabf994bb513361e9db1a70bc8effd77c2",
+      "actual_input_ids_ordered_sha256": "849b1d90a34cca3de928561b21c8d073e0cda27dd989f9da5d25d4655559e77a",
+      "input_tokens_min": 8382,
+      "input_tokens_max": 31514,
+      "truncated": 36,
+      "max_new_tokens": 128,
+      "treatment_sha256": "932711dc4efdbc6a4cdf800d318fcc503d65d89c25d9dbd03af01fcfe4760910",
+      "checks": [
+        "runcap-schema-result-binding",
+        "full-source-identity-and-round-robin-ids",
+        "producer-and-fixed-treatment",
+        "per-sample-tokenizer-input-token-counts-hashes-and-truncation",
+        "source-answer-metadata-and-eager-execution"
+      ]
+    },
+    {
+      "task": "narrativeqa",
+      "rank": 1,
+      "world_size": 2,
+      "path": "/home/wangyuanshuo02/ak_verify_results/qwen32b_asynctls_lb_v1_per_group_20261115/pred_r1/narrativeqa-asynctls_vendor_qwen3_32b_qasper_per_group_k1024_b64_kb128_h932711dc4e-20261115T01.jsonl",
+      "rows": 100,
+      "result_sha256": "bde618ce9743ef176435aaba33e5d9b05b6e476d92b29d3bab56bd11105bdda3",
+      "runcap_sha256": "f07d8e13eec4e0deb563a029dfe8a23bbd95aafbf4a9a77d17ad73a4a8e9b841",
+      "cap_identity_hash": "738c19489a",
+      "source_sha256": "6e5f045c9865a76b8722c0ae1635a3aabf994bb513361e9db1a70bc8effd77c2",
+      "actual_input_ids_ordered_sha256": "a38ac6b08e5fa21ec730b3bff3424d48f35322fa732e55afc2d06fbde8fef8e2",
+      "input_tokens_min": 8390,
+      "input_tokens_max": 31514,
+      "truncated": 49,
+      "max_new_tokens": 128,
+      "treatment_sha256": "932711dc4efdbc6a4cdf800d318fcc503d65d89c25d9dbd03af01fcfe4760910",
+      "checks": [
+        "runcap-schema-result-binding",
+        "full-source-identity-and-round-robin-ids",
+        "producer-and-fixed-treatment",
+        "per-sample-tokenizer-input-token-counts-hashes-and-truncation",
+        "source-answer-metadata-and-eager-execution"
+      ]
+    },
+    {
+      "task": "qasper",
+      "rank": 0,
+      "world_size": 2,
+      "path": "/home/wangyuanshuo02/ak_verify_results/qwen32b_asynctls_lb_v1_per_group_20261115/pred_r0/qasper-asynctls_vendor_qwen3_32b_qasper_per_group_k1024_b64_kb128_h932711dc4e-20261115T01.jsonl",
+      "rows": 100,
+      "result_sha256": "155e7b7f4f33059dd02803d131af80ea3cef032bec010f34d3a1833ecc295414",
+      "runcap_sha256": "873b2a14baf1c126213316192f5172ac2de8fa77edb04c69d973d8335fba8e10",
+      "cap_identity_hash": "0c033c9050",
+      "source_sha256": "5e2bf8729da651892986ab459ddc16b1d810e0f8fca9c6245012a7bd7b7308d9",
+      "actual_input_ids_ordered_sha256": "f959e83c98de2dfccf8570c0e104f3eb07bfd034028dd4b56bed4e077edbecea",
+      "input_tokens_min": 2290,
+      "input_tokens_max": 20212,
+      "truncated": 0,
+      "max_new_tokens": 128,
+      "treatment_sha256": "932711dc4efdbc6a4cdf800d318fcc503d65d89c25d9dbd03af01fcfe4760910",
+      "checks": [
+        "runcap-schema-result-binding",
+        "full-source-identity-and-round-robin-ids",
+        "producer-and-fixed-treatment",
+        "per-sample-tokenizer-input-token-counts-hashes-and-truncation",
+        "source-answer-metadata-and-eager-execution"
+      ]
+    },
+    {
+      "task": "qasper",
+      "rank": 1,
+      "world_size": 2,
+      "path": "/home/wangyuanshuo02/ak_verify_results/qwen32b_asynctls_lb_v1_per_group_20261115/pred_r1/qasper-asynctls_vendor_qwen3_32b_qasper_per_group_k1024_b64_kb128_h932711dc4e-20261115T01.jsonl",
+      "rows": 100,
+      "result_sha256": "05234eb81beded680cf50baeacfdaf3a9bbbb909de3bbd7809386a499e85f254",
+      "runcap_sha256": "d004313e4cbda1e5b897255ce75993f07d104bc12ab07494395693ce6fccd3cb",
+      "cap_identity_hash": "0c033c9050",
+      "source_sha256": "5e2bf8729da651892986ab459ddc16b1d810e0f8fca9c6245012a7bd7b7308d9",
+      "actual_input_ids_ordered_sha256": "7454c4761c52d9fdf89abd10cd826923e8a35a38a8aa415a7f5f67f611332cee",
+      "input_tokens_min": 2088,
+      "input_tokens_max": 22058,
+      "truncated": 0,
+      "max_new_tokens": 128,
+      "treatment_sha256": "932711dc4efdbc6a4cdf800d318fcc503d65d89c25d9dbd03af01fcfe4760910",
+      "checks": [
+        "runcap-schema-result-binding",
+        "full-source-identity-and-round-robin-ids",
+        "producer-and-fixed-treatment",
+        "per-sample-tokenizer-input-token-counts-hashes-and-truncation",
+        "source-answer-metadata-and-eager-execution"
+      ]
+    },
+    {
+      "task": "multifieldqa_en",
+      "rank": 0,
+      "world_size": 2,
+      "path": "/home/wangyuanshuo02/ak_verify_results/qwen32b_asynctls_lb_v1_per_group_20261115/pred_r0/multifieldqa_en-asynctls_vendor_qwen3_32b_qasper_per_group_k1024_b64_kb128_h932711dc4e-20261115T01.jsonl",
+      "rows": 75,
+      "result_sha256": "bd8bfce07c672e6e81d89e5c9ef9370e890deccc39c6766ff52b1236478e504f",
+      "runcap_sha256": "ccdb2824dfd94a5a7f0640cc6ff591880967db9e4ca3cf0e7a92279d7362edfd",
+      "cap_identity_hash": "374b7bc647",
+      "source_sha256": "6515af9766c290bcda8f8cbe5b51b7148129ef2d5db2206e45f811e5de2a5a8e",
+      "actual_input_ids_ordered_sha256": "2079ae0206aaee6a032da0e814b7434e5afffe968e027c36ec96a3c14bcf8719",
+      "input_tokens_min": 1363,
+      "input_tokens_max": 14917,
+      "truncated": 0,
+      "max_new_tokens": 64,
+      "treatment_sha256": "932711dc4efdbc6a4cdf800d318fcc503d65d89c25d9dbd03af01fcfe4760910",
+      "checks": [
+        "runcap-schema-result-binding",
+        "full-source-identity-and-round-robin-ids",
+        "producer-and-fixed-treatment",
+        "per-sample-tokenizer-input-token-counts-hashes-and-truncation",
+        "source-answer-metadata-and-eager-execution"
+      ]
+    },
+    {
+      "task": "multifieldqa_en",
+      "rank": 1,
+      "world_size": 2,
+      "path": "/home/wangyuanshuo02/ak_verify_results/qwen32b_asynctls_lb_v1_per_group_20261115/pred_r1/multifieldqa_en-asynctls_vendor_qwen3_32b_qasper_per_group_k1024_b64_kb128_h932711dc4e-20261115T01.jsonl",
+      "rows": 75,
+      "result_sha256": "89dcf0ed72bb37d9286e8fb40a565dd011b444887bc23a0cf3732f0f0ff6071b",
+      "runcap_sha256": "2005b47cd4bdcfb1a44cdc2381f49acb4fd71b0ae2b073bbfb85007f2a9e67a0",
+      "cap_identity_hash": "374b7bc647",
+      "source_sha256": "6515af9766c290bcda8f8cbe5b51b7148129ef2d5db2206e45f811e5de2a5a8e",
+      "actual_input_ids_ordered_sha256": "1fb5a3670f73bdde361e634dcfbb908b7c9f205c584d123da956c202182a207e",
+      "input_tokens_min": 1695,
+      "input_tokens_max": 16510,
+      "truncated": 0,
+      "max_new_tokens": 64,
+      "treatment_sha256": "932711dc4efdbc6a4cdf800d318fcc503d65d89c25d9dbd03af01fcfe4760910",
+      "checks": [
+        "runcap-schema-result-binding",
+        "full-source-identity-and-round-robin-ids",
+        "producer-and-fixed-treatment",
+        "per-sample-tokenizer-input-token-counts-hashes-and-truncation",
+        "source-answer-metadata-and-eager-execution"
+      ]
+    },
+    {
+      "task": "hotpotqa",
+      "rank": 0,
+      "world_size": 2,
+      "path": "/home/wangyuanshuo02/ak_verify_results/qwen32b_asynctls_lb_v1_per_group_20261115/pred_r0/hotpotqa-asynctls_vendor_qwen3_32b_qasper_per_group_k1024_b64_kb128_h932711dc4e-20261115T01.jsonl",
+      "rows": 100,
+      "result_sha256": "43392dc3cd7c6c9d28bfd764a6991c3edcc99d374abdb2d4adac4fec145847b0",
+      "runcap_sha256": "249048afc369a39fa4041137453ffb8a7b5775d08a89cd954946572c2f94e724",
+      "cap_identity_hash": "7f333c613c",
+      "source_sha256": "0ee9634748d46dd4464291e9086f5d90862d9e0aac77afbc00cf46d51d8f4b03",
+      "actual_input_ids_ordered_sha256": "ec664790b4b373f1579746f6ce4816301bf9a3dede5824647f59ce314dbdcd09",
+      "input_tokens_min": 3387,
+      "input_tokens_max": 17581,
+      "truncated": 0,
+      "max_new_tokens": 32,
+      "treatment_sha256": "932711dc4efdbc6a4cdf800d318fcc503d65d89c25d9dbd03af01fcfe4760910",
+      "checks": [
+        "runcap-schema-result-binding",
+        "full-source-identity-and-round-robin-ids",
+        "producer-and-fixed-treatment",
+        "per-sample-tokenizer-input-token-counts-hashes-and-truncation",
+        "source-answer-metadata-and-eager-execution"
+      ]
+    },
+    {
+      "task": "hotpotqa",
+      "rank": 1,
+      "world_size": 2,
+      "path": "/home/wangyuanshuo02/ak_verify_results/qwen32b_asynctls_lb_v1_per_group_20261115/pred_r1/hotpotqa-asynctls_vendor_qwen3_32b_qasper_per_group_k1024_b64_kb128_h932711dc4e-20261115T01.jsonl",
+      "rows": 100,
+      "result_sha256": "056a104bafa794e25bc81f6523359ddfde083a0e3c47f9d68b4d32b878218da8",
+      "runcap_sha256": "df3355e319b7e16d2d042a8ddfb0b0aa97c413753c6659c19b2b903753adb038",
+      "cap_identity_hash": "7f333c613c",
+      "source_sha256": "0ee9634748d46dd4464291e9086f5d90862d9e0aac77afbc00cf46d51d8f4b03",
+      "actual_input_ids_ordered_sha256": "e377c7746198563e22c278b68bc272402297e69082e2f5f0b845b6a88e3cdcda",
+      "input_tokens_min": 1910,
+      "input_tokens_max": 17669,
+      "truncated": 0,
+      "max_new_tokens": 32,
+      "treatment_sha256": "932711dc4efdbc6a4cdf800d318fcc503d65d89c25d9dbd03af01fcfe4760910",
+      "checks": [
+        "runcap-schema-result-binding",
+        "full-source-identity-and-round-robin-ids",
+        "producer-and-fixed-treatment",
+        "per-sample-tokenizer-input-token-counts-hashes-and-truncation",
+        "source-answer-metadata-and-eager-execution"
+      ]
+    },
+    {
+      "task": "2wikimqa",
+      "rank": 0,
+      "world_size": 2,
+      "path": "/home/wangyuanshuo02/ak_verify_results/qwen32b_asynctls_lb_v1_per_group_20261115/pred_r0/2wikimqa-asynctls_vendor_qwen3_32b_qasper_per_group_k1024_b64_kb128_h932711dc4e-20261115T01.jsonl",
+      "rows": 100,
+      "result_sha256": "1d6b410c55d740cc60fdd5935dac8f111d909bb50ba35985985515456124146e",
+      "runcap_sha256": "4c29eb1797e58ca5722997b3207b86af705b67eb345399265e854290d5469a26",
+      "cap_identity_hash": "48508c51a2",
+      "source_sha256": "4c555240d567abc824de74a6aa2aade1683541a2e4e41d59a25c3f9ffafb329e",
+      "actual_input_ids_ordered_sha256": "50232ed2edf0c0b13169ba3617932cf675ef39191bc3bfa5f69575f096e941fd",
+      "input_tokens_min": 1204,
+      "input_tokens_max": 17062,
+      "truncated": 0,
+      "max_new_tokens": 32,
+      "treatment_sha256": "932711dc4efdbc6a4cdf800d318fcc503d65d89c25d9dbd03af01fcfe4760910",
+      "checks": [
+        "runcap-schema-result-binding",
+        "full-source-identity-and-round-robin-ids",
+        "producer-and-fixed-treatment",
+        "per-sample-tokenizer-input-token-counts-hashes-and-truncation",
+        "source-answer-metadata-and-eager-execution"
+      ]
+    },
+    {
+      "task": "2wikimqa",
+      "rank": 1,
+      "world_size": 2,
+      "path": "/home/wangyuanshuo02/ak_verify_results/qwen32b_asynctls_lb_v1_per_group_20261115/pred_r1/2wikimqa-asynctls_vendor_qwen3_32b_qasper_per_group_k1024_b64_kb128_h932711dc4e-20261115T01.jsonl",
+      "rows": 100,
+      "result_sha256": "ffac4faeb32bd6895ad96403156a5ede80ca89a87c110f558ea6ba6c3abca506",
+      "runcap_sha256": "012c327c87a1cea92319deff3025ee08596a4c84e56bbe569420f8c51108b168",
+      "cap_identity_hash": "48508c51a2",
+      "source_sha256": "4c555240d567abc824de74a6aa2aade1683541a2e4e41d59a25c3f9ffafb329e",
+      "actual_input_ids_ordered_sha256": "a9f81ffa4bc9a7e30856335a1d8f84a277fb0a36ee42beb07ef88448f37ae0f9",
+      "input_tokens_min": 1030,
+      "input_tokens_max": 17039,
+      "truncated": 0,
+      "max_new_tokens": 32,
+      "treatment_sha256": "932711dc4efdbc6a4cdf800d318fcc503d65d89c25d9dbd03af01fcfe4760910",
+      "checks": [
+        "runcap-schema-result-binding",
+        "full-source-identity-and-round-robin-ids",
+        "producer-and-fixed-treatment",
+        "per-sample-tokenizer-input-token-counts-hashes-and-truncation",
+        "source-answer-metadata-and-eager-execution"
+      ]
+    },
+    {
+      "task": "musique",
+      "rank": 0,
+      "world_size": 2,
+      "path": "/home/wangyuanshuo02/ak_verify_results/qwen32b_asynctls_lb_v1_per_group_20261115/pred_r0/musique-asynctls_vendor_qwen3_32b_qasper_per_group_k1024_b64_kb128_h932711dc4e-20261115T01.jsonl",
+      "rows": 100,
+      "result_sha256": "6226932b2a7148f669b1e40f52d48333390c6054db386d5fdde1f8f17657ad55",
+      "runcap_sha256": "1fa965b678e5fead78a463454b57947bc95a1271135ed06ab37397f2cb513591",
+      "cap_identity_hash": "5b86e132d1",
+      "source_sha256": "e3354e5125f899f90f0099e4c3e6bc38b94b43b83cc8a45e2e7644527ebe39a5",
+      "actual_input_ids_ordered_sha256": "66da70128f92ccb9efe8df25a53fb4a4e2ab8a7d2c1cbb53a106ce9393f88697",
+      "input_tokens_min": 6814,
+      "input_tokens_max": 17646,
+      "truncated": 0,
+      "max_new_tokens": 32,
+      "treatment_sha256": "932711dc4efdbc6a4cdf800d318fcc503d65d89c25d9dbd03af01fcfe4760910",
+      "checks": [
+        "runcap-schema-result-binding",
+        "full-source-identity-and-round-robin-ids",
+        "producer-and-fixed-treatment",
+        "per-sample-tokenizer-input-token-counts-hashes-and-truncation",
+        "source-answer-metadata-and-eager-execution"
+      ]
+    },
+    {
+      "task": "musique",
+      "rank": 1,
+      "world_size": 2,
+      "path": "/home/wangyuanshuo02/ak_verify_results/qwen32b_asynctls_lb_v1_per_group_20261115/pred_r1/musique-asynctls_vendor_qwen3_32b_qasper_per_group_k1024_b64_kb128_h932711dc4e-20261115T01.jsonl",
+      "rows": 100,
+      "result_sha256": "5942ca29805eee3d6b06b1e0c95682d6bcf333691ec21243bb5c4ca6f625b959",
+      "runcap_sha256": "068da1f0c61222bd1dd61776b49279e1f6b397b91a2b620c6b1d87311c3212be",
+      "cap_identity_hash": "5b86e132d1",
+      "source_sha256": "e3354e5125f899f90f0099e4c3e6bc38b94b43b83cc8a45e2e7644527ebe39a5",
+      "actual_input_ids_ordered_sha256": "7991c0537c088a731dd9e8e84045ee220d8cf4eed428bee57e6f28528ac4c1cb",
+      "input_tokens_min": 7809,
+      "input_tokens_max": 17910,
+      "truncated": 0,
+      "max_new_tokens": 32,
+      "treatment_sha256": "932711dc4efdbc6a4cdf800d318fcc503d65d89c25d9dbd03af01fcfe4760910",
+      "checks": [
+        "runcap-schema-result-binding",
+        "full-source-identity-and-round-robin-ids",
+        "producer-and-fixed-treatment",
+        "per-sample-tokenizer-input-token-counts-hashes-and-truncation",
+        "source-answer-metadata-and-eager-execution"
+      ]
+    }
+  ],
+  "limitations": [
+    "当前 JSONL 不含逐请求生成 token/stop-reason/backend-call receipt，本审计不虚构这些字段。",
+    "局部 PASS 不代表 LongBench v1 16 任务质量完成，不产生 macro/micro 分数。"
+  ]
+}

@@ -34,7 +34,7 @@
 
 - [x] [TL-NFA-OBS-ABLATION-20261106] O-GATE 12 plans/240请求/60份 raw Q/K 与 B-REPLAY 12 plans/240文档/69952 cells 全部独立验收通过；精简结果已入库，明确固定轨迹 CPU replay 非质量、性能或生产 bit-exact 证据，K2=1024 逻辑支持集对照 7248/7248 不相等。([详情](task_details/TL-NFA-OBS-ABLATION-20261106.md))
 
-- [ ] [TL-ASYNCTLS-PAPER-QWEN32B-LBV1-20261110] 修正 AsyncTLS 每 KV group 独立选择、上一步块选集与完整 prompt dense prefill 语义；完成回归和 Qwen3-32B 新校准后运行 LongBench v1，结果独立验收前保持 pending。([详情](task_details/TL-ASYNCTLS-PAPER-QWEN32B-LBV1-20261110.md))
+- [ ] [TL-ASYNCTLS-PAPER-QWEN32B-LBV1-20261110] 每 KV group 独立选择、上一步块选集与完整 prompt dense prefill 回归已通过；Qwen3-32B 新校准及双路真实 32B smoke 已闭格，LongBench v1 双卡 world=2 正式链已产出 12/32 complete 分片、1150/3750 条预测，6/16 任务双 rank 闭集；生产侧独立进程逐样本输入/runcap 复算 PASS，未评分、未合并，结果独立验收前保持 pending。([详情](task_details/TL-ASYNCTLS-PAPER-QWEN32B-LBV1-20261110.md))
 
 - [x] [TL-RULER-REGION-SELECTOR-20261110] 按用户收窄范围仅交付 Qwen3-8B Single-pool MinMax × RULER 32K/64K/128K × 11任务×100条；33/33 cells、3300条预测及六项独立只读验收全部通过，AVG11=40.1333/36.1909/24.3212，状态 `usable-with-scope`，不作性能或跨臂结论。([详情](task_details/TL-RULER-REGION-SELECTOR-20261110.md))
 

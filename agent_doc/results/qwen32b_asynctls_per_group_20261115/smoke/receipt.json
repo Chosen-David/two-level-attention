@@ -1,0 +1,54 @@
+{
+  "schema": "qwen3-32b-asynctls-real-model-smoke-receipt-v1",
+  "status": "complete",
+  "verification": "pending-independent-verification",
+  "created_date": "2026-11-15",
+  "producer": {
+    "git_commit": "1cfed8481e87a62b3a705cd981049e8e699a1f81",
+    "script_path": "benchmark/LongBench/pred.py",
+    "script_sha256": "8be2ee032422ac8d0099a19f8ebc1ab66454d125892602b7fb7bc31dcf7ed81d"
+  },
+  "attempt1": {
+    "status": "failed-gate",
+    "ranks": [0, 1],
+    "error": "079 nfa_layer_skip_path missing because --nfa_enable_layer_skip false was omitted",
+    "logs": ["logs/qasper_r0.log", "logs/qasper_r1.log"],
+    "predictions_written": false
+  },
+  "attempt2": {
+    "status": "PASS",
+    "run_timestamp": "20261115T_smoke_attempt2",
+    "task": "qasper",
+    "ranks": [0, 1],
+    "world_size": 100,
+    "rows_per_rank": 2,
+    "total_rows": 4,
+    "execution": "eager",
+    "max_new_tokens": 128,
+    "effective_cap": 31500,
+    "truncated_requests": 0,
+    "checks": [
+      "complete runcap and exactly two predictions per rank",
+      "result SHA256 recomputed from bytes",
+      "producer commit and script SHA256",
+      "source_order[rank::world_size] IDs 0/100 and 1/101",
+      "actual input token counts and per-sample input SHA256 present",
+      "all requested and actual execution modes are eager"
+    ],
+    "results": {
+      "rank0": {
+        "input_tokens": [4085, 7644],
+        "result_sha256": "d293e41b81ad2ebb545e6cbf058687e7ad1c66001a50f9ded36681039b64029d",
+        "runcap_sha256": "7ed4c47db20088062bfe4ed96ab2c2c473f314d1162c11e23065ebb085c46933",
+        "log_sha256": "013fac536eda1558c85ab74225813e6b57768af3864dec6fc427aa23341a8c27"
+      },
+      "rank1": {
+        "input_tokens": [3422, 5978],
+        "result_sha256": "551281c6413a70e5df1eb8f2056448199dc0fe9dd40a723f47d818b35d0bfb1e",
+        "runcap_sha256": "e1437aaa8a26dc412e8ec2bb1edb19f3761db2766ccf3c8d691bff289a5dbade",
+        "log_sha256": "363781495ba7ebf1458718922557cd8c22002c0e5d389cd352909bfe0684564f"
+      }
+    }
+  },
+  "scope": "Real Qwen3-32B functional smoke only; no LongBench quality or performance claim. Formal 16-task generation requires separate completion and scoring audits."
+}
