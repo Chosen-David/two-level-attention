@@ -1,0 +1,43 @@
+[START] L=131072 B=1 output=/home/wangyuanshuo02/ak_verify_results/qwen3_official_ruler_perf_19edfebd_20261115/quest/quest_b1_128k.json
+Traceback (most recent call last):
+  File "/tmp/qwen3-official-smoke-19edfebd-20261115/benchmark/official_baselines/long_context_official.py", line 204, in <module>
+    main()
+  File "/tmp/qwen3-official-smoke-19edfebd-20261115/benchmark/official_baselines/long_context_official.py", line 137, in main
+    engine = OfficialEngine(args, len(ids) + args.max_new_tokens + 16)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/qwen3-official-smoke-19edfebd-20261115/benchmark/official_baselines/longbench_official.py", line 239, in __init__
+    self._init_quest(max_model_len)
+  File "/tmp/qwen3-official-smoke-19edfebd-20261115/benchmark/official_baselines/longbench_official.py", line 246, in _init_quest
+    from benchmark.official_baselines.qwen3_quest_kernel import (
+  File "/tmp/qwen3-official-smoke-19edfebd-20261115/benchmark/official_baselines/qwen3_quest_kernel.py", line 28, in <module>
+    import quest._kernels as quest_kernels  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ModuleNotFoundError: No module named 'quest'
+[START] L=131072 B=1 output=/home/wangyuanshuo02/ak_verify_results/qwen3_official_ruler_perf_19edfebd_20261115/quest/quest_b1_128k.json
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/5 [00:00<?, ?it/s]Loading checkpoint shards:  20%|██        | 1/5 [00:00<00:01,  2.41it/s]Loading checkpoint shards:  40%|████      | 2/5 [00:00<00:01,  2.43it/s]Loading checkpoint shards:  60%|██████    | 3/5 [00:01<00:00,  2.49it/s]Loading checkpoint shards:  80%|████████  | 4/5 [00:01<00:00,  2.71it/s]Loading checkpoint shards: 100%|██████████| 5/5 [00:01<00:00,  3.56it/s]Loading checkpoint shards: 100%|██████████| 5/5 [00:01<00:00,  3.02it/s]
+The following generation flags are not valid and may be ignored: ['top_p', 'top_k']. Set `TRANSFORMERS_VERBOSITY=info` for more details.
+[LONG PERF] quest L=131072 repeat=0 TPOT=24.812ms
+[LONG PERF] quest L=131072 repeat=1 TPOT=24.685ms
+[LONG PERF] quest L=131072 repeat=2 TPOT=24.565ms
+[LONG PERF DONE] /home/wangyuanshuo02/ak_verify_results/qwen3_official_ruler_perf_19edfebd_20261115/quest/quest_b1_128k.json
+[DONE] L=131072 B=1
+[START] L=65536 B=1 output=/home/wangyuanshuo02/ak_verify_results/qwen3_official_ruler_perf_19edfebd_20261115/quest/quest_b1_64k.json
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/5 [00:00<?, ?it/s]Loading checkpoint shards:  20%|██        | 1/5 [00:00<00:01,  2.42it/s]Loading checkpoint shards:  40%|████      | 2/5 [00:00<00:01,  2.44it/s]Loading checkpoint shards:  60%|██████    | 3/5 [00:01<00:00,  2.45it/s]Loading checkpoint shards:  80%|████████  | 4/5 [00:01<00:00,  2.66it/s]Loading checkpoint shards: 100%|██████████| 5/5 [00:01<00:00,  3.54it/s]Loading checkpoint shards: 100%|██████████| 5/5 [00:01<00:00,  2.99it/s]
+The following generation flags are not valid and may be ignored: ['top_p', 'top_k']. Set `TRANSFORMERS_VERBOSITY=info` for more details.
+[LONG PERF] quest L=65536 repeat=0 TPOT=22.984ms
+[LONG PERF] quest L=65536 repeat=1 TPOT=23.140ms
+[LONG PERF] quest L=65536 repeat=2 TPOT=22.950ms
+[LONG PERF DONE] /home/wangyuanshuo02/ak_verify_results/qwen3_official_ruler_perf_19edfebd_20261115/quest/quest_b1_64k.json
+[DONE] L=65536 B=1
+[START] L=32768 B=1 output=/home/wangyuanshuo02/ak_verify_results/qwen3_official_ruler_perf_19edfebd_20261115/quest/quest_b1_32k.json
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/5 [00:00<?, ?it/s]Loading checkpoint shards:  20%|██        | 1/5 [00:00<00:01,  2.40it/s]Loading checkpoint shards:  40%|████      | 2/5 [00:00<00:01,  2.50it/s]Loading checkpoint shards:  60%|██████    | 3/5 [00:01<00:00,  2.49it/s]Loading checkpoint shards:  80%|████████  | 4/5 [00:01<00:00,  2.71it/s]Loading checkpoint shards: 100%|██████████| 5/5 [00:01<00:00,  3.60it/s]Loading checkpoint shards: 100%|██████████| 5/5 [00:01<00:00,  3.04it/s]
+The following generation flags are not valid and may be ignored: ['top_p', 'top_k']. Set `TRANSFORMERS_VERBOSITY=info` for more details.
+[LONG PERF] quest L=32768 repeat=0 TPOT=19.267ms
+[LONG PERF] quest L=32768 repeat=1 TPOT=19.401ms
+[LONG PERF] quest L=32768 repeat=2 TPOT=19.125ms
+[LONG PERF DONE] /home/wangyuanshuo02/ak_verify_results/qwen3_official_ruler_perf_19edfebd_20261115/quest/quest_b1_32k.json
+[DONE] L=32768 B=1
+[CHAIN DONE]

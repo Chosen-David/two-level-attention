@@ -1,0 +1,70 @@
+[START] L=262144 B=2 output=/home/wangyuanshuo02/ak_verify_results/qwen3_official_ruler_perf_19edfebd_20261115/nfa/nfa_graph_b2_256k.json
+Token indices sequence length is longer than the specified maximum sequence length for this model (261935 > 131072). Running this sequence through the model will result in indexing errors
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/5 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 5/5 [00:00<00:00, 182.18it/s]
+register qwen3 attn: [model.layers.0.self_attn]
+register iter91 rmsnorm: [model.layers.0.self_attn.q_norm]
+register iter91 rmsnorm: [model.layers.0.self_attn.k_norm]
+register iter91 rmsnorm: [model.layers.0.input_layernorm]
+register iter91 rmsnorm: [model.layers.0.post_attention_layernorm]
+register iter97 MLP SiLU+mul: [model.layers.0.mlp]
+Traceback (most recent call last):
+  File "/tmp/qwen3-official-smoke-19edfebd-20261115/benchmark/efficiency/benchmark_long_context_two_point.py", line 496, in <module>
+    main()
+  File "/tmp/qwen3-official-smoke-19edfebd-20261115/benchmark/efficiency/benchmark_long_context_two_point.py", line 477, in main
+    generated, timing = timed_pair(engine, ids, args.max_new_tokens)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/qwen3-official-smoke-19edfebd-20261115/benchmark/official_baselines/longbench_official.py", line 527, in timed_pair
+    raise RuntimeError(
+RuntimeError: 两点法 decode 时间非正: -0.3824041932821274; T(1)=500.99470134824514, T(33)=500.612297154963
+[START] L=262144 B=2 output=/home/wangyuanshuo02/ak_verify_results/qwen3_official_ruler_perf_19edfebd_20261115/nfa/nfa_graph_b2_256k.json
+Token indices sequence length is longer than the specified maximum sequence length for this model (261935 > 131072). Running this sequence through the model will result in indexing errors
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/5 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 5/5 [00:00<00:00, 185.49it/s]
+register qwen3 attn: [model.layers.0.self_attn]
+register iter91 rmsnorm: [model.layers.0.self_attn.q_norm]
+register iter91 rmsnorm: [model.layers.0.self_attn.k_norm]
+register iter91 rmsnorm: [model.layers.0.input_layernorm]
+register iter91 rmsnorm: [model.layers.0.post_attention_layernorm]
+register iter97 MLP SiLU+mul: [model.layers.0.mlp]
+[LONG PERF] nfa-graph L=262144 B=2 repeat=0 TPOT=28.233ms
+[LONG PERF] nfa-graph L=262144 B=2 repeat=1 TPOT=28.737ms
+[LONG PERF] nfa-graph L=262144 B=2 repeat=2 TPOT=23.362ms
+[LONG PERF DONE] /home/wangyuanshuo02/ak_verify_results/qwen3_official_ruler_perf_19edfebd_20261115/nfa/nfa_graph_b2_256k.json
+[DONE] L=262144 B=2
+[START] L=262144 B=4 output=/home/wangyuanshuo02/ak_verify_results/qwen3_official_ruler_perf_19edfebd_20261115/nfa/nfa_graph_b4_256k.json
+Token indices sequence length is longer than the specified maximum sequence length for this model (261935 > 131072). Running this sequence through the model will result in indexing errors
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/5 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 5/5 [00:00<00:00, 179.52it/s]
+register qwen3 attn: [model.layers.0.self_attn]
+register iter91 rmsnorm: [model.layers.0.self_attn.q_norm]
+register iter91 rmsnorm: [model.layers.0.self_attn.k_norm]
+register iter91 rmsnorm: [model.layers.0.input_layernorm]
+register iter91 rmsnorm: [model.layers.0.post_attention_layernorm]
+register iter97 MLP SiLU+mul: [model.layers.0.mlp]
+Traceback (most recent call last):
+  File "/tmp/qwen3-official-smoke-19edfebd-20261115/benchmark/efficiency/benchmark_long_context_two_point.py", line 496, in <module>
+    main()
+  File "/tmp/qwen3-official-smoke-19edfebd-20261115/benchmark/efficiency/benchmark_long_context_two_point.py", line 475, in main
+    timed_pair(engine, ids, args.max_new_tokens, require_positive=False)
+  File "/tmp/qwen3-official-smoke-19edfebd-20261115/benchmark/official_baselines/longbench_official.py", line 518, in timed_pair
+    first_ids, ttft = engine.generate(ids, 1, ignore_eos=True)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/qwen3-official-smoke-19edfebd-20261115/benchmark/efficiency/benchmark_long_context_two_point.py", line 190, in generate
+    return self._generate_nfa(prompt, max_new_tokens)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/qwen3-official-smoke-19edfebd-20261115/benchmark/efficiency/benchmark_long_context_two_point.py", line 205, in _generate_nfa
+    self._nfa_cache = build_frozen_cache(
+                      ^^^^^^^^^^^^^^^^^^^
+  File "/tmp/qwen3-official-smoke-19edfebd-20261115/sparse_attn/engine/frozen_runner.py", line 77, in build_frozen_cache
+    return GraphReadyPagedRegionCache(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/qwen3-official-smoke-19edfebd-20261115/sparse_attn/cache/paged_region_cache.py", line 156, in __init__
+    self.layers = [
+                  ^
+  File "/tmp/qwen3-official-smoke-19edfebd-20261115/sparse_attn/cache/paged_region_cache.py", line 157, in <listcomp>
+    GraphReadyPagedRegionLayer(
+  File "/tmp/qwen3-official-smoke-19edfebd-20261115/sparse_attn/cache/paged_region_cache.py", line 96, in __init__
+    self.kv_pool_v = torch.empty(
+                     ^^^^^^^^^^^^
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 2.01 GiB. GPU 0 has a total capacity of 139.72 GiB of which 1.49 GiB is free. Process 531291 has 138.21 GiB memory in use. Of the allocated memory 137.54 GiB is allocated by PyTorch, and 257.77 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)

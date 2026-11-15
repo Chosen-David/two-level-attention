@@ -1,0 +1,35 @@
+[START] L=262144 B=1 output=/home/wangyuanshuo02/ak_verify_results/qwen3_official_ruler_perf_19edfebd_20261115/asynctls/asynctls_graph_b1_256k.json
+Token indices sequence length is longer than the specified maximum sequence length for this model (261935 > 131072). Running this sequence through the model will result in indexing errors
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/5 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 5/5 [00:00<00:00, 185.99it/s]
+[LONG PERF] asynctls-semantic-graph L=262144 B=1 repeat=0 TPOT=25.076ms
+[LONG PERF] asynctls-semantic-graph L=262144 B=1 repeat=1 TPOT=24.907ms
+[LONG PERF] asynctls-semantic-graph L=262144 B=1 repeat=2 TPOT=24.989ms
+[LONG PERF DONE] /home/wangyuanshuo02/ak_verify_results/qwen3_official_ruler_perf_19edfebd_20261115/asynctls/asynctls_graph_b1_256k.json
+[DONE] L=262144 B=1
+[START] L=262144 B=2 output=/home/wangyuanshuo02/ak_verify_results/qwen3_official_ruler_perf_19edfebd_20261115/asynctls/asynctls_graph_b2_256k.json
+Token indices sequence length is longer than the specified maximum sequence length for this model (261935 > 131072). Running this sequence through the model will result in indexing errors
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/5 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 5/5 [00:00<00:00, 182.71it/s]
+[LONG PERF] asynctls-semantic-graph L=262144 B=2 repeat=0 TPOT=33.048ms
+[LONG PERF] asynctls-semantic-graph L=262144 B=2 repeat=1 TPOT=33.016ms
+[LONG PERF] asynctls-semantic-graph L=262144 B=2 repeat=2 TPOT=33.092ms
+[LONG PERF DONE] /home/wangyuanshuo02/ak_verify_results/qwen3_official_ruler_perf_19edfebd_20261115/asynctls/asynctls_graph_b2_256k.json
+[DONE] L=262144 B=2
+[START] L=262144 B=4 output=/home/wangyuanshuo02/ak_verify_results/qwen3_official_ruler_perf_19edfebd_20261115/asynctls/asynctls_graph_b4_256k.json
+Token indices sequence length is longer than the specified maximum sequence length for this model (261935 > 131072). Running this sequence through the model will result in indexing errors
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/5 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 5/5 [00:00<00:00, 184.07it/s]
+Traceback (most recent call last):
+  File "/tmp/qwen3-official-smoke-19edfebd-20261115/benchmark/efficiency/benchmark_asynctls_two_point.py", line 364, in <module>
+    main()
+  File "/tmp/qwen3-official-smoke-19edfebd-20261115/benchmark/efficiency/benchmark_asynctls_two_point.py", line 306, in main
+    engine = AsyncTLSTwoPointEngine(args, model, tokenizer, len(ids))
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/qwen3-official-smoke-19edfebd-20261115/benchmark/efficiency/benchmark_asynctls_two_point.py", line 145, in __init__
+    self.runtime_impl = AsyncTLSQwen3GraphRuntime(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/qwen3-official-smoke-19edfebd-20261115/exp/vendor_baselines/asynctls_vendor/qwen3_asynctls_graph.py", line 76, in __init__
+    self.v_cache = torch.empty(cache_shape, dtype=self.dtype, device=device)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 71.95 GiB. GPU 0 has a total capacity of 139.72 GiB of which 51.90 GiB is free. Process 468559 has 87.81 GiB memory in use. Of the allocated memory 87.24 GiB is allocated by PyTorch, and 147.18 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)

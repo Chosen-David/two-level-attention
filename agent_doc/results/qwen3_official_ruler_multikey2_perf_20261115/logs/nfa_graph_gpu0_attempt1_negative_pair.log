@@ -1,0 +1,19 @@
+[START] L=262144 B=2 output=/home/wangyuanshuo02/ak_verify_results/qwen3_official_ruler_perf_19edfebd_20261115/nfa/nfa_graph_b2_256k.json
+Token indices sequence length is longer than the specified maximum sequence length for this model (261935 > 131072). Running this sequence through the model will result in indexing errors
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/5 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 5/5 [00:00<00:00, 182.18it/s]
+register qwen3 attn: [model.layers.0.self_attn]
+register iter91 rmsnorm: [model.layers.0.self_attn.q_norm]
+register iter91 rmsnorm: [model.layers.0.self_attn.k_norm]
+register iter91 rmsnorm: [model.layers.0.input_layernorm]
+register iter91 rmsnorm: [model.layers.0.post_attention_layernorm]
+register iter97 MLP SiLU+mul: [model.layers.0.mlp]
+Traceback (most recent call last):
+  File "/tmp/qwen3-official-smoke-19edfebd-20261115/benchmark/efficiency/benchmark_long_context_two_point.py", line 496, in <module>
+    main()
+  File "/tmp/qwen3-official-smoke-19edfebd-20261115/benchmark/efficiency/benchmark_long_context_two_point.py", line 477, in main
+    generated, timing = timed_pair(engine, ids, args.max_new_tokens)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/qwen3-official-smoke-19edfebd-20261115/benchmark/official_baselines/longbench_official.py", line 527, in timed_pair
+    raise RuntimeError(
+RuntimeError: 两点法 decode 时间非正: -0.3824041932821274; T(1)=500.99470134824514, T(33)=500.612297154963

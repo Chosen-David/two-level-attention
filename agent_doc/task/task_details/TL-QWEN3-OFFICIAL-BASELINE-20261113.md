@@ -490,9 +490,22 @@ Date: 2026-11-13
 - 结果=`agent_doc/results/qwen32b_quest_lbv2_topk64_734f539d_20261115/summary.json`，SHA256=`f735e174049197dfc40d752fdd07aa18994e563453699111e14e96cc65729248`；`shard_audit.json` SHA256=`582f92e29ef1f6f720bb6c406bf3ef0e7d459dbc7063106454841de546238068`，逐样本 strict 结果 SHA256=`4d01f55581b82b261c12f09213730e0a043aeb760697e1f95f8a57774405fe0a`，57项文件manifest SHA256=`dc5faf8e8b8f0d5a92b32ad859367c076e26a2b62163bacbeb0b23e6f737e9f6`。审计器SHA256=`32c505137b8e0132ca5ed34f8be408e5565da4a21b4bdbac68af0157e0d0f0a3`。派单清单已更新为complete并登记最终证据，SHA256=`1e3cee0156fa6cfffe9214b734a6e3993f166d9e01f100f4ec323b4c8681e17f`；全部结果继续保持 `pending-independent-verification`。
 - 本机两条正式性能链继续运行，统一审计已由11 complete/15 pending推进到 **16 complete、10 pending、2 resource-blocked**，审计SHA256=`063a3516b65b52e8dbfa5ebbb13aab7afdcdf4927433fce82caaa6cf50d5ea5b`。新增闭格包括NFA 128K B1/B2/B4（中位TPOT=18.8528/15.8075/25.1072ms，B2低repeat=3.3572ms如实保留）和AsyncTLS 128K B4、64K B1/B2（中位TPOT=46.2248/24.2021/31.9759ms）；当前NFA在64K B2、AsyncTLS在64K B4，partial repeat不计完成。
 
+### 2026-11-15 07:40：Qwen32B Quest 质量推送与 AsyncTLS 性能链闭集
+
+- Qwen3-32B 官方Quest LongBench v2 的68个质量结果、原始分片、canonical、official-strict评分、生产侧审计、复现脚本及任务文档已精确提交并正常推送 `origin/main`，commit=`9f901675750436e015ec7061be9a5ec4151e7496`。提交未包含Quest/JSSA第三方工作树或三份旧profiler SQLite；原始首次失败日志保持原字节。结果仍为183/503、official eval=36.38，继续保持 `pending-independent-verification`，不重复测量。
+- AsyncTLS正式链已真实打印 `[CHAIN DONE]`，后台任务已结束且GPU1释放至1MiB、无compute app。32K/64K/128K/256K的B1/B2/B4共12格中，11个可测格均完成1 warmup+3 repeats并通过统一定义、输入身份、RoPE、调用回执、Graph、预算及无fallback审计；256K B4保持resource-blocked OOM，不重试。中位TPOT分别为：32K B1/B2/B4=`23.9578/31.6374/45.8491ms`，64K=`24.2021/31.9759/46.1242ms`，128K=`24.2910/32.0543/46.2248ms`，256K B1/B2=`24.9893/33.0482ms`。完整日志SHA256=`0a3349822586c2dd177f7cebfc2f07ae61f49e620518547677ab700ced82a0f9`。
+- 当前矩阵审计为 **21 complete、5 pending、2 resource-blocked**，`performance_audit.json` SHA256=`974a67214bb62a45a4ace93427e0128647d198b47d15a7450e25e0cbea88f6ae`；审计器SHA256=`4a5f38f0d356194f1d97460c016ff271f6f8751a20423763cd4b50bc8c235299`。剩余全部为NFA：64K B1/B4及32K B1/B2/B4；NFA链仍在64K B4真实运行，GPU0约62GiB且util=100%。最终26个measurable cells全部闭集后才归档、提交并推送完整性能矩阵。
+
+### 2026-11-15 08:03：RULER MultiKey2 四方法性能矩阵闭集与归档
+
+- NFA后台任务 `bij37tbu4` 已真实完成并返回 `completed/exit_code=0`，NFA与AsyncTLS日志均以 `[CHAIN DONE]` 结束；没有因等待超时或后台句柄查询失败而重复启动。最终统一审计为 **PASS：26 complete、0 pending、48 matrix cells、2 resource-blocked**，另含4个固定cu129 wheel阻塞的JSSA B1格和16个无已验收官方高性能batched path的Quest/JSSA B2/B4格。最终 `performance_audit.json` SHA256=`bacc13b272c974d5dc6e0b0ed29489c4e9f68a3c375295a91e2b03525c983507`，NFA日志SHA256=`1d9f8c076090d0cf192a1ada4fc761fbfe772f980931859ee446f7353cfc69fa`。
+- NFA中位TPOT：32K B1/B2/B4=`12.588/13.926/15.996ms`，64K=`14.934/16.9461/18.848ms`，128K=`18.8528/15.8075/25.1072ms`，256K B1/B2=`26.2036/28.2327ms`；256K B4为真实cache分配OOM，保持resource-blocked。128K B2三次repeat完整保留为 `15.807458432391286/3.3572011161595583/21.380052901804447ms`，不删除异常低值、不用smoke或partial补齐。Quest B1和AsyncTLS各可测格沿用前述正式结果，两个256K B1格只复用同协议既有闭集回执，未重复测量。
+- 已执行 `agent_doc/results/archive_qwen3_official_ruler_perf_20261115.py`，归档至 `agent_doc/results/qwen3_official_ruler_multikey2_perf_20261115/`。24份新原始JSON逐文件SHA与审计一致，另有6份日志、3个runner、审计器、最终审计、summary及manifest；manifest登记36份文件，两个复用原始回执继续引用 `qwen3_official_long_context_20261113/` 并登记绝对路径与SHA。`summary.json` SHA256=`39f59fd7aa29bb348b9e1151d54e106591e19f0e101f87ddc244501853bef615`，`manifest.json` SHA256=`ba1b96ddd62a26e6e2cf464046ae7ac2007eecf265c08ec69a26c2047c783f93`。所有结果继续保持 `pending-independent-verification`，生产侧PASS不冒充不同owner独立验收。
+- 最终本机GPU0/GPU1均释放至1MiB、util=0%、无compute app。下一步只精确提交本轮性能结果、归档脚本和任务文档并正常推送 `origin/main`，不包含第三方工作树或旧profiler SQLite。
+
 ### 阻塞与下一步
 
-1. 继续收割本机 `bij37tbu4` 与 `bgzxq6604` 的真实日志和逐格JSON，最终应得到26个complete measurable cells及2个resource-blocked，统一审计才可为PASS；不以smoke、partial repeat或OOM冒充正式性能。Quest/JSSA B>1继续fail-closed，JSSA固定cu129 wheel不换版本。
+1. 本机两条性能链均已完整结束，26个complete measurable cells及2个resource-blocked已通过统一审计并归档；不以smoke、partial repeat或OOM冒充正式性能。下一步精确提交并正常推送本轮性能结果、归档脚本和任务文档；Quest/JSSA B>1继续fail-closed，JSSA固定cu129 wheel不换版本。
 2. Qwen3-32B Quest八rank、canonical 503题、official-strict评分及八片生产侧审计已全部完成，结果183/503、official eval=36.38，保持 `pending-independent-verification`；不得重复Qwen3-8B/32B Quest LBV2、三模型FullKV LBV2或已闭集LongBench v1。
 3. NFA/FlashInfer LongBench16 canonical结果已作为 `ec672453` 精确提交并推送，保持生产侧闭集与 `pending-independent-verification`；后续性能/质量提交只纳入本轮证据、复现脚本和文档，不包含旧profiler SQLite或第三方工作树。
 4. 取得同一vLLM提交的官方cu129预编译wheel后再验收JSSA；不换提交、不换CUDA变体、不退回Torch。其他AI的GLM AsyncTLS/NFA保持不动，旧P0a/P0b及256K/512K/1M扩展任务不得提前标完成。
