@@ -142,7 +142,7 @@ a_arms = {
     "A4_tail32_gate_on": "tail32;gate on;obs256;tau0.10",
     "FullKV": "dense FullKV reference",
 }
-ruler_audit_path = ROOT / "ruler_formal/_audits/pc31_32k_complete_audit.json"
+ruler_audit_path = ROOT / "ruler_formal/_audits/local_archive_reaudit.json"
 ruler_results = {}
 if ruler_audit_path.exists():
     ruler_audit = json.loads(ruler_audit_path.read_text())
