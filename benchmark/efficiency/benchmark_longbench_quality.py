@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import math
 import subprocess
 import time
 from pathlib import Path
@@ -56,6 +57,8 @@ def parse_args():
     parser.add_argument("--nfa-subspace", choices=("full", "tail"), default="tail")
     parser.add_argument("--nfa-subspace-dim", type=int, choices=(16, 32, 64, 128), default=None)
     parser.add_argument("--nfa-gate", choices=("off", "on"), default="off")
+    parser.add_argument("--nfa-gate-epsilon", type=float, default=None,
+                        help="NFA gate-on epsilon；默认 0.1，gate-off 强制为 0")
     parser.add_argument("--nfa-far-method", choices=("minmax", "avg", "avg_top2"),
                         default="minmax")
     parser.add_argument("--model-path", default="/home/wangyuanshuo02/Qwen3-8B")
@@ -74,7 +77,8 @@ def parse_args():
 
 def resolve_nfa_quality_config(subspace, gate, subspace_dim=None,
                                near_pages=None, near_tokens=None,
-                               far_method="minmax", near_method="avg"):
+                               far_method="minmax", near_method="avg",
+                               gate_epsilon=0.10):
     """返回模型 patch 与 prefill 标定共用的配置；尾维维度必须真实落到 ratio。"""
     if subspace not in {"full", "tail"} or gate not in {"off", "on"}:
         raise ValueError("NFA 质量臂只支持 full/tail × gate off/on")
@@ -82,6 +86,12 @@ def resolve_nfa_quality_config(subspace, gate, subspace_dim=None,
         raise ValueError(f"未知 NFA far_method: {far_method}")
     if near_method not in {"avg", "minmax"}:
         raise ValueError(f"未知 NFA near_method: {near_method}")
+    try:
+        gate_epsilon = float(gate_epsilon)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("NFA gate epsilon 必须是 [0, 1] 内的有限浮点数") from exc
+    if not math.isfinite(gate_epsilon) or not 0.0 <= gate_epsilon <= 1.0:
+        raise ValueError("NFA gate epsilon 必须是 [0, 1] 内的有限浮点数")
     if subspace_dim is None:
         subspace_dim = 128 if subspace == "full" else 32
     if subspace_dim not in {16, 32, 64, 128}:
@@ -98,11 +108,27 @@ def resolve_nfa_quality_config(subspace, gate, subspace_dim=None,
         patch_args.nfa_near_pages = near_pages
     if near_tokens is not None:
         patch_args.nfa_near_tokens = near_tokens
+    effective_epsilon = gate_epsilon if gate == "on" else 0.0
     patch_args.nfa_enable_layer_skip = gate == "on"
-    patch_args.nfa_dyn_dgate_eps = 0.10
+    patch_args.nfa_dyn_dgate_eps = effective_epsilon
     patch_args.nfa_dyn_dgate_rows = 256
-    gate_config = GateConfig(epsilon=0.10 if gate == "on" else 0.0, rows=256)
+    gate_config = GateConfig(epsilon=effective_epsilon, rows=256)
     return patch_args, gate_config
+
+
+def nfa_quality_arm(subspace, gate, subspace_dim=None, *, gate_epsilon=0.10,
+                    far_method="minmax"):
+    """非默认 epsilon 使用独立臂名；默认 0.1 保持历史目录兼容。"""
+    if subspace_dim is None:
+        subspace_dim = 128 if subspace == "full" else 32
+    arm = (f"{subspace}_gate_{gate}"
+           if subspace_dim in {32, 128}
+           else f"tail{subspace_dim}_gate_{gate}")
+    if gate == "on" and gate_epsilon != 0.10:
+        arm += f"_eps{gate_epsilon:g}"
+    if far_method != "minmax":
+        arm += f"_far_{far_method}"
+    return arm
 
 
 def source_receipt():
@@ -202,9 +228,11 @@ class RequestQualityEngine(RequestTwoPointEngine):
                 near_tokens=selector.nfa_near_tokens,
                 boundary_bypass=selector.nfa_boundary_bypass,
             )
-            self.runtime["nfa_quality_arm"] = (
-                f"{'full' if selector.nfa_subspace == 'full' else f'tail{subspace_dim}'}_"
-                f"gate_{'on' if selector.nfa_enable_layer_skip else 'off'}")
+            self.runtime["nfa_quality_arm"] = nfa_quality_arm(
+                selector.nfa_subspace,
+                "on" if selector.nfa_enable_layer_skip else "off",
+                subspace_dim, gate_epsilon=selector.nfa_dyn_dgate_eps,
+                far_method=selector.nfa_far_method)
 
     def generate(self, ids, max_new_tokens, ignore_eos, stop_token_ids=None,
                  min_new_tokens=0, stop_strings=None):
@@ -418,18 +446,19 @@ def main():
     cap_gate_info = enforce_context_capability_gate(
         args.model_name, args.model_path, max_length, args.config_path)
     if args.method == "nfa":
+        gate_epsilon = 0.10 if args.nfa_gate_epsilon is None else args.nfa_gate_epsilon
         args.nfa_patch_args, args.nfa_gate_config = resolve_nfa_quality_config(
             args.nfa_subspace, args.nfa_gate, args.nfa_subspace_dim,
+            far_method=args.nfa_far_method, gate_epsilon=gate_epsilon)
+        arm = nfa_quality_arm(
+            args.nfa_subspace, args.nfa_gate, args.nfa_subspace_dim,
+            gate_epsilon=args.nfa_gate_config.epsilon,
             far_method=args.nfa_far_method)
-        arm = (
-            f"{args.nfa_subspace}_gate_{args.nfa_gate}"
-            if args.nfa_subspace_dim in (None, 32, 128)
-            else f"tail{args.nfa_subspace_dim}_gate_{args.nfa_gate}")
-        if args.nfa_far_method != "minmax":
-            arm += f"_far_{args.nfa_far_method}"
     else:
         if args.nfa_far_method != "minmax":
             raise ValueError("FullKV 臂不得携带会被忽略的 NFA far method")
+        if args.nfa_gate_epsilon is not None:
+            raise ValueError("FullKV 臂不得携带会被忽略的 NFA gate epsilon")
         args.nfa_patch_args = args.nfa_gate_config = None
         arm = "fullkv"
     args.quality_label = f"{args.method}_{arm}_{args.execution}"

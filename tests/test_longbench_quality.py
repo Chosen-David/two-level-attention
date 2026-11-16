@@ -7,6 +7,7 @@ from transformers import AutoTokenizer
 
 from benchmark.efficiency.benchmark_longbench_quality import (
     _validate_quality_receipt,
+    nfa_quality_arm,
     resolve_nfa_quality_config,
 )
 from sparse_attn.indexer.nfa_indexer import NFAIndexer
@@ -21,7 +22,7 @@ def test_nfa_quality_2x2_uses_one_config_for_patch_and_prefill(subspace, gate):
     patch_args, gate_config = resolve_nfa_quality_config(subspace, gate)
     assert patch_args.nfa_subspace == subspace
     assert patch_args.nfa_enable_layer_skip is (gate == "on")
-    assert patch_args.nfa_dyn_dgate_eps == 0.10
+    assert patch_args.nfa_dyn_dgate_eps == (0.10 if gate == "on" else 0.0)
     assert patch_args.nfa_dyn_dgate_rows == 256
     assert patch_args.nfa_near_tokens == "off"
     assert patch_args.tia_level2_cmp_ratio == 4
@@ -37,6 +38,34 @@ def test_nfa_quality_2x2_uses_one_config_for_patch_and_prefill(subspace, gate):
     assert patch_args.nfa_boundary_bypass is True
     assert gate_config.epsilon == (0.10 if gate == "on" else 0.0)
     assert gate_config.rows == 256
+
+
+@pytest.mark.parametrize("epsilon", [0.01, 0.05, 0.1, 0.2, 0.5])
+def test_nfa_gate_epsilon_reaches_patch_prefill_and_arm(epsilon):
+    patch_args, gate_config = resolve_nfa_quality_config(
+        "tail", "on", gate_epsilon=epsilon)
+    assert patch_args.nfa_dyn_dgate_eps == epsilon
+    assert gate_config.epsilon == epsilon
+    expected_arm = ("tail_gate_on" if epsilon == 0.1
+                    else f"tail_gate_on_eps{epsilon:g}")
+    assert nfa_quality_arm(
+        "tail", "on", gate_epsilon=gate_config.epsilon) == expected_arm
+
+
+@pytest.mark.parametrize("epsilon", [-0.01, 1.01, float("nan"), float("inf")])
+def test_nfa_gate_epsilon_rejects_invalid_values(epsilon):
+    with pytest.raises(ValueError, match="gate epsilon"):
+        resolve_nfa_quality_config("tail", "on", gate_epsilon=epsilon)
+
+
+def test_nfa_gate_off_forces_zero_epsilon_everywhere():
+    patch_args, gate_config = resolve_nfa_quality_config(
+        "tail", "off", gate_epsilon=0.5)
+    assert patch_args.nfa_enable_layer_skip is False
+    assert patch_args.nfa_dyn_dgate_eps == 0.0
+    assert gate_config.epsilon == 0.0
+    assert nfa_quality_arm(
+        "tail", "off", gate_epsilon=gate_config.epsilon) == "tail_gate_off"
 
 
 def test_nfa_quality_numeric_near_quota_reaches_real_indexer():
@@ -145,6 +174,23 @@ def test_nfa_gate_off_receipt_requires_all_layers_to_keep():
     with pytest.raises(RuntimeError, match="gate-off"):
         _validate_quality_receipt(
             "nfa", "eager", 36, 64, receipt, nfa_gate_epsilon=0.0)
+
+
+def test_nfa_gate_on_receipt_requires_exact_epsilon_match():
+    receipt = _nfa_receipt("eager")
+    receipt.update(
+        gate_epsilon=0.05,
+        gate_counts={"keep": 36, "near": 0, "far": 0, "both": 0},
+        prefill_decisions={
+            str(layer): {"skip_near": False, "skip_far": False}
+            for layer in range(36)
+        },
+    )
+    _validate_quality_receipt(
+        "nfa", "eager", 36, 64, receipt, nfa_gate_epsilon=0.05)
+    with pytest.raises(RuntimeError, match="gate epsilon"):
+        _validate_quality_receipt(
+            "nfa", "eager", 36, 64, receipt, nfa_gate_epsilon=0.1)
 
 
 def _nfa_receipt(execution):
