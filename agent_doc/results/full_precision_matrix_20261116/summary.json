@@ -74,10 +74,10 @@
     "Qwen3-8B": {
       "longbench_v1": {
         "reuse": ["FullKV", "NFA", "Quest", "JSSA", "AsyncTLS"],
-        "merge-audit": ["FASA"],
+        "rescore-only": ["FASA"],
         "partial": ["MoBA"],
         "missing_or_unrecovered": ["MInference", "SparQ", "ClusterKV", "HISA"],
-        "note": "FASA恢复目录3750/3750、16/16 strict runcap及SHA通过，但高层报告与恢复generation分数来源不一致，且输入身份为legacy_strict；MoBA旧full文件实际只有13/16任务。"
+        "note": "FASA pred_fasa_1024恢复目录3750/3750、16/16 strict runcap及SHA通过，生产侧AVG16=33.31与fasa_lb_16.json逐任务一致；输入身份仅为legacy_strict。另一份AVG16=35.15报告的source file/generation尚未定位，保留为独立report-only恢复候选，不覆盖33.31证据。MoBA原始13任务3150行已恢复，缺samsum/trec/passage_count且无run-cap sidecar；canonical difflib AVG13=49.04，显式Levenshtein复算逐任务吻合旧AVG13=49.19。"
       },
       "longbench_v2": {
         "reuse": ["FullKV", "Quest", "JSSA", "AsyncTLS"],
@@ -158,13 +158,16 @@
       "llama_nfa_k128_L131072_rescore.json"
     ],
     "qwen8_extended_baseline": "15个历史运行归档、16500条prediction逐文件SHA/ID/answers/官方分复算通过；其中3个为替代或重复generation，不记为额外唯一覆盖。",
-    "fasa_longbench": "独立staging重评分完成16/16、3750/3750；strict_validated=16、legacy_strict=16、v2_validated=0。"
+    "fasa_longbench": "pred_fasa_1024独立staging重评分完成16/16、3750/3750，AVG16=33.31，与exp/trace/results/fasa_lb_16.json逐任务一致；strict_validated=16、legacy_strict=16、v2_validated=0。另一份AVG16=35.15报告的qwen3_8b_longbench_fasa_vendor.json及原始generation未定位，不与前者混池。",
+    "moba_longbench": "原始13任务、3150行及13项SHA256副本一致；缺samsum/trec/passage_count，strict_validated=0、legacy_no_sidecar=13、cap_effective=null、v2_validated=0、legacy_strict=0。canonical difflib重评分LCC/RepoBench=67.68/66.67、AVG13=49.04；显式Levenshtein 0.27.5复算为68.98/68.13、AVG13=49.19，逐任务吻合e89_moba_full.json，差异仅为已固定披露的代码相似度后端。",
+    "qwen32b_nfa_longbench": "三项补缺passage_count/samsum/trec各200行、strict runcap和v2输入身份已定位并正式评分15.50/37.28/73.50；既有13任务当前仅有result.json汇总，原始generation仍未恢复，因此全16任务继续merge-audit而非reuse。",
+    "quest_jssa_recovery": "历史报告精确指向pc14:/tmp/tli-baseline-jssa-quest；pc14当前及历史旧地址均SSH超时，pc02/pc40/pc31/pc32的主仓、ak_verify_results和/tmp精确文件名检索均为0，四套RULER原始generation保持recover。"
   },
   "dispatch_state": {
     "producer": "9f3e8057acd528a904aa8883b830d541b389e39f",
     "formal_requests_started": 0,
     "last_ignition_attempt": "pc32 C2/C3链因远程内联shell提前展开循环变量而在参数检查退出；无prediction、无正式worker。随后pc32亦出现其他计算PID。",
-    "resource_policy": "只使用点火前重新实测空闲的卡；pc02/pc40/pc31/pc32出现的其他计算进程均不触碰。",
+    "resource_policy": "只使用点火前重新实测空闲的卡；最新pc33/pc02/pc40/pc31/pc32全部卡均有其他compute app，均不触碰；pc14两次SSH超时，不作为可用资源。",
     "next": "使用落盘链脚本重新点火C2/C3；SparQ/HISA/ClusterKV缺口在vendor资产和空闲GPU同时满足后执行。"
   }
 }
