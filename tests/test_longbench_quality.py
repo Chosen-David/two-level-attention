@@ -39,6 +39,23 @@ def test_nfa_quality_2x2_uses_one_config_for_patch_and_prefill(subspace, gate):
     assert gate_config.rows == 256
 
 
+def test_nfa_quality_numeric_near_quota_reaches_real_indexer():
+    patch_args, _ = resolve_nfa_quality_config(
+        "tail", "off", near_pages=32, near_tokens=448)
+    indexer = NFAIndexer(patch_args)
+    assert indexer.nt_near_pages == 32
+    assert indexer.nt_near_tokens == 448
+
+
+def test_nfa_quality_far_method_reaches_real_indexer():
+    patch_args, _ = resolve_nfa_quality_config(
+        "full", "off", far_method="avg_top2")
+    indexer = NFAIndexer(patch_args)
+    assert indexer.far_method == "avg_top2"
+    with pytest.raises(ValueError, match="far_method"):
+        resolve_nfa_quality_config("full", "off", far_method="unknown")
+
+
 def test_nfa_quality_2x2_rejects_unknown_arm():
     with pytest.raises(ValueError, match="full/tail"):
         resolve_nfa_quality_config("random", "off")

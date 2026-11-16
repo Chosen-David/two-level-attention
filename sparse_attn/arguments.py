@@ -279,8 +279,10 @@ def _add_nfa_args(parser: argparse.ArgumentParser):
     group.add_argument('--nfa_far_tokens', type=int, default=512)
     group.add_argument('--nfa_layer_skip_path', type=str, default=None)
     # ---- E64 框架参数化（B 配置帕累托点：bp128+sup_wsvd d8+alpha0.125/beta0.25/gamma0.5）----
-    group.add_argument('--nfa_far_method', type=str, default='minmax', choices=['minmax', 'avg'],
-                       help='far 池 L1 粗筛分数源: minmax=块上界(默认) / avg=块均值')
+    group.add_argument('--nfa_far_method', type=str, default='minmax',
+                       choices=['minmax', 'avg', 'avg_top2'],
+                       help='far 池 L1 粗筛分数源: minmax=块上界(默认) / avg=GQA 均值 / '
+                            'avg_top2=各 query head 块均值分的最高两者均值')
     group.add_argument('--nfa_near_method', type=str, default='avg', choices=['avg', 'minmax'],
                        help='near 池 L1 粗筛分数源: avg=块均值(默认) / minmax=块上界')
     # 【E155d 参数退役（用户 2026-10-19 拍板：全面转向 nl/nb/nt）】α/β/γ

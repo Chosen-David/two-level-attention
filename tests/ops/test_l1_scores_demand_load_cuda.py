@@ -144,7 +144,8 @@ class L1ScoresDemandLoadTest(unittest.TestCase):
         skip_far = torch.tensor([1, 0, 1, 0], dtype=torch.bool, device=device)
         skip_near = torch.tensor([0, 0, 1, 1], dtype=torch.bool, device=device)
 
-        def run(kernel, far_avg, near_avg, min_arg=None, max_arg=None):
+        def run(kernel, far_avg, near_avg, min_arg=None, max_arg=None,
+                far_top2=False):
             far = torch.full((layers * batch, hkv, t), 13.25,
                              dtype=torch.bfloat16, device=device)
             near = torch.full_like(far, 13.25)
@@ -166,7 +167,9 @@ class L1ScoresDemandLoadTest(unittest.TestCase):
                 STRIDE_KR=kmin.stride(1), STRIDE_KR2=kmax.stride(1),
                 STRIDE_KRS=sum_arg.stride(1), HAS_AVG=has_avg,
                 FAR_AVG=far_avg, NEAR_AVG=near_avg,
-                MAX_REQ=batch, LAYER_OFFSET=0, num_warps=4)
+                MAX_REQ=batch, LAYER_OFFSET=0, num_warps=4,
+                **({} if kernel is _reference_l1_scores_kernel
+                   else {"FAR_TOP2": far_top2}))
             torch.cuda.synchronize()
             return far, near, stats_len
 
@@ -201,6 +204,87 @@ class L1ScoresDemandLoadTest(unittest.TestCase):
         assert_active_and_poison_tail(reference, actual)
 
     @unittest.skipUnless(torch.cuda.is_available(), "需要 CUDA")
+    def test_avg_top2_gqa4_matches_per_head_torch_topk(self):
+        """新聚合只改变 GQA 归约；点积和候选池仍由旧 kernel 独立对拍。"""
+        layers, batch, hkv, group, d = 1, 4, 1, 4, 32
+        t, bs, bt = 80, 16, 16
+        device = "cuda"
+        torch.manual_seed(20261116)
+        shape = (layers, batch, t, hkv, d)
+        kmin = torch.randn(shape, dtype=torch.bfloat16, device=device)
+        kmax = torch.randn(shape, dtype=torch.bfloat16, device=device)
+        ksum = torch.randn(shape, dtype=torch.bfloat16, device=device)
+        q = torch.randn((layers * batch * hkv * group, d),
+                        dtype=torch.bfloat16, device=device)
+        # 全零 Q 制造 +0/-0 与同分；其他 request 覆盖 NaN、±inf 和重复分数。
+        q[0].zero_()
+        q[1].zero_().neg_()
+        q[2].zero_()
+        q[3].zero_().neg_()
+        q[4] = float("nan")
+        q[5] = float("inf")
+        q[9] = q[8]
+        ksum[0, 2, 7, 0, 2] = float("-inf")
+        ksum[0, 3, 9, 0, 3] = float("inf")
+        lengths_host = [1003, 1280, 1093, 997]
+        lengths = torch.tensor(lengths_host, dtype=torch.int64, device=device)
+        active_req = torch.arange(batch, dtype=torch.int64, device=device)
+        valid_req = torch.tensor([1, 0, 3, 2], dtype=torch.int64, device=device)
+        skip_far = torch.tensor([0, 1, 1, 0], dtype=torch.bool, device=device)
+        skip_near = torch.tensor([0, 0, 1, 1], dtype=torch.bool, device=device)
+
+        def launch(kernel, group_value, stats, far_top2=False):
+            min_value, max_value, sum_value = stats
+            hkv_value = min_value.shape[3]
+            far = torch.full((layers * batch, hkv_value, t), 13.25,
+                             dtype=torch.bfloat16, device=device)
+            near = torch.full_like(far, 13.25)
+            stats_len = torch.zeros((layers, batch), dtype=torch.int64,
+                                    device=device)
+            kernel[(triton.cdiv(t, bt), layers * batch * hkv_value)](
+                min_value, max_value, sum_value, q, lengths, active_req,
+                skip_far, skip_near, valid_req, stats_len, far, near, t,
+                min_value.stride(2), min_value.stride(3),
+                max_value.stride(2), max_value.stride(3),
+                sum_value.stride(2), sum_value.stride(3), q.stride(0),
+                PAGE=bs, BS=bs, SINK=4, NEAR_LEN=256, WINDOW=64,
+                POOL_NEAR_LEN=256, SINK_POOL_LO=0, Hkv=hkv_value,
+                G=group_value, D=d, BT=bt, B=batch,
+                STRIDE_KB=min_value.stride(0), STRIDE_KB2=max_value.stride(0),
+                STRIDE_KS=sum_value.stride(0), STRIDE_KR=min_value.stride(1),
+                STRIDE_KR2=max_value.stride(1), STRIDE_KRS=sum_value.stride(1),
+                HAS_AVG=True, FAR_AVG=True, NEAR_AVG=True,
+                MAX_REQ=batch, LAYER_OFFSET=0, num_warps=4,
+                **({} if kernel is _reference_l1_scores_kernel
+                   else {"FAR_TOP2": far_top2}))
+            torch.cuda.synchronize()
+            return far, near
+
+        stats = (kmin, kmax, ksum)
+        actual_far, actual_near = launch(
+            _nfa_l1_scores_kernel, group, stats, far_top2=True)
+        reference_near = launch(_reference_l1_scores_kernel, group, stats)[1]
+        repeated_stats = tuple(
+            value.repeat_interleave(group, dim=3) for value in stats)
+        per_head_far = launch(
+            _reference_l1_scores_kernel, 1, repeated_stats)[0]
+        reference_far = per_head_far.reshape(
+            layers * batch, hkv, group, t).topk(2, dim=2).values.mean(dim=2)
+
+        for row, length in enumerate(lengths_host):
+            active = triton.cdiv(length, bs)
+            for reference, actual in ((reference_far, actual_far),
+                                      (reference_near, actual_near)):
+                torch.testing.assert_close(
+                    reference[row, :, :active].view(torch.int16),
+                    actual[row, :, :active].view(torch.int16),
+                    rtol=0, atol=0)
+                torch.testing.assert_close(
+                    actual[row, :, active:],
+                    torch.full_like(actual[row, :, active:], 13.25),
+                    rtol=0, atol=0)
+
+    @unittest.skipUnless(torch.cuda.is_available(), "需要 CUDA")
     def test_region_wrappers_cover_candidates_with_reduced_grids(self):
         """独立 near/far 入口的小 grid 不得漏掉非对齐区域尾部。"""
         batch, hkv, group, d = 4, 1, 2, 32
@@ -224,7 +308,8 @@ class L1ScoresDemandLoadTest(unittest.TestCase):
                         for length in lengths_host)
         far_grid = triton.cdiv(far_width, bt)
 
-        def run(kernel, grid, skip_far_value, skip_near_value, far_avg, near_avg):
+        def run(kernel, grid, skip_far_value, skip_near_value, far_avg, near_avg,
+                far_top2=False):
             far = torch.full((batch, hkv, t), 13.25,
                              dtype=torch.bfloat16, device=device)
             near = torch.full_like(far, 13.25)
@@ -247,20 +332,25 @@ class L1ScoresDemandLoadTest(unittest.TestCase):
                 STRIDE_KS=sum_arg.stride(0), STRIDE_KR=kmin.stride(1),
                 STRIDE_KR2=kmax.stride(1), STRIDE_KRS=sum_arg.stride(1),
                 HAS_AVG=has_avg, FAR_AVG=far_avg, NEAR_AVG=near_avg,
-                MAX_REQ=batch, LAYER_OFFSET=0, num_warps=4)
+                MAX_REQ=batch, LAYER_OFFSET=0, num_warps=4,
+                **({} if kernel is _reference_l1_scores_kernel
+                   else {"FAR_TOP2": far_top2}))
             torch.cuda.synchronize()
             return far, near, stats_len
 
-        for far_avg, near_avg in ((False, False), (False, True), (True, True)):
+        for far_avg, near_avg, far_top2 in (
+                (False, False, False), (False, True, False),
+                (True, True, False), (True, True, True)):
             for region, kernel, grid in (
                     (1, _nfa_l1_near_scores_kernel, near_grid),
                     (2, _nfa_l1_far_scores_kernel, far_grid)):
                 with self.subTest(region=region, far_avg=far_avg,
-                                  near_avg=near_avg):
+                                  near_avg=near_avg, far_top2=far_top2):
                     reference = run(_nfa_l1_scores_kernel, triton.cdiv(t, bt),
-                                    region == 1, region == 2, far_avg, near_avg)
+                                    region == 1, region == 2, far_avg, near_avg,
+                                    far_top2)
                     actual = run(kernel, grid, region == 1, region == 2,
-                                 far_avg, near_avg)
+                                 far_avg, near_avg, far_top2)
                     for row, length in enumerate(lengths_host):
                         kt_eff = triton.cdiv(length, bs)
                         near_start = max(

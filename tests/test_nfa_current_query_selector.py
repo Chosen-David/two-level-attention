@@ -184,6 +184,47 @@ def test_current_query_not_previous_frame_query():
     assert current_ids != previous_ids
 
 
+def test_avg_top2_split_q_and_eager_multistep_bypass_launch_plan(monkeypatch):
+    cache, attention, _ = _make_counterfactual_cache()
+    generator = torch.Generator(device='cuda').manual_seed(20261116)
+    attention.indexer.far_method = 'avg_top2'
+    attention.indexer.args.nfa_far_method = 'avg_top2'
+    attention.scaling = 0.123456789
+    current, previous = _counterfactual_queries()
+    original_l1_scores = selector_ops._l1_scores
+    observed = []
+
+    def capture_q(*args, **kwargs):
+        observed.append((args[3].clone(), kwargs['top2_q'].clone()))
+        return original_l1_scores(*args, **kwargs)
+
+    monkeypatch.setattr(selector_ops, '_l1_scores', capture_q)
+    for step, query in enumerate((current, previous)):
+        if step:
+            cache.commit_step()
+            _plan_and_write(cache, [2], generator)
+        select_topk_for_layer_batched(
+            cache, 0, [2], query, attention=attention)
+        ids = _logical_ids(cache, 2, 0)
+        selected_block = 64 if step == 0 else 192
+        excluded_block = 192 if step == 0 else 64
+        assert sum(selected_block <= token < selected_block + 64
+                   for token in ids) == 60
+        assert not any(excluded_block <= token < excluded_block + 64
+                       for token in ids)
+
+        dims = attention.indexer._subspace_indices(query.device).long()
+        unrounded = query[0][:, dims].float() * attention.scaling
+        rounded = unrounded.to(torch.bfloat16).float()
+        torch.testing.assert_close(observed[-1][0][0], rounded, rtol=0, atol=0)
+        torch.testing.assert_close(
+            observed[-1][1][0], unrounded, rtol=0, atol=0)
+        assert not torch.equal(rounded, unrounded)
+
+    assert len(observed) == 2
+    assert ('eager_selector_call_plan', 0) not in cache._nfa_selector_workspace
+
+
 def _make_fixed_quota_cache(near_tokens=16, skip_state=(False, False)):
     cache, attention, generator = _make_cache(
         [2], [448], [skip_state], k1=4, near_pages=2,
@@ -633,17 +674,14 @@ def test_fixed_stats_grid_owner_writes_and_refreshes_latest_block(
                 torch.arange(HEAD_DIM, dtype=torch.int64, device=query.device))
         current_k = cache.layers[0].kv_pool_k[
             physical, 0, 0, :valid, :][:, dims].float()
-        # 生产 kernel 对末块无效 lane 以 0 参与 min/max/sum，而非只归约
-        # valid 前缀；参考必须复现这一既有数值契约。
-        padded_k = current_k.new_zeros((PAGE, dims.numel()))
-        padded_k[:valid] = current_k
+        # 非对齐尾块只对 valid 前缀归约；padding 不得进入 Min/Max。
         buffers = next(iter(cache._nfa_page_stats_persistent.values()))
         torch.testing.assert_close(
             buffers[0][0, 2, last_blk, 0],
-            padded_k.min(dim=0).values.to(torch.bfloat16), rtol=0, atol=0)
+            current_k.min(dim=0).values.to(torch.bfloat16), rtol=0, atol=0)
         torch.testing.assert_close(
             buffers[1][0, 2, last_blk, 0],
-            padded_k.max(dim=0).values.to(torch.bfloat16), rtol=0, atol=0)
+            current_k.max(dim=0).values.to(torch.bfloat16), rtol=0, atol=0)
         if decode_write is not None:
             slot = int(decode_write[2][0])
             physical, offset = slot // PAGE, slot % PAGE
@@ -694,13 +732,20 @@ def test_incremental_stats_keep_independent_history_per_layer():
             padded = keys.new_zeros((kt * PAGE, dims.numel()))
             padded[:length] = keys
             coarse = padded.view(kt, PAGE, dims.numel())
+            valid = (torch.arange(PAGE, device=query.device)[None, :]
+                     < (length - PAGE * torch.arange(
+                         kt, device=query.device)).clamp(0, PAGE)[:, None])
+            expected_min = coarse.masked_fill(
+                ~valid[..., None], float("inf")).amin(dim=1)
+            expected_max = coarse.masked_fill(
+                ~valid[..., None], float("-inf")).amax(dim=1)
             buffers = cache._nfa_page_stats_persistent[
                 (layer_idx, 1, dims.numel(), torch.bfloat16, True)]
             torch.testing.assert_close(
-                buffers[0][0, 2, :kt, 0], coarse.amin(dim=1),
+                buffers[0][0, 2, :kt, 0], expected_min,
                 rtol=0, atol=0, msg=f'min step={step} layer={layer_idx}')
             torch.testing.assert_close(
-                buffers[1][0, 2, :kt, 0], coarse.amax(dim=1),
+                buffers[1][0, 2, :kt, 0], expected_max,
                 rtol=0, atol=0, msg=f'max step={step} layer={layer_idx}')
         if step == 0:
             cache.commit_step()
@@ -889,8 +934,11 @@ def test_both_skip_light_path_capture_replay_writes_live_decode_kv():
     assert set(replay_ids) == _strict_both_skip_oracle(450)[0]
 
 
-def test_selector_capture_replay_uses_live_current_query():
+@pytest.mark.parametrize('far_method', ['minmax', 'avg_top2'])
+def test_selector_capture_replay_uses_live_current_query(far_method):
     cache, attention, _ = _make_counterfactual_cache()
+    attention.indexer.far_method = far_method
+    attention.indexer.args.nfa_far_method = far_method
     query, previous = _counterfactual_queries()
 
     def run():
