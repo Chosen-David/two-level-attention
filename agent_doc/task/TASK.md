@@ -2,7 +2,7 @@
 
 ## 2026-11-16
 
-- [ ] [TL-FULL-PRECISION-MATRIX-20261116] 四模型×FullKV/NFA×全部现行baseline×LongBench v1/v2/RULER三长度的真实覆盖矩阵已落盘；历史Llama FullKV/NFA六单元、GLM/Qwen3-32B 32K TLI及Qwen3-8B扩展baseline完成恢复和生产侧复算；FASA双来源、MoBA13任务子集与双评分后端已分列闭合，Qwen3-32B NFA既有13任务已恢复并完成canonical复评，13+3仍因跨代runcap/输入身份保持merge-audit，Quest/JSSA现场定位到暂不可达的pc14。SparQ跨producer/人口缺口及模型入口限制均显式保留。C2/C3、SparQ/HISA/ClusterKV缺口的隔离派单脚本已实现；首次远程内联链在参数检查退出且未生成prediction，改用落盘链并等待实测空闲GPU，所有结果保持pending。([详情](task_details/TL-FULL-PRECISION-MATRIX-20261116.md)；[矩阵](../results/full_precision_matrix_20261116/summary.json))
+- [ ] [TL-FULL-PRECISION-MATRIX-20261116] 四模型×FullKV/NFA×全部现行baseline×LongBench v1/v2/RULER三长度的真实覆盖矩阵已落盘；历史Llama FullKV/NFA六单元、GLM/Qwen3-32B 32K TLI及Qwen3-8B扩展baseline完成恢复和生产侧复算；FASA双来源、MoBA13任务子集与双评分后端已分列闭合，35.15汇总source file已定位但原始generation仍待恢复，Qwen3-32B NFA既有13任务已恢复并完成canonical复评，13+3仍因跨代runcap/输入身份保持merge-audit，Quest/JSSA现场定位到暂不可达的pc14。Qwen3-8B NFA LBv2入口及隔离smoke/formal分片脚本已实现，普通/-O各29项主机契约测试通过，待真实GPU smoke。C2/C3、SparQ/HISA/ClusterKV缺口脚本已落盘；最新全部实测GPU仍有其他compute app，未生成新正式请求，所有结果保持pending。([详情](task_details/TL-FULL-PRECISION-MATRIX-20261116.md)；[矩阵](../results/full_precision_matrix_20261116/summary.json))
 
 ## 2026-11-15
 

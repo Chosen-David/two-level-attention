@@ -1,4 +1,4 @@
-"""Qwen3-8B × LongBench v1 英文16任务 NFA/FlashInfer 真实质量入口。
+"""Qwen3-8B × LongBench v1 英文16任务或 LongBench v2 的 NFA/FlashInfer 真实质量入口。
 
 复用官方数据、prompt、runcap、EOS/min-new/stop-string 与评分输入格式；不复用
 固定33 token性能回执。NFA 每请求使用独立 Cache 并在边界释放 Graph session，
@@ -70,6 +70,14 @@ def parse_args():
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--visible-len", type=int, default=8192)
     return parser.parse_args()
+
+
+def validate_longbench_quality_tasks(tasks):
+    if (len(set(tasks)) != len(tasks)
+            or any(task not in {*ENGLISH16, "lbv2"} for task in tasks)):
+        raise ValueError("tasks 必须是唯一的 LongBench 英文16任务或 lbv2")
+    if "lbv2" in tasks and tasks != ["lbv2"]:
+        raise ValueError("lbv2 必须作为唯一任务运行，不能与 LongBench v1 混合")
 
 
 def resolve_nfa_quality_config(subspace, gate, subspace_dim=None,
@@ -403,8 +411,7 @@ class RequestQualityEngine(RequestTwoPointEngine):
 
 def main():
     args = parse_args()
-    if len(set(args.tasks)) != len(args.tasks) or any(t not in ENGLISH16 for t in args.tasks):
-        raise ValueError("tasks 必须是唯一的 LongBench 英文16任务")
+    validate_longbench_quality_tasks(args.tasks)
     if not 0 <= args.shard_index < args.num_shards:
         raise ValueError("要求 0<=shard-index<num-shards")
     if args.model_name != "Qwen3-8B" or args.visible_len <= 0:

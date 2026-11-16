@@ -8,9 +8,21 @@ from transformers import AutoTokenizer
 from benchmark.efficiency.benchmark_longbench_quality import (
     _validate_quality_receipt,
     resolve_nfa_quality_config,
+    validate_longbench_quality_tasks,
 )
 from sparse_attn.indexer.nfa_indexer import NFAIndexer
 from sparse_attn.scheduler.scheduler import StopStringMatcher
+
+
+def test_longbench_quality_accepts_lbv2_only_as_an_exclusive_task():
+    validate_longbench_quality_tasks(["lbv2"])
+    validate_longbench_quality_tasks(["trec", "samsum"])
+    with pytest.raises(ValueError, match="不能与 LongBench v1 混合"):
+        validate_longbench_quality_tasks(["lbv2", "trec"])
+    with pytest.raises(ValueError, match="唯一的 LongBench"):
+        validate_longbench_quality_tasks(["lbv2", "lbv2"])
+    with pytest.raises(ValueError, match="唯一的 LongBench"):
+        validate_longbench_quality_tasks(["unknown"])
 
 
 @pytest.mark.parametrize(
