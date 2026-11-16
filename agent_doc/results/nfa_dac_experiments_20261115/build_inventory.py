@@ -258,6 +258,36 @@ for arm, config in a_arms.items():
                 reuse_decision="new formal result; do not regenerate",
                 missing_work="independent owner verification")
         add(record_id, "new_A_2x2", "Qwen3-8B", dataset, arm, **common)
+
+avg_top2_dir = "ruler_avg_top2_64k_233d09af"
+avg_top2_audit_path = ROOT / avg_top2_dir / "_audits/local_archive_reaudit.json"
+avg_top2_rows = []
+if avg_top2_audit_path.exists():
+    avg_top2_audit = json.loads(avg_top2_audit_path.read_text())
+    if (avg_top2_audit["status"] != "pass-production-side"
+            or avg_top2_audit["verification"] != "pending-independent-verification"):
+        raise ValueError("avg_top2 production audit is not valid pending evidence")
+    for produced in avg_top2_audit["results"]:
+        arm = produced["arm"]
+        length = produced["context_length"]
+        if length != 65536 or produced["rows"] != 100:
+            raise ValueError(f"unexpected avg_top2 inventory cell: {arm} {length}")
+        result_root = ROOT / avg_top2_dir / arm
+        add(f"repair_avg_top2_{arm}_mk2_{length}", "repair_avg_top2_64k",
+            "Qwen3-8B", "niah_multikey_2", arm, context_length=length,
+            sample_scope="n=100;two disjoint source_order shards;same IDs as FullKV",
+            configuration="K1=128;K2=1024;page64;near32/far96;near_tokens=off;near Avg;far avg_top2;boundary true;obs256",
+            generation_protocol="dense prefill;eager;greedy;real EOS;max-new128;min-new1",
+            input_identity=produced["ordered_input_sha256"],
+            result=json.dumps({"score_percent": produced["official_score"],
+                               "prediction_sha256": produced["prediction_sha256"],
+                               "producer": produced["source_head"]}),
+            result_location=str(result_root.relative_to(REPO)),
+            evidence_status="complete repair candidate 100/100; production-side audit PASS; pending-independent-verification",
+            reuse_decision="repair candidate result; do not regenerate this closed cell",
+            missing_work="independent owner verification; full TPOT and any still-failing lengths remain open")
+        avg_top2_rows.append(produced)
+
 for arm, config, source in [
     ("B_low32", "paired low-frequency16 RoPE pairs=32 scalars;gate off", "A2_tail32_gate_off"),
     ("B_high32", "paired high-frequency16 RoPE pairs=32 scalars;gate off", ""),
@@ -358,6 +388,7 @@ summary = {
         "FlashInfer HotpotQA/GovReport rows are same-input FullKV references with page64 eager decode.",
         "All reused Qwen3 LongBench rows remain pending independent verification by a different owner.",
         "Old 113/125 were unreachable with No route to host on 2026-11-15.",
+        "Repair avg_top2 cells are additional candidates and do not replace original new_A accounting.",
     ],
 }
 for row in rows:
@@ -384,6 +415,8 @@ summary.update(
     reused_requests=reused_requests,
     produced_new_A_requests=produced_requests,
     remaining_new_A_requests=3500 - reused_requests - produced_requests,
+    repair_avg_top2_rows=len(avg_top2_rows),
+    repair_avg_top2_requests=sum(row["rows"] for row in avg_top2_rows),
 )
 assert summary["unique_ids"] == len(rows)
 assert [row["record_id"] for row in reused_a_rows] == [

@@ -1,0 +1,12 @@
+[GPU] 空闲显存 142747 / 143072 MiB
+[yarn] enabled: factor=2.0 (effective context = 81920)
+[ruler] task=niah_multikey_2 L=65536 n=1 method=tli
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/5 [00:00<?, ?it/s]Loading checkpoint shards:  20%|██        | 1/5 [00:00<00:03,  1.30it/s]Loading checkpoint shards:  40%|████      | 2/5 [00:01<00:02,  1.31it/s]Loading checkpoint shards:  60%|██████    | 3/5 [00:02<00:01,  1.31it/s]Loading checkpoint shards:  80%|████████  | 4/5 [00:02<00:00,  1.43it/s]Loading checkpoint shards: 100%|██████████| 5/5 [00:03<00:00,  1.88it/s]Loading checkpoint shards: 100%|██████████| 5/5 [00:03<00:00,  1.60it/s]
+[device-map] {'': 0}
+register qwen3 attn: [model.layers.0.self_attn]
+  0%|          | 0/1 [00:00<?, ?it/s][historical-tli:niah_multikey_2:L65536] 13 in=65424 out=128 score=0.000000 stop=max_new_tokens
+100%|██████████| 1/1 [00:37<00:00, 37.03s/it]100%|██████████| 1/1 [00:37<00:00, 37.03s/it]
+[yarn-receipt] effective config + 同代绑定 -> /tmp/nfa_historical_tli_diag_20261116/tail32/L65536/pred_historical_tail/niah_multikey_2-tli_64_128_1024_c4_ABa0_b0_g1_sk4_sw128_np32_ntoff_nl4096_h0a30f107c4-historical_sample13_mn128.jsonl.gen-20261116081255-2578820-2824/niah_multikey_2-tli_64_128_1024_c4_ABa0_b0_g1_sk4_sw128_np32_ntoff_nl4096_h0a30f107c4-historical_sample13_mn128-yarn_receipt.json（generation 目录内）
+[pred] 提交：指针 /tmp/nfa_historical_tli_diag_20261116/tail32/L65536/pred_historical_tail/niah_multikey_2-tli_64_128_1024_c4_ABa0_b0_g1_sk4_sw128_np32_ntoff_nl4096_h0a30f107c4-historical_sample13_mn128.jsonl.tli_gen -> niah_multikey_2-tli_64_128_1024_c4_ABa0_b0_g1_sk4_sw128_np32_ntoff_nl4096_h0a30f107c4-historical_sample13_mn128.jsonl.gen-20261116081255-2578820-2824
+saved -> /tmp/nfa_historical_tli_diag_20261116/tail32/L65536/pred_historical_tail/niah_multikey_2-tli_64_128_1024_c4_ABa0_b0_g1_sk4_sw128_np32_ntoff_nl4096_h0a30f107c4-historical_sample13_mn128.jsonl (via generation pointer)

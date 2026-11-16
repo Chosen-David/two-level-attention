@@ -1,0 +1,68 @@
+DIAG sample=13 subspace=full K1=128 K2=1024 out=/tmp/nfa_selection_budget_diag_20261116/hist_exact_l1_mn128
+RESOLVED K1=128 K2=1024 near_tokens=off max_new=128 dense_gather=False
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/5 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 5/5 [00:00<00:00, 160.98it/s]
+register qwen3 attn: [model.layers.0.self_attn]
+register iter91 rmsnorm: [model.layers.0.self_attn.q_norm]
+register iter91 rmsnorm: [model.layers.0.self_attn.k_norm]
+register iter91 rmsnorm: [model.layers.0.input_layernorm]
+register iter91 rmsnorm: [model.layers.0.post_attention_layernorm]
+register iter97 MLP SiLU+mul: [model.layers.0.mlp]
+Traceback (most recent call last):
+  File "/tmp/nfa_selection_budget_diag.py", line 884, in <module>
+    quality.main()
+  File "/tmp/nfa-dac-tailstats-diag-2ddfd741-20261116/benchmark/efficiency/benchmark_ruler_quality.py", line 493, in main
+    run_quality(args, engine, rows, data_sha256)
+  File "/tmp/nfa-dac-tailstats-diag-2ddfd741-20261116/benchmark/efficiency/benchmark_ruler_quality.py", line 340, in run_quality
+    generated, _ = engine.generate(
+  File "/tmp/nfa-dac-tailstats-diag-2ddfd741-20261116/benchmark/efficiency/benchmark_longbench_quality.py", line 207, in generate
+    return self._generate_nfa_quality(
+  File "/tmp/nfa-dac-tailstats-diag-2ddfd741-20261116/benchmark/efficiency/benchmark_longbench_quality.py", line 232, in _generate_nfa_quality
+    generated, _ = decode_frozen_request(
+  File "/tmp/nfa-dac-tailstats-diag-2ddfd741-20261116/sparse_attn/engine/frozen_runner.py", line 293, in decode_frozen_request
+    runner.step(
+  File "/tmp/nfa-dac-tailstats-diag-2ddfd741-20261116/sparse_attn/engine/graph_runner.py", line 180, in step
+    logits = model(
+  File "/home/wangyuanshuo02/.local/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/wangyuanshuo02/.local/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/wangyuanshuo02/.local/lib/python3.9/site-packages/transformers/utils/generic.py", line 940, in wrapper
+    output = func(self, *args, **kwargs)
+  File "/home/wangyuanshuo02/.local/lib/python3.9/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 480, in forward
+    outputs: BaseModelOutputWithPast = self.model(
+  File "/home/wangyuanshuo02/.local/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/wangyuanshuo02/.local/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/wangyuanshuo02/.local/lib/python3.9/site-packages/transformers/utils/generic.py", line 1064, in wrapper
+    outputs = func(self, *args, **kwargs)
+  File "/home/wangyuanshuo02/.local/lib/python3.9/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 410, in forward
+    hidden_states = decoder_layer(
+  File "/home/wangyuanshuo02/.local/lib/python3.9/site-packages/transformers/modeling_layers.py", line 94, in __call__
+    return super().__call__(*args, **kwargs)
+  File "/home/wangyuanshuo02/.local/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/wangyuanshuo02/.local/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/wangyuanshuo02/.local/lib/python3.9/site-packages/transformers/utils/deprecation.py", line 172, in wrapped_func
+    return func(*args, **kwargs)
+  File "/home/wangyuanshuo02/.local/lib/python3.9/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 260, in forward
+    hidden_states, _ = self.self_attn(
+  File "/home/wangyuanshuo02/.local/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/wangyuanshuo02/.local/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/tmp/nfa-dac-tailstats-diag-2ddfd741-20261116/sparse_attn/patches/qwen3_attn_patch.py", line 111, in qwen3_attn_forward
+    select_topk_for_layer_batched(
+  File "/tmp/nfa_selection_budget_diag.py", line 841, in _traced_select
+    result = _original_select(*args, **kwargs)
+  File "/tmp/nfa-dac-tailstats-diag-2ddfd741-20261116/sparse_attn/indexer/nfa_layer_batch_selector.py", line 2630, in select_topk_for_layer_batched
+    return _layer_batched_select_impl(
+  File "/tmp/nfa-dac-tailstats-diag-2ddfd741-20261116/sparse_attn/indexer/nfa_layer_batch_selector.py", line 2892, in _layer_batched_select_impl
+    far_scored, near_scored = _l1_scores(
+  File "/tmp/nfa_selection_budget_diag.py", line 387, in _l1_scores_diagnostic
+    _record_l1_variants(result[0], *args, **kwargs)
+  File "/tmp/nfa_selection_budget_diag.py", line 355, in _record_l1_variants
+    score = torch.where(valid, score, actual_far[0]).to(query.dtype)
+RuntimeError: The size of tensor a (1033) must match the size of tensor b (1023) at non-singleton dimension 1

@@ -1,0 +1,768 @@
+DIAG sample=13 subspace=full K1=128 K2=1024 out=/tmp/nfa_selection_budget_diag_20261116/hist_l2variants_exactlse_mn128_v2
+RESOLVED K1=128 K2=1024 near_tokens=off max_new=128 dense_gather=False
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/5 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 5/5 [00:00<00:00, 160.19it/s]
+register qwen3 attn: [model.layers.0.self_attn]
+register iter91 rmsnorm: [model.layers.0.self_attn.q_norm]
+register iter91 rmsnorm: [model.layers.0.self_attn.k_norm]
+register iter91 rmsnorm: [model.layers.0.input_layernorm]
+register iter91 rmsnorm: [model.layers.0.post_attention_layernorm]
+register iter97 MLP SiLU+mul: [model.layers.0.mlp]
+TRACE_L1_VARIANTS layer=0 step=0 target_head_coverage={'production': [0, 2], 'mm_mean': [0, 2], 'mm_max': [0, 1], 'mm_top2_mean': [0, 2], 'mm_mean_max_average': [0, 1], 'avg_mean': [0, 4], 'avg_max': [0, 4], 'mm_mean_plus_avg_mean': [0, 2], 'mm_max_plus_avg_mean': [0, 3], 'exact_page_max_mean': [0, 4], 'exact_page_max_max': [0, 5], 'exact_page_lse_mean': [0, 4], 'exact_page_lse_max': [0, 4]}
+TRACE_L2_VARIANTS layer=0 step=0 target_head_coverage={'historical_mean': [0, 2], 'probability_max': [0, 2], 'probability_top2_mean': [0, 2], 'probability_mean_max_average': [0, 2], 'probability_lse': [0, 1], 'logits_mean': [0, 0], 'logits_max': [0, 2], 'logits_lse': [0, 2]}
+TRACE_HIST_L2 layer=0 step=0 apply=True overlap=[402, 310, 327, 394, 389, 334, 333, 455] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=0 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=0 step=0 span=47951-47957 candidate(any,all)=([0, 1, 2, 6], [0, 1, 2, 6]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=0 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=0 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=1 step=0 target_head_coverage={'production': [0, 1], 'mm_mean': [0, 1], 'mm_max': [0, 1], 'mm_top2_mean': [0, 1], 'mm_mean_max_average': [0, 1], 'avg_mean': [0, 1], 'avg_max': [0, 1], 'mm_mean_plus_avg_mean': [0, 1], 'mm_max_plus_avg_mean': [0, 1], 'exact_page_max_mean': [0, 1], 'exact_page_max_max': [0, 2], 'exact_page_lse_mean': [0, 1], 'exact_page_lse_max': [0, 2]}
+TRACE_L2_VARIANTS layer=1 step=0 target_head_coverage={'historical_mean': [0, 1], 'probability_max': [0, 1], 'probability_top2_mean': [0, 1], 'probability_mean_max_average': [0, 1], 'probability_lse': [0, 0], 'logits_mean': [0, 1], 'logits_max': [0, 1], 'logits_lse': [0, 1]}
+TRACE_HIST_L2 layer=1 step=0 apply=True overlap=[487, 355, 585, 632, 458, 527, 392, 457] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=1 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=1 step=0 span=47951-47957 candidate(any,all)=([1], [1]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=1 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=1 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=2 step=0 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 1], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0], 'exact_page_max_mean': [0, 0], 'exact_page_max_max': [0, 0], 'exact_page_lse_mean': [0, 1], 'exact_page_lse_max': [0, 0]}
+TRACE_L2_VARIANTS layer=2 step=0 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 1], 'probability_top2_mean': [0, 1], 'probability_mean_max_average': [0, 1], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 1], 'logits_lse': [0, 1]}
+TRACE_HIST_L2 layer=2 step=0 apply=True overlap=[669, 528, 538, 520, 577, 535, 371, 643] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=2 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=2 step=0 span=47951-47957 candidate(any,all)=([7], [7]) middle(any,all)=([7], []) historical(any,all)=([], [])
+TRACE_UNION layer=2 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=2 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=3 step=0 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [1, 1], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0], 'exact_page_max_mean': [0, 1], 'exact_page_max_max': [0, 0], 'exact_page_lse_mean': [0, 1], 'exact_page_lse_max': [0, 0]}
+TRACE_L2_VARIANTS layer=3 step=0 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=3 step=0 apply=True overlap=[362, 605, 682, 689, 484, 789, 75, 223] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=3 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=3 step=0 span=47951-47957 candidate(any,all)=([3], [3]) middle(any,all)=([], []) historical(any,all)=([3], [])
+TRACE_UNION layer=3 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=3 step=0 span=47951-47957 final(any,all)=([3], [])
+TRACE_L1_VARIANTS layer=4 step=0 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0], 'exact_page_max_mean': [0, 0], 'exact_page_max_max': [0, 0], 'exact_page_lse_mean': [0, 0], 'exact_page_lse_max': [0, 0]}
+TRACE_L2_VARIANTS layer=4 step=0 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=4 step=0 apply=True overlap=[662, 438, 452, 363, 543, 628, 401, 281] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=4 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=4 step=0 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=4 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=4 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=5 step=0 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0], 'exact_page_max_mean': [0, 2], 'exact_page_max_max': [0, 1], 'exact_page_lse_mean': [0, 0], 'exact_page_lse_max': [0, 1]}
+TRACE_L2_VARIANTS layer=5 step=0 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=5 step=0 apply=True overlap=[475, 756, 296, 658, 164, 533, 567, 485] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=5 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=5 step=0 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=5 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=5 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=6 step=0 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 1], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 1], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0], 'exact_page_max_mean': [0, 0], 'exact_page_max_max': [0, 1], 'exact_page_lse_mean': [0, 0], 'exact_page_lse_max': [0, 1]}
+TRACE_L2_VARIANTS layer=6 step=0 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=6 step=0 apply=True overlap=[368, 596, 443, 565, 291, 229, 367, 370] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=6 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=6 step=0 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=6 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=6 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=7 step=0 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 1], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0], 'exact_page_max_mean': [0, 0], 'exact_page_max_max': [0, 1], 'exact_page_lse_mean': [0, 0], 'exact_page_lse_max': [0, 1]}
+TRACE_L2_VARIANTS layer=7 step=0 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=7 step=0 apply=True overlap=[591, 604, 422, 304, 197, 499, 151, 137] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=7 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=7 step=0 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=7 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=7 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=8 step=0 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [1, 1], 'mm_top2_mean': [1, 1], 'mm_mean_max_average': [1, 1], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [1, 1], 'exact_page_max_mean': [1, 0], 'exact_page_max_max': [0, 1], 'exact_page_lse_mean': [0, 0], 'exact_page_lse_max': [0, 1]}
+TRACE_L2_VARIANTS layer=8 step=0 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=8 step=0 apply=True overlap=[362, 577, 530, 420, 656, 464, 435, 429] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=8 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=8 step=0 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=8 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=8 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=9 step=0 target_head_coverage={'production': [1, 1], 'mm_mean': [1, 1], 'mm_max': [2, 1], 'mm_top2_mean': [1, 1], 'mm_mean_max_average': [1, 1], 'avg_mean': [1, 4], 'avg_max': [2, 0], 'mm_mean_plus_avg_mean': [1, 1], 'mm_max_plus_avg_mean': [2, 1], 'exact_page_max_mean': [0, 1], 'exact_page_max_max': [2, 0], 'exact_page_lse_mean': [0, 1], 'exact_page_lse_max': [2, 0]}
+TRACE_L2_VARIANTS layer=9 step=0 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=9 step=0 apply=True overlap=[431, 258, 689, 465, 409, 506, 638, 683] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=9 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=9 step=0 span=47951-47957 candidate(any,all)=([1], [1]) middle(any,all)=([1], []) historical(any,all)=([], [])
+TRACE_UNION layer=9 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=9 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=10 step=0 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 1], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 1], 'exact_page_max_mean': [0, 0], 'exact_page_max_max': [0, 0], 'exact_page_lse_mean': [0, 0], 'exact_page_lse_max': [0, 0]}
+TRACE_L2_VARIANTS layer=10 step=0 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=10 step=0 apply=True overlap=[69, 197, 228, 86, 280, 480, 244, 126] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=10 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=10 step=0 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=10 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=10 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=11 step=0 target_head_coverage={'production': [0, 2], 'mm_mean': [0, 2], 'mm_max': [0, 1], 'mm_top2_mean': [0, 2], 'mm_mean_max_average': [0, 2], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0], 'exact_page_max_mean': [0, 2], 'exact_page_max_max': [1, 3], 'exact_page_lse_mean': [0, 1], 'exact_page_lse_max': [1, 2]}
+TRACE_L2_VARIANTS layer=11 step=0 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=11 step=0 apply=True overlap=[488, 468, 501, 410, 312, 424, 346, 606] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=11 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=11 step=0 span=47951-47957 candidate(any,all)=([6], [6]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=11 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=11 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=12 step=0 target_head_coverage={'production': [0, 3], 'mm_mean': [0, 3], 'mm_max': [2, 3], 'mm_top2_mean': [1, 4], 'mm_mean_max_average': [0, 3], 'avg_mean': [0, 1], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 2], 'mm_max_plus_avg_mean': [0, 2], 'exact_page_max_mean': [1, 6], 'exact_page_max_max': [4, 5], 'exact_page_lse_mean': [0, 5], 'exact_page_lse_max': [2, 3]}
+TRACE_L2_VARIANTS layer=12 step=0 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 1], 'logits_mean': [0, 2], 'logits_max': [0, 1], 'logits_lse': [0, 1]}
+TRACE_HIST_L2 layer=12 step=0 apply=True overlap=[363, 470, 494, 564, 610, 607, 549, 290] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=12 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=12 step=0 span=47951-47957 candidate(any,all)=([1, 3, 4, 6, 7], [1, 3, 4, 6, 7]) middle(any,all)=([6, 7], []) historical(any,all)=([7], [])
+TRACE_UNION layer=12 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=12 step=0 span=47951-47957 final(any,all)=([7], [])
+TRACE_L1_VARIANTS layer=13 step=0 target_head_coverage={'production': [2, 2], 'mm_mean': [2, 2], 'mm_max': [2, 2], 'mm_top2_mean': [2, 2], 'mm_mean_max_average': [2, 2], 'avg_mean': [0, 0], 'avg_max': [0, 1], 'mm_mean_plus_avg_mean': [1, 2], 'mm_max_plus_avg_mean': [1, 2], 'exact_page_max_mean': [4, 5], 'exact_page_max_max': [5, 5], 'exact_page_lse_mean': [4, 4], 'exact_page_lse_max': [4, 5]}
+TRACE_L2_VARIANTS layer=13 step=0 target_head_coverage={'historical_mean': [1, 1], 'probability_max': [1, 1], 'probability_top2_mean': [1, 1], 'probability_mean_max_average': [1, 1], 'probability_lse': [2, 3], 'logits_mean': [2, 1], 'logits_max': [2, 2], 'logits_lse': [2, 1]}
+TRACE_HIST_L2 layer=13 step=0 apply=True overlap=[685, 424, 438, 672, 675, 525, 503, 594] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=13 step=0 span=15951-15957 candidate(any,all)=([0, 4, 5, 7], [0, 4, 5, 7]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=13 step=0 span=47951-47957 candidate(any,all)=([0, 2, 4, 5], [0, 2, 4, 5]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=13 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=13 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=14 step=0 target_head_coverage={'production': [0, 1], 'mm_mean': [0, 1], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 1], 'avg_max': [1, 0], 'mm_mean_plus_avg_mean': [0, 1], 'mm_max_plus_avg_mean': [0, 1], 'exact_page_max_mean': [3, 4], 'exact_page_max_max': [3, 4], 'exact_page_lse_mean': [2, 4], 'exact_page_lse_max': [3, 4]}
+TRACE_L2_VARIANTS layer=14 step=0 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [1, 3], 'logits_mean': [0, 0], 'logits_max': [0, 2], 'logits_lse': [0, 1]}
+TRACE_HIST_L2 layer=14 step=0 apply=True overlap=[314, 634, 458, 548, 642, 402, 574, 507] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=14 step=0 span=15951-15957 candidate(any,all)=([1, 6], [1, 6]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=14 step=0 span=47951-47957 candidate(any,all)=([1, 3, 4, 6], [1, 3, 4, 6]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=14 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=14 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=15 step=0 target_head_coverage={'production': [1, 2], 'mm_mean': [1, 2], 'mm_max': [1, 2], 'mm_top2_mean': [1, 2], 'mm_mean_max_average': [1, 1], 'avg_mean': [1, 5], 'avg_max': [1, 4], 'mm_mean_plus_avg_mean': [1, 3], 'mm_max_plus_avg_mean': [1, 3], 'exact_page_max_mean': [5, 8], 'exact_page_max_max': [5, 8], 'exact_page_lse_mean': [4, 8], 'exact_page_lse_max': [5, 8]}
+TRACE_L2_VARIANTS layer=15 step=0 target_head_coverage={'historical_mean': [3, 2], 'probability_max': [3, 2], 'probability_top2_mean': [3, 2], 'probability_mean_max_average': [3, 2], 'probability_lse': [3, 5], 'logits_mean': [3, 2], 'logits_max': [3, 2], 'logits_lse': [3, 2]}
+TRACE_HIST_L2 layer=15 step=0 apply=True overlap=[626, 649, 668, 631, 705, 360, 590, 453] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=15 step=0 span=15951-15957 candidate(any,all)=([1, 2, 3, 4], [1, 2, 3, 4]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=15 step=0 span=47951-47957 candidate(any,all)=([0, 1, 2, 3, 4, 5, 6, 7], [0, 1, 2, 3, 4, 5, 6, 7]) middle(any,all)=([0, 1, 2, 3, 4, 7], []) historical(any,all)=([2, 3, 4], [])
+TRACE_UNION layer=15 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=15 step=0 span=47951-47957 final(any,all)=([2, 3, 4], [])
+TRACE_L1_VARIANTS layer=16 step=0 target_head_coverage={'production': [0, 1], 'mm_mean': [0, 1], 'mm_max': [0, 1], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [1, 2], 'avg_max': [0, 1], 'mm_mean_plus_avg_mean': [0, 1], 'mm_max_plus_avg_mean': [0, 1], 'exact_page_max_mean': [6, 7], 'exact_page_max_max': [6, 7], 'exact_page_lse_mean': [5, 7], 'exact_page_lse_max': [6, 7]}
+TRACE_L2_VARIANTS layer=16 step=0 target_head_coverage={'historical_mean': [3, 0], 'probability_max': [4, 0], 'probability_top2_mean': [4, 0], 'probability_mean_max_average': [4, 0], 'probability_lse': [1, 4], 'logits_mean': [3, 0], 'logits_max': [2, 1], 'logits_lse': [2, 1]}
+TRACE_HIST_L2 layer=16 step=0 apply=True overlap=[726, 587, 537, 654, 642, 604, 663, 714] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=16 step=0 span=15951-15957 candidate(any,all)=([0, 2, 3, 6, 7], [0, 2, 3, 6, 7]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=16 step=0 span=47951-47957 candidate(any,all)=([0, 1, 2, 3, 4, 6, 7], [0, 1, 2, 3, 4, 6, 7]) middle(any,all)=([7], []) historical(any,all)=([7], [])
+TRACE_UNION layer=16 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=16 step=0 span=47951-47957 final(any,all)=([7], [])
+TRACE_L1_VARIANTS layer=17 step=0 target_head_coverage={'production': [0, 1], 'mm_mean': [0, 1], 'mm_max': [0, 1], 'mm_top2_mean': [0, 1], 'mm_mean_max_average': [0, 1], 'avg_mean': [0, 1], 'avg_max': [0, 1], 'mm_mean_plus_avg_mean': [0, 2], 'mm_max_plus_avg_mean': [0, 2], 'exact_page_max_mean': [4, 7], 'exact_page_max_max': [5, 7], 'exact_page_lse_mean': [4, 8], 'exact_page_lse_max': [5, 8]}
+TRACE_L2_VARIANTS layer=17 step=0 target_head_coverage={'historical_mean': [1, 0], 'probability_max': [1, 0], 'probability_top2_mean': [1, 0], 'probability_mean_max_average': [1, 0], 'probability_lse': [1, 0], 'logits_mean': [2, 0], 'logits_max': [1, 0], 'logits_lse': [1, 0]}
+TRACE_HIST_L2 layer=17 step=0 apply=True overlap=[707, 709, 688, 757, 780, 787, 687, 709] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=17 step=0 span=15951-15957 candidate(any,all)=([1, 2, 4, 5], [1, 2, 4, 5]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=17 step=0 span=47951-47957 candidate(any,all)=([0, 1, 2, 3, 4, 5, 6, 7], [0, 1, 2, 3, 4, 5, 6, 7]) middle(any,all)=([1, 3, 6], []) historical(any,all)=([6], [])
+TRACE_UNION layer=17 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=17 step=0 span=47951-47957 final(any,all)=([6], [])
+TRACE_L1_VARIANTS layer=18 step=0 target_head_coverage={'production': [0, 3], 'mm_mean': [0, 3], 'mm_max': [0, 4], 'mm_top2_mean': [0, 2], 'mm_mean_max_average': [0, 3], 'avg_mean': [0, 1], 'avg_max': [0, 2], 'mm_mean_plus_avg_mean': [0, 3], 'mm_max_plus_avg_mean': [0, 3], 'exact_page_max_mean': [3, 8], 'exact_page_max_max': [4, 4], 'exact_page_lse_mean': [0, 8], 'exact_page_lse_max': [2, 7]}
+TRACE_L2_VARIANTS layer=18 step=0 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 1], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=18 step=0 apply=True overlap=[638, 770, 684, 776, 739, 718, 741, 785] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=18 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=18 step=0 span=47951-47957 candidate(any,all)=([0, 1, 2, 3, 4, 5, 6, 7], [0, 1, 2, 3, 4, 5, 6, 7]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=18 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=18 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=19 step=0 target_head_coverage={'production': [0, 1], 'mm_mean': [0, 1], 'mm_max': [0, 2], 'mm_top2_mean': [0, 1], 'mm_mean_max_average': [0, 1], 'avg_mean': [2, 2], 'avg_max': [2, 2], 'mm_mean_plus_avg_mean': [1, 2], 'mm_max_plus_avg_mean': [0, 1], 'exact_page_max_mean': [3, 6], 'exact_page_max_max': [4, 7], 'exact_page_lse_mean': [1, 5], 'exact_page_lse_max': [4, 6]}
+TRACE_L2_VARIANTS layer=19 step=0 target_head_coverage={'historical_mean': [1, 1], 'probability_max': [1, 1], 'probability_top2_mean': [1, 1], 'probability_mean_max_average': [1, 1], 'probability_lse': [0, 0], 'logits_mean': [1, 0], 'logits_max': [1, 0], 'logits_lse': [1, 0]}
+TRACE_HIST_L2 layer=19 step=0 apply=True overlap=[666, 626, 735, 784, 673, 481, 610, 729] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=19 step=0 span=15951-15957 candidate(any,all)=([4], [4]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=19 step=0 span=47951-47957 candidate(any,all)=([0, 1, 2, 4, 7], [0, 1, 2, 4, 7]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=19 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=19 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=20 step=0 target_head_coverage={'production': [0, 1], 'mm_mean': [0, 1], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 1], 'avg_mean': [0, 3], 'avg_max': [0, 1], 'mm_mean_plus_avg_mean': [0, 2], 'mm_max_plus_avg_mean': [0, 2], 'exact_page_max_mean': [1, 4], 'exact_page_max_max': [2, 4], 'exact_page_lse_mean': [1, 4], 'exact_page_lse_max': [2, 4]}
+TRACE_L2_VARIANTS layer=20 step=0 target_head_coverage={'historical_mean': [0, 1], 'probability_max': [0, 1], 'probability_top2_mean': [0, 1], 'probability_mean_max_average': [0, 1], 'probability_lse': [0, 0], 'logits_mean': [0, 1], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=20 step=0 apply=True overlap=[659, 608, 761, 769, 781, 629, 588, 832] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=20 step=0 span=15951-15957 candidate(any,all)=([0], [0]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=20 step=0 span=47951-47957 candidate(any,all)=([0, 1, 2, 4], [0, 1, 2, 4]) middle(any,all)=([], []) historical(any,all)=([4], [])
+TRACE_UNION layer=20 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=20 step=0 span=47951-47957 final(any,all)=([4], [])
+TRACE_L1_VARIANTS layer=21 step=0 target_head_coverage={'production': [0, 2], 'mm_mean': [0, 2], 'mm_max': [0, 1], 'mm_top2_mean': [0, 2], 'mm_mean_max_average': [0, 1], 'avg_mean': [0, 1], 'avg_max': [0, 2], 'mm_mean_plus_avg_mean': [0, 2], 'mm_max_plus_avg_mean': [0, 2], 'exact_page_max_mean': [1, 6], 'exact_page_max_max': [1, 5], 'exact_page_lse_mean': [1, 6], 'exact_page_lse_max': [1, 5]}
+TRACE_L2_VARIANTS layer=21 step=0 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 1], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 1], 'logits_lse': [0, 1]}
+TRACE_HIST_L2 layer=21 step=0 apply=True overlap=[370, 597, 763, 542, 790, 690, 718, 747] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=21 step=0 span=15951-15957 candidate(any,all)=([6], [6]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=21 step=0 span=47951-47957 candidate(any,all)=([1, 3, 4, 5, 6, 7], [1, 3, 4, 5, 6, 7]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=21 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=21 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=22 step=0 target_head_coverage={'production': [2, 3], 'mm_mean': [2, 3], 'mm_max': [4, 3], 'mm_top2_mean': [2, 3], 'mm_mean_max_average': [3, 3], 'avg_mean': [0, 0], 'avg_max': [1, 0], 'mm_mean_plus_avg_mean': [1, 0], 'mm_max_plus_avg_mean': [1, 1], 'exact_page_max_mean': [4, 7], 'exact_page_max_max': [6, 7], 'exact_page_lse_mean': [3, 7], 'exact_page_lse_max': [5, 7]}
+TRACE_L2_VARIANTS layer=22 step=0 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=22 step=0 apply=True overlap=[684, 766, 615, 723, 760, 538, 636, 637] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=22 step=0 span=15951-15957 candidate(any,all)=([0, 3, 7], [0, 3, 7]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=22 step=0 span=47951-47957 candidate(any,all)=([0, 1, 2, 3, 4, 6, 7], [0, 1, 2, 3, 4, 6, 7]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=22 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=22 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=23 step=0 target_head_coverage={'production': [0, 4], 'mm_mean': [0, 4], 'mm_max': [1, 2], 'mm_top2_mean': [0, 3], 'mm_mean_max_average': [0, 3], 'avg_mean': [0, 5], 'avg_max': [0, 3], 'mm_mean_plus_avg_mean': [0, 5], 'mm_max_plus_avg_mean': [0, 4], 'exact_page_max_mean': [1, 3], 'exact_page_max_max': [0, 2], 'exact_page_lse_mean': [1, 4], 'exact_page_lse_max': [0, 3]}
+TRACE_L2_VARIANTS layer=23 step=0 target_head_coverage={'historical_mean': [0, 1], 'probability_max': [0, 1], 'probability_top2_mean': [0, 1], 'probability_mean_max_average': [0, 1], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=23 step=0 apply=True overlap=[660, 407, 651, 725, 428, 606, 636, 756] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=23 step=0 span=15951-15957 candidate(any,all)=([7], [7]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=23 step=0 span=47951-47957 candidate(any,all)=([0, 1, 4, 6], [0, 1, 4, 6]) middle(any,all)=([], []) historical(any,all)=([1], [])
+TRACE_UNION layer=23 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=23 step=0 span=47951-47957 final(any,all)=([1], [])
+TRACE_L1_VARIANTS layer=24 step=0 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 1], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 1], 'avg_max': [0, 1], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 1], 'exact_page_max_mean': [2, 4], 'exact_page_max_max': [2, 5], 'exact_page_lse_mean': [2, 3], 'exact_page_lse_max': [2, 4]}
+TRACE_L2_VARIANTS layer=24 step=0 target_head_coverage={'historical_mean': [0, 1], 'probability_max': [0, 1], 'probability_top2_mean': [0, 1], 'probability_mean_max_average': [0, 1], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=24 step=0 apply=True overlap=[550, 609, 718, 751, 744, 634, 639, 752] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=24 step=0 span=15951-15957 candidate(any,all)=([4, 6], [4, 6]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=24 step=0 span=47951-47957 candidate(any,all)=([2, 6, 7], [2, 6, 7]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=24 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=24 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=25 step=0 target_head_coverage={'production': [0, 4], 'mm_mean': [0, 4], 'mm_max': [0, 2], 'mm_top2_mean': [0, 3], 'mm_mean_max_average': [0, 3], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 2], 'mm_max_plus_avg_mean': [0, 2], 'exact_page_max_mean': [2, 7], 'exact_page_max_max': [2, 5], 'exact_page_lse_mean': [1, 6], 'exact_page_lse_max': [1, 5]}
+TRACE_L2_VARIANTS layer=25 step=0 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=25 step=0 apply=True overlap=[520, 437, 723, 372, 421, 531, 593, 567] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=25 step=0 span=15951-15957 candidate(any,all)=([5], [5]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=25 step=0 span=47951-47957 candidate(any,all)=([0, 2, 4, 5, 6, 7], [0, 2, 4, 5, 6, 7]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=25 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=25 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=26 step=0 target_head_coverage={'production': [0, 2], 'mm_mean': [0, 2], 'mm_max': [0, 2], 'mm_top2_mean': [0, 2], 'mm_mean_max_average': [0, 2], 'avg_mean': [0, 0], 'avg_max': [1, 0], 'mm_mean_plus_avg_mean': [0, 1], 'mm_max_plus_avg_mean': [0, 0], 'exact_page_max_mean': [1, 1], 'exact_page_max_max': [2, 1], 'exact_page_lse_mean': [1, 1], 'exact_page_lse_max': [2, 2]}
+TRACE_L2_VARIANTS layer=26 step=0 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=26 step=0 apply=True overlap=[519, 738, 309, 573, 667, 664, 684, 716] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=26 step=0 span=15951-15957 candidate(any,all)=([1], [1]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=26 step=0 span=47951-47957 candidate(any,all)=([1], [1]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=26 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=26 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=27 step=0 target_head_coverage={'production': [0, 2], 'mm_mean': [0, 2], 'mm_max': [0, 2], 'mm_top2_mean': [0, 2], 'mm_mean_max_average': [0, 3], 'avg_mean': [0, 0], 'avg_max': [0, 1], 'mm_mean_plus_avg_mean': [0, 1], 'mm_max_plus_avg_mean': [0, 2], 'exact_page_max_mean': [3, 4], 'exact_page_max_max': [2, 4], 'exact_page_lse_mean': [2, 4], 'exact_page_lse_max': [2, 4]}
+TRACE_L2_VARIANTS layer=27 step=0 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 1], 'logits_lse': [0, 1]}
+TRACE_HIST_L2 layer=27 step=0 apply=True overlap=[523, 549, 532, 432, 633, 629, 698, 773] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=27 step=0 span=15951-15957 candidate(any,all)=([5, 7], [5, 7]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=27 step=0 span=47951-47957 candidate(any,all)=([0, 2, 3, 5], [0, 2, 3, 5]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=27 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=27 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=28 step=0 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0], 'exact_page_max_mean': [0, 3], 'exact_page_max_max': [1, 1], 'exact_page_lse_mean': [0, 2], 'exact_page_lse_max': [1, 0]}
+TRACE_L2_VARIANTS layer=28 step=0 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=28 step=0 apply=True overlap=[641, 311, 754, 477, 633, 583, 262, 92] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=28 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=28 step=0 span=47951-47957 candidate(any,all)=([0, 3], [0, 3]) middle(any,all)=([0], []) historical(any,all)=([0], [])
+TRACE_UNION layer=28 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=28 step=0 span=47951-47957 final(any,all)=([0], [])
+TRACE_L1_VARIANTS layer=29 step=0 target_head_coverage={'production': [0, 3], 'mm_mean': [0, 3], 'mm_max': [0, 3], 'mm_top2_mean': [0, 3], 'mm_mean_max_average': [0, 3], 'avg_mean': [0, 1], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 3], 'mm_max_plus_avg_mean': [0, 4], 'exact_page_max_mean': [0, 4], 'exact_page_max_max': [0, 2], 'exact_page_lse_mean': [0, 4], 'exact_page_lse_max': [0, 2]}
+TRACE_L2_VARIANTS layer=29 step=0 target_head_coverage={'historical_mean': [0, 1], 'probability_max': [0, 1], 'probability_top2_mean': [0, 1], 'probability_mean_max_average': [0, 1], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=29 step=0 apply=True overlap=[723, 692, 699, 731, 683, 573, 707, 490] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=29 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=29 step=0 span=47951-47957 candidate(any,all)=([0, 1, 5, 7], [0, 1, 5, 7]) middle(any,all)=([1], []) historical(any,all)=([1], [])
+TRACE_UNION layer=29 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=29 step=0 span=47951-47957 final(any,all)=([1], [])
+TRACE_L1_VARIANTS layer=30 step=0 target_head_coverage={'production': [0, 1], 'mm_mean': [0, 1], 'mm_max': [0, 3], 'mm_top2_mean': [0, 3], 'mm_mean_max_average': [0, 2], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0], 'exact_page_max_mean': [0, 5], 'exact_page_max_max': [0, 3], 'exact_page_lse_mean': [0, 4], 'exact_page_lse_max': [0, 3]}
+TRACE_L2_VARIANTS layer=30 step=0 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 1], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=30 step=0 apply=True overlap=[381, 210, 699, 459, 700, 605, 731, 93] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=30 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=30 step=0 span=47951-47957 candidate(any,all)=([0, 2, 4, 5], [0, 2, 4, 5]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=30 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=30 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=31 step=0 target_head_coverage={'production': [0, 3], 'mm_mean': [0, 3], 'mm_max': [1, 2], 'mm_top2_mean': [0, 2], 'mm_mean_max_average': [0, 2], 'avg_mean': [0, 2], 'avg_max': [1, 2], 'mm_mean_plus_avg_mean': [0, 2], 'mm_max_plus_avg_mean': [0, 1], 'exact_page_max_mean': [1, 4], 'exact_page_max_max': [1, 4], 'exact_page_lse_mean': [0, 4], 'exact_page_lse_max': [1, 3]}
+TRACE_L2_VARIANTS layer=31 step=0 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=31 step=0 apply=True overlap=[688, 774, 484, 668, 449, 668, 398, 669] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=31 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=31 step=0 span=47951-47957 candidate(any,all)=([0, 1, 2, 4], [0, 1, 2, 4]) middle(any,all)=([2, 4], []) historical(any,all)=([], [])
+TRACE_UNION layer=31 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=31 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=32 step=0 target_head_coverage={'production': [0, 4], 'mm_mean': [0, 4], 'mm_max': [0, 4], 'mm_top2_mean': [0, 4], 'mm_mean_max_average': [0, 4], 'avg_mean': [0, 3], 'avg_max': [0, 3], 'mm_mean_plus_avg_mean': [0, 5], 'mm_max_plus_avg_mean': [0, 4], 'exact_page_max_mean': [2, 5], 'exact_page_max_max': [0, 5], 'exact_page_lse_mean': [0, 5], 'exact_page_lse_max': [0, 5]}
+TRACE_L2_VARIANTS layer=32 step=0 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=32 step=0 apply=True overlap=[741, 698, 740, 477, 547, 496, 395, 175] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=32 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=32 step=0 span=47951-47957 candidate(any,all)=([0, 3, 4, 5, 6], [0, 3, 4, 5, 6]) middle(any,all)=([3, 6], []) historical(any,all)=([], [])
+TRACE_UNION layer=32 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=32 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=33 step=0 target_head_coverage={'production': [0, 1], 'mm_mean': [0, 1], 'mm_max': [0, 1], 'mm_top2_mean': [0, 1], 'mm_mean_max_average': [0, 1], 'avg_mean': [0, 1], 'avg_max': [0, 1], 'mm_mean_plus_avg_mean': [0, 1], 'mm_max_plus_avg_mean': [0, 1], 'exact_page_max_mean': [1, 3], 'exact_page_max_max': [2, 3], 'exact_page_lse_mean': [1, 3], 'exact_page_lse_max': [1, 3]}
+TRACE_L2_VARIANTS layer=33 step=0 target_head_coverage={'historical_mean': [0, 1], 'probability_max': [0, 1], 'probability_top2_mean': [0, 1], 'probability_mean_max_average': [0, 1], 'probability_lse': [0, 0], 'logits_mean': [0, 1], 'logits_max': [0, 1], 'logits_lse': [0, 1]}
+TRACE_HIST_L2 layer=33 step=0 apply=True overlap=[680, 637, 676, 784, 779, 709, 444, 771] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=33 step=0 span=15951-15957 candidate(any,all)=([0], [0]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=33 step=0 span=47951-47957 candidate(any,all)=([0, 3, 5], [0, 3, 5]) middle(any,all)=([], []) historical(any,all)=([0], [])
+TRACE_UNION layer=33 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=33 step=0 span=47951-47957 final(any,all)=([0], [])
+TRACE_L1_VARIANTS layer=34 step=0 target_head_coverage={'production': [0, 5], 'mm_mean': [0, 5], 'mm_max': [0, 5], 'mm_top2_mean': [0, 5], 'mm_mean_max_average': [0, 5], 'avg_mean': [0, 6], 'avg_max': [1, 2], 'mm_mean_plus_avg_mean': [0, 6], 'mm_max_plus_avg_mean': [0, 5], 'exact_page_max_mean': [2, 8], 'exact_page_max_max': [3, 6], 'exact_page_lse_mean': [1, 8], 'exact_page_lse_max': [2, 6]}
+TRACE_L2_VARIANTS layer=34 step=0 target_head_coverage={'historical_mean': [0, 3], 'probability_max': [0, 3], 'probability_top2_mean': [0, 4], 'probability_mean_max_average': [0, 4], 'probability_lse': [0, 0], 'logits_mean': [0, 2], 'logits_max': [0, 4], 'logits_lse': [0, 5]}
+TRACE_HIST_L2 layer=34 step=0 apply=True overlap=[765, 771, 696, 357, 554, 212, 267, 626] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=34 step=0 span=15951-15957 candidate(any,all)=([2], [2]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=34 step=0 span=47951-47957 candidate(any,all)=([0, 1, 2, 3, 4, 5, 6, 7], [0, 1, 2, 3, 4, 5, 6, 7]) middle(any,all)=([0, 7], []) historical(any,all)=([6], [])
+TRACE_UNION layer=34 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=34 step=0 span=47951-47957 final(any,all)=([6], [])
+TRACE_L1_VARIANTS layer=35 step=0 target_head_coverage={'production': [0, 2], 'mm_mean': [0, 2], 'mm_max': [0, 2], 'mm_top2_mean': [0, 2], 'mm_mean_max_average': [0, 2], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 1], 'mm_max_plus_avg_mean': [0, 1], 'exact_page_max_mean': [0, 1], 'exact_page_max_max': [0, 0], 'exact_page_lse_mean': [0, 0], 'exact_page_lse_max': [0, 0]}
+TRACE_L2_VARIANTS layer=35 step=0 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=35 step=0 apply=True overlap=[253, 269, 394, 428, 340, 252, 188, 326] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=35 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=35 step=0 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=35 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=35 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=0 step=1 target_head_coverage={'production': [0, 2], 'mm_mean': [0, 2], 'mm_max': [0, 1], 'mm_top2_mean': [0, 2], 'mm_mean_max_average': [0, 2], 'avg_mean': [0, 2], 'avg_max': [0, 2], 'mm_mean_plus_avg_mean': [0, 2], 'mm_max_plus_avg_mean': [0, 2], 'exact_page_max_mean': [0, 4], 'exact_page_max_max': [0, 2], 'exact_page_lse_mean': [0, 2], 'exact_page_lse_max': [0, 2]}
+TRACE_L2_VARIANTS layer=0 step=1 target_head_coverage={'historical_mean': [0, 1], 'probability_max': [0, 1], 'probability_top2_mean': [0, 1], 'probability_mean_max_average': [0, 1], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 2], 'logits_lse': [0, 2]}
+TRACE_HIST_L2 layer=0 step=1 apply=True overlap=[416, 313, 219, 396, 332, 269, 294, 384] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=0 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=0 step=1 span=47951-47957 candidate(any,all)=([0, 6], [0, 6]) middle(any,all)=([], []) historical(any,all)=([6], [])
+TRACE_UNION layer=0 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=0 step=1 span=47951-47957 final(any,all)=([6], [])
+TRACE_L1_VARIANTS layer=1 step=1 target_head_coverage={'production': [0, 1], 'mm_mean': [0, 1], 'mm_max': [0, 1], 'mm_top2_mean': [0, 2], 'mm_mean_max_average': [0, 1], 'avg_mean': [0, 2], 'avg_max': [0, 2], 'mm_mean_plus_avg_mean': [0, 1], 'mm_max_plus_avg_mean': [0, 1], 'exact_page_max_mean': [0, 1], 'exact_page_max_max': [0, 2], 'exact_page_lse_mean': [0, 1], 'exact_page_lse_max': [0, 1]}
+TRACE_L2_VARIANTS layer=1 step=1 target_head_coverage={'historical_mean': [0, 1], 'probability_max': [0, 1], 'probability_top2_mean': [0, 1], 'probability_mean_max_average': [0, 1], 'probability_lse': [0, 0], 'logits_mean': [0, 1], 'logits_max': [0, 1], 'logits_lse': [0, 1]}
+TRACE_HIST_L2 layer=1 step=1 apply=True overlap=[395, 262, 538, 595, 409, 520, 443, 381] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=1 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=1 step=1 span=47951-47957 candidate(any,all)=([1], [1]) middle(any,all)=([], []) historical(any,all)=([1], [])
+TRACE_UNION layer=1 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=1 step=1 span=47951-47957 final(any,all)=([1], [])
+TRACE_L1_VARIANTS layer=2 step=1 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0], 'exact_page_max_mean': [0, 0], 'exact_page_max_max': [0, 0], 'exact_page_lse_mean': [0, 0], 'exact_page_lse_max': [0, 0]}
+TRACE_L2_VARIANTS layer=2 step=1 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=2 step=1 apply=True overlap=[697, 605, 484, 527, 532, 526, 386, 619] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=2 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=2 step=1 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=2 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=2 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=3 step=1 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [1, 1], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0], 'exact_page_max_mean': [0, 1], 'exact_page_max_max': [0, 0], 'exact_page_lse_mean': [0, 1], 'exact_page_lse_max': [0, 0]}
+TRACE_L2_VARIANTS layer=3 step=1 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=3 step=1 apply=True overlap=[327, 588, 683, 717, 495, 786, 101, 296] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=3 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=3 step=1 span=47951-47957 candidate(any,all)=([3], [3]) middle(any,all)=([3], []) historical(any,all)=([3], [])
+TRACE_UNION layer=3 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=3 step=1 span=47951-47957 final(any,all)=([3], [])
+TRACE_L1_VARIANTS layer=4 step=1 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 1], 'mm_top2_mean': [0, 1], 'mm_mean_max_average': [0, 1], 'avg_mean': [0, 0], 'avg_max': [0, 1], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 1], 'exact_page_max_mean': [0, 0], 'exact_page_max_max': [0, 0], 'exact_page_lse_mean': [0, 0], 'exact_page_lse_max': [0, 0]}
+TRACE_L2_VARIANTS layer=4 step=1 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=4 step=1 apply=True overlap=[572, 448, 412, 421, 525, 688, 415, 315] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=4 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=4 step=1 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=4 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=4 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=5 step=1 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 1], 'avg_max': [1, 1], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0], 'exact_page_max_mean': [0, 0], 'exact_page_max_max': [1, 1], 'exact_page_lse_mean': [0, 0], 'exact_page_lse_max': [1, 1]}
+TRACE_L2_VARIANTS layer=5 step=1 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=5 step=1 apply=True overlap=[483, 725, 269, 626, 193, 526, 518, 453] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=5 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=5 step=1 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=5 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=5 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=6 step=1 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 2], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 1], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 1], 'exact_page_max_mean': [0, 0], 'exact_page_max_max': [0, 0], 'exact_page_lse_mean': [0, 0], 'exact_page_lse_max': [0, 0]}
+TRACE_L2_VARIANTS layer=6 step=1 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=6 step=1 apply=True overlap=[312, 612, 571, 597, 350, 264, 435, 287] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=6 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=6 step=1 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=6 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=6 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=7 step=1 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 1], 'mm_top2_mean': [0, 1], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 1], 'exact_page_max_mean': [0, 0], 'exact_page_max_max': [1, 1], 'exact_page_lse_mean': [0, 0], 'exact_page_lse_max': [1, 0]}
+TRACE_L2_VARIANTS layer=7 step=1 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=7 step=1 apply=True overlap=[579, 596, 327, 282, 207, 531, 134, 152] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=7 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=7 step=1 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=7 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=7 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=8 step=1 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 1], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0], 'exact_page_max_mean': [0, 0], 'exact_page_max_max': [0, 0], 'exact_page_lse_mean': [0, 0], 'exact_page_lse_max': [0, 0]}
+TRACE_L2_VARIANTS layer=8 step=1 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=8 step=1 apply=True overlap=[381, 611, 503, 425, 658, 398, 401, 524] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=8 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=8 step=1 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=8 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=8 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=9 step=1 target_head_coverage={'production': [1, 0], 'mm_mean': [1, 0], 'mm_max': [2, 2], 'mm_top2_mean': [1, 0], 'mm_mean_max_average': [1, 2], 'avg_mean': [0, 0], 'avg_max': [1, 1], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 1], 'exact_page_max_mean': [0, 1], 'exact_page_max_max': [1, 0], 'exact_page_lse_mean': [0, 0], 'exact_page_lse_max': [1, 1]}
+TRACE_L2_VARIANTS layer=9 step=1 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=9 step=1 apply=True overlap=[355, 216, 738, 590, 449, 559, 489, 661] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=9 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=9 step=1 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=9 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=9 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=10 step=1 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 1], 'mm_top2_mean': [0, 1], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0], 'exact_page_max_mean': [0, 0], 'exact_page_max_max': [0, 0], 'exact_page_lse_mean': [0, 0], 'exact_page_lse_max': [0, 0]}
+TRACE_L2_VARIANTS layer=10 step=1 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=10 step=1 apply=True overlap=[53, 123, 191, 141, 296, 250, 263, 87] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=10 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=10 step=1 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=10 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=10 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=11 step=1 target_head_coverage={'production': [0, 3], 'mm_mean': [0, 3], 'mm_max': [0, 2], 'mm_top2_mean': [0, 2], 'mm_mean_max_average': [0, 3], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0], 'exact_page_max_mean': [0, 1], 'exact_page_max_max': [0, 1], 'exact_page_lse_mean': [0, 0], 'exact_page_lse_max': [0, 0]}
+TRACE_L2_VARIANTS layer=11 step=1 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=11 step=1 apply=True overlap=[457, 477, 444, 468, 326, 328, 296, 492] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=11 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=11 step=1 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=11 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=11 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=12 step=1 target_head_coverage={'production': [0, 4], 'mm_mean': [0, 4], 'mm_max': [0, 2], 'mm_top2_mean': [0, 4], 'mm_mean_max_average': [0, 4], 'avg_mean': [0, 1], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 1], 'mm_max_plus_avg_mean': [0, 1], 'exact_page_max_mean': [0, 4], 'exact_page_max_max': [1, 4], 'exact_page_lse_mean': [0, 1], 'exact_page_lse_max': [1, 3]}
+TRACE_L2_VARIANTS layer=12 step=1 target_head_coverage={'historical_mean': [0, 1], 'probability_max': [0, 1], 'probability_top2_mean': [0, 1], 'probability_mean_max_average': [0, 1], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 1], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=12 step=1 apply=True overlap=[331, 441, 485, 481, 573, 656, 360, 419] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=12 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=12 step=1 span=47951-47957 candidate(any,all)=([7], [7]) middle(any,all)=([7], []) historical(any,all)=([], [])
+TRACE_UNION layer=12 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=12 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=13 step=1 target_head_coverage={'production': [1, 1], 'mm_mean': [1, 1], 'mm_max': [1, 1], 'mm_top2_mean': [0, 1], 'mm_mean_max_average': [1, 1], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 1], 'mm_max_plus_avg_mean': [0, 1], 'exact_page_max_mean': [4, 3], 'exact_page_max_max': [2, 4], 'exact_page_lse_mean': [2, 2], 'exact_page_lse_max': [0, 2]}
+TRACE_L2_VARIANTS layer=13 step=1 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [1, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 1], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=13 step=1 apply=True overlap=[678, 417, 515, 693, 624, 446, 443, 457] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=13 step=1 span=15951-15957 candidate(any,all)=([4, 7], [4, 7]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=13 step=1 span=47951-47957 candidate(any,all)=([0, 4], [0, 4]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=13 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=13 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=14 step=1 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0], 'exact_page_max_mean': [2, 4], 'exact_page_max_max': [3, 4], 'exact_page_lse_mean': [1, 3], 'exact_page_lse_max': [3, 4]}
+TRACE_L2_VARIANTS layer=14 step=1 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [1, 2], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=14 step=1 apply=True overlap=[232, 585, 458, 535, 599, 406, 450, 438] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=14 step=1 span=15951-15957 candidate(any,all)=([1], [1]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=14 step=1 span=47951-47957 candidate(any,all)=([1, 3, 6], [1, 3, 6]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=14 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=14 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=15 step=1 target_head_coverage={'production': [1, 1], 'mm_mean': [1, 1], 'mm_max': [1, 1], 'mm_top2_mean': [1, 1], 'mm_mean_max_average': [1, 1], 'avg_mean': [0, 0], 'avg_max': [0, 1], 'mm_mean_plus_avg_mean': [1, 2], 'mm_max_plus_avg_mean': [1, 1], 'exact_page_max_mean': [3, 6], 'exact_page_max_max': [4, 6], 'exact_page_lse_mean': [3, 6], 'exact_page_lse_max': [2, 7]}
+TRACE_L2_VARIANTS layer=15 step=1 target_head_coverage={'historical_mean': [2, 1], 'probability_max': [2, 1], 'probability_top2_mean': [2, 1], 'probability_mean_max_average': [2, 1], 'probability_lse': [0, 2], 'logits_mean': [3, 1], 'logits_max': [2, 2], 'logits_lse': [2, 2]}
+TRACE_HIST_L2 layer=15 step=1 apply=True overlap=[517, 529, 681, 568, 689, 285, 499, 437] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=15 step=1 span=15951-15957 candidate(any,all)=([2, 3, 4], [2, 3, 4]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=15 step=1 span=47951-47957 candidate(any,all)=([0, 1, 2, 3, 4, 6], [0, 1, 2, 3, 4, 6]) middle(any,all)=([2, 4], []) historical(any,all)=([2], [])
+TRACE_UNION layer=15 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=15 step=1 span=47951-47957 final(any,all)=([2], [])
+TRACE_L1_VARIANTS layer=16 step=1 target_head_coverage={'production': [0, 1], 'mm_mean': [0, 1], 'mm_max': [0, 0], 'mm_top2_mean': [0, 1], 'mm_mean_max_average': [0, 1], 'avg_mean': [0, 2], 'avg_max': [0, 2], 'mm_mean_plus_avg_mean': [0, 1], 'mm_max_plus_avg_mean': [0, 2], 'exact_page_max_mean': [3, 6], 'exact_page_max_max': [3, 7], 'exact_page_lse_mean': [2, 6], 'exact_page_lse_max': [2, 6]}
+TRACE_L2_VARIANTS layer=16 step=1 target_head_coverage={'historical_mean': [0, 1], 'probability_max': [0, 1], 'probability_top2_mean': [0, 1], 'probability_mean_max_average': [0, 1], 'probability_lse': [0, 1], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=16 step=1 apply=True overlap=[701, 582, 465, 666, 616, 629, 596, 692] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=16 step=1 span=15951-15957 candidate(any,all)=([3, 6], [3, 6]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=16 step=1 span=47951-47957 candidate(any,all)=([0, 2, 3, 4, 6, 7], [0, 2, 3, 4, 6, 7]) middle(any,all)=([], []) historical(any,all)=([4], [])
+TRACE_UNION layer=16 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=16 step=1 span=47951-47957 final(any,all)=([4], [])
+TRACE_L1_VARIANTS layer=17 step=1 target_head_coverage={'production': [0, 1], 'mm_mean': [0, 1], 'mm_max': [0, 1], 'mm_top2_mean': [0, 1], 'mm_mean_max_average': [0, 1], 'avg_mean': [1, 1], 'avg_max': [1, 0], 'mm_mean_plus_avg_mean': [0, 1], 'mm_max_plus_avg_mean': [0, 0], 'exact_page_max_mean': [3, 6], 'exact_page_max_max': [4, 5], 'exact_page_lse_mean': [2, 5], 'exact_page_lse_max': [4, 5]}
+TRACE_L2_VARIANTS layer=17 step=1 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [1, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=17 step=1 apply=True overlap=[671, 675, 733, 723, 788, 828, 684, 647] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=17 step=1 span=15951-15957 candidate(any,all)=([2, 4], [2, 4]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=17 step=1 span=47951-47957 candidate(any,all)=([0, 1, 2, 3, 4], [0, 1, 2, 3, 4]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=17 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=17 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=18 step=1 target_head_coverage={'production': [1, 1], 'mm_mean': [1, 1], 'mm_max': [1, 1], 'mm_top2_mean': [0, 1], 'mm_mean_max_average': [1, 1], 'avg_mean': [0, 4], 'avg_max': [0, 2], 'mm_mean_plus_avg_mean': [0, 1], 'mm_max_plus_avg_mean': [0, 1], 'exact_page_max_mean': [1, 6], 'exact_page_max_max': [1, 2], 'exact_page_lse_mean': [1, 5], 'exact_page_lse_max': [1, 2]}
+TRACE_L2_VARIANTS layer=18 step=1 target_head_coverage={'historical_mean': [0, 1], 'probability_max': [0, 1], 'probability_top2_mean': [0, 1], 'probability_mean_max_average': [0, 1], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 2], 'logits_lse': [0, 2]}
+TRACE_HIST_L2 layer=18 step=1 apply=True overlap=[510, 730, 681, 732, 751, 640, 725, 724] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=18 step=1 span=15951-15957 candidate(any,all)=([6], [6]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=18 step=1 span=47951-47957 candidate(any,all)=([1, 2, 3, 6, 7], [1, 2, 3, 6, 7]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=18 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=18 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=19 step=1 target_head_coverage={'production': [0, 1], 'mm_mean': [0, 1], 'mm_max': [0, 1], 'mm_top2_mean': [0, 1], 'mm_mean_max_average': [0, 1], 'avg_mean': [1, 0], 'avg_max': [2, 0], 'mm_mean_plus_avg_mean': [1, 1], 'mm_max_plus_avg_mean': [1, 1], 'exact_page_max_mean': [1, 4], 'exact_page_max_max': [2, 4], 'exact_page_lse_mean': [1, 4], 'exact_page_lse_max': [2, 4]}
+TRACE_L2_VARIANTS layer=19 step=1 target_head_coverage={'historical_mean': [1, 0], 'probability_max': [1, 0], 'probability_top2_mean': [1, 0], 'probability_mean_max_average': [1, 0], 'probability_lse': [0, 0], 'logits_mean': [1, 0], 'logits_max': [1, 0], 'logits_lse': [1, 0]}
+TRACE_HIST_L2 layer=19 step=1 apply=True overlap=[606, 545, 710, 765, 591, 365, 567, 707] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=19 step=1 span=15951-15957 candidate(any,all)=([4], [4]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=19 step=1 span=47951-47957 candidate(any,all)=([0, 1, 2, 4], [0, 1, 2, 4]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=19 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=19 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=20 step=1 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 3], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 1], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 1], 'exact_page_max_mean': [1, 3], 'exact_page_max_max': [2, 2], 'exact_page_lse_mean': [1, 3], 'exact_page_lse_max': [2, 3]}
+TRACE_L2_VARIANTS layer=20 step=1 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=20 step=1 apply=True overlap=[602, 557, 738, 757, 806, 642, 554, 826] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=20 step=1 span=15951-15957 candidate(any,all)=([0], [0]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=20 step=1 span=47951-47957 candidate(any,all)=([0, 1, 2], [0, 1, 2]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=20 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=20 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=21 step=1 target_head_coverage={'production': [0, 1], 'mm_mean': [0, 1], 'mm_max': [0, 3], 'mm_top2_mean': [0, 2], 'mm_mean_max_average': [0, 2], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 1], 'mm_max_plus_avg_mean': [0, 2], 'exact_page_max_mean': [0, 2], 'exact_page_max_max': [1, 2], 'exact_page_lse_mean': [0, 2], 'exact_page_lse_max': [1, 2]}
+TRACE_L2_VARIANTS layer=21 step=1 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=21 step=1 apply=True overlap=[334, 628, 742, 470, 772, 698, 695, 702] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=21 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=21 step=1 span=47951-47957 candidate(any,all)=([1, 3], [1, 3]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=21 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=21 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=22 step=1 target_head_coverage={'production': [3, 0], 'mm_mean': [2, 0], 'mm_max': [2, 0], 'mm_top2_mean': [4, 1], 'mm_mean_max_average': [3, 0], 'avg_mean': [1, 0], 'avg_max': [1, 0], 'mm_mean_plus_avg_mean': [2, 0], 'mm_max_plus_avg_mean': [1, 0], 'exact_page_max_mean': [3, 6], 'exact_page_max_max': [2, 5], 'exact_page_lse_mean': [3, 6], 'exact_page_lse_max': [2, 5]}
+TRACE_L2_VARIANTS layer=22 step=1 target_head_coverage={'historical_mean': [1, 0], 'probability_max': [1, 0], 'probability_top2_mean': [1, 0], 'probability_mean_max_average': [1, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [1, 0], 'logits_lse': [1, 0]}
+TRACE_HIST_L2 layer=22 step=1 apply=True overlap=[426, 788, 503, 723, 718, 476, 565, 713] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=22 step=1 span=15951-15957 candidate(any,all)=([0, 3, 7], [0, 3, 7]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=22 step=1 span=47951-47957 candidate(any,all)=([0, 2, 3, 4, 6, 7], [0, 2, 3, 4, 6, 7]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=22 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=22 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=23 step=1 target_head_coverage={'production': [0, 5], 'mm_mean': [0, 5], 'mm_max': [0, 4], 'mm_top2_mean': [0, 3], 'mm_mean_max_average': [0, 4], 'avg_mean': [0, 4], 'avg_max': [0, 3], 'mm_mean_plus_avg_mean': [0, 5], 'mm_max_plus_avg_mean': [0, 4], 'exact_page_max_mean': [0, 2], 'exact_page_max_max': [0, 2], 'exact_page_lse_mean': [0, 4], 'exact_page_lse_max': [0, 1]}
+TRACE_L2_VARIANTS layer=23 step=1 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=23 step=1 apply=True overlap=[623, 448, 686, 761, 328, 576, 489, 752] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=23 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=23 step=1 span=47951-47957 candidate(any,all)=([0, 4, 5, 6], [0, 4, 5, 6]) middle(any,all)=([5], []) historical(any,all)=([], [])
+TRACE_UNION layer=23 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=23 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=24 step=1 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0], 'exact_page_max_mean': [2, 2], 'exact_page_max_max': [1, 2], 'exact_page_lse_mean': [2, 2], 'exact_page_lse_max': [1, 2]}
+TRACE_L2_VARIANTS layer=24 step=1 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=24 step=1 apply=True overlap=[467, 633, 664, 769, 732, 622, 609, 772] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=24 step=1 span=15951-15957 candidate(any,all)=([4, 6], [4, 6]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=24 step=1 span=47951-47957 candidate(any,all)=([0, 6], [0, 6]) middle(any,all)=([0], []) historical(any,all)=([], [])
+TRACE_UNION layer=24 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=24 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=25 step=1 target_head_coverage={'production': [0, 1], 'mm_mean': [0, 1], 'mm_max': [0, 3], 'mm_top2_mean': [0, 2], 'mm_mean_max_average': [0, 2], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 1], 'mm_max_plus_avg_mean': [0, 2], 'exact_page_max_mean': [2, 6], 'exact_page_max_max': [0, 4], 'exact_page_lse_mean': [0, 4], 'exact_page_lse_max': [0, 4]}
+TRACE_L2_VARIANTS layer=25 step=1 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=25 step=1 apply=True overlap=[438, 392, 749, 245, 397, 538, 604, 618] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=25 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=25 step=1 span=47951-47957 candidate(any,all)=([0, 4, 5, 6], [0, 4, 5, 6]) middle(any,all)=([0], []) historical(any,all)=([], [])
+TRACE_UNION layer=25 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=25 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=26 step=1 target_head_coverage={'production': [0, 1], 'mm_mean': [0, 1], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0], 'exact_page_max_mean': [1, 1], 'exact_page_max_max': [1, 1], 'exact_page_lse_mean': [0, 1], 'exact_page_lse_max': [0, 1]}
+TRACE_L2_VARIANTS layer=26 step=1 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=26 step=1 apply=True overlap=[497, 626, 252, 491, 698, 724, 782, 768] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=26 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=26 step=1 span=47951-47957 candidate(any,all)=([1], [1]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=26 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=26 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=27 step=1 target_head_coverage={'production': [0, 2], 'mm_mean': [0, 2], 'mm_max': [0, 2], 'mm_top2_mean': [0, 2], 'mm_mean_max_average': [0, 2], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 1], 'mm_max_plus_avg_mean': [0, 1], 'exact_page_max_mean': [3, 5], 'exact_page_max_max': [3, 3], 'exact_page_lse_mean': [2, 4], 'exact_page_lse_max': [2, 4]}
+TRACE_L2_VARIANTS layer=27 step=1 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=27 step=1 apply=True overlap=[518, 521, 441, 459, 677, 612, 683, 774] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=27 step=1 span=15951-15957 candidate(any,all)=([5, 7], [5, 7]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=27 step=1 span=47951-47957 candidate(any,all)=([0, 2, 5, 7], [0, 2, 5, 7]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=27 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=27 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=28 step=1 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0], 'exact_page_max_mean': [0, 1], 'exact_page_max_max': [0, 0], 'exact_page_lse_mean': [0, 1], 'exact_page_lse_max': [0, 0]}
+TRACE_L2_VARIANTS layer=28 step=1 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=28 step=1 apply=True overlap=[632, 315, 716, 594, 662, 593, 229, 61] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=28 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=28 step=1 span=47951-47957 candidate(any,all)=([3], [3]) middle(any,all)=([3], []) historical(any,all)=([], [])
+TRACE_UNION layer=28 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=28 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=29 step=1 target_head_coverage={'production': [0, 2], 'mm_mean': [0, 2], 'mm_max': [0, 3], 'mm_top2_mean': [0, 2], 'mm_mean_max_average': [0, 2], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 2], 'mm_max_plus_avg_mean': [0, 2], 'exact_page_max_mean': [0, 3], 'exact_page_max_max': [0, 3], 'exact_page_lse_mean': [0, 2], 'exact_page_lse_max': [0, 1]}
+TRACE_L2_VARIANTS layer=29 step=1 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=29 step=1 apply=True overlap=[710, 668, 617, 651, 665, 511, 720, 555] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=29 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=29 step=1 span=47951-47957 candidate(any,all)=([4, 5], [4, 5]) middle(any,all)=([4], []) historical(any,all)=([], [])
+TRACE_UNION layer=29 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=29 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=30 step=1 target_head_coverage={'production': [0, 2], 'mm_mean': [0, 2], 'mm_max': [0, 3], 'mm_top2_mean': [0, 2], 'mm_mean_max_average': [0, 3], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0], 'exact_page_max_mean': [0, 4], 'exact_page_max_max': [1, 3], 'exact_page_lse_mean': [0, 3], 'exact_page_lse_max': [1, 2]}
+TRACE_L2_VARIANTS layer=30 step=1 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=30 step=1 apply=True overlap=[385, 259, 725, 182, 639, 588, 766, 56] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=30 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=30 step=1 span=47951-47957 candidate(any,all)=([2, 4, 5], [2, 4, 5]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=30 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=30 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=31 step=1 target_head_coverage={'production': [0, 2], 'mm_mean': [0, 2], 'mm_max': [0, 2], 'mm_top2_mean': [0, 1], 'mm_mean_max_average': [0, 2], 'avg_mean': [0, 2], 'avg_max': [0, 2], 'mm_mean_plus_avg_mean': [0, 2], 'mm_max_plus_avg_mean': [0, 2], 'exact_page_max_mean': [0, 2], 'exact_page_max_max': [1, 3], 'exact_page_lse_mean': [0, 2], 'exact_page_lse_max': [1, 3]}
+TRACE_L2_VARIANTS layer=31 step=1 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=31 step=1 apply=True overlap=[670, 759, 569, 735, 372, 650, 447, 748] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=31 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=31 step=1 span=47951-47957 candidate(any,all)=([0, 4], [0, 4]) middle(any,all)=([4], []) historical(any,all)=([], [])
+TRACE_UNION layer=31 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=31 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=32 step=1 target_head_coverage={'production': [0, 4], 'mm_mean': [0, 4], 'mm_max': [0, 4], 'mm_top2_mean': [0, 4], 'mm_mean_max_average': [0, 4], 'avg_mean': [0, 3], 'avg_max': [0, 2], 'mm_mean_plus_avg_mean': [0, 4], 'mm_max_plus_avg_mean': [0, 4], 'exact_page_max_mean': [2, 4], 'exact_page_max_max': [2, 3], 'exact_page_lse_mean': [0, 4], 'exact_page_lse_max': [2, 4]}
+TRACE_L2_VARIANTS layer=32 step=1 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=32 step=1 apply=True overlap=[728, 699, 770, 498, 604, 533, 393, 171] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=32 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=32 step=1 span=47951-47957 candidate(any,all)=([3, 4, 5, 6], [3, 4, 5, 6]) middle(any,all)=([3, 5, 6], []) historical(any,all)=([], [])
+TRACE_UNION layer=32 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=32 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=33 step=1 target_head_coverage={'production': [0, 1], 'mm_mean': [0, 1], 'mm_max': [0, 1], 'mm_top2_mean': [0, 1], 'mm_mean_max_average': [0, 1], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 1], 'mm_max_plus_avg_mean': [0, 1], 'exact_page_max_mean': [0, 1], 'exact_page_max_max': [0, 1], 'exact_page_lse_mean': [0, 1], 'exact_page_lse_max': [0, 1]}
+TRACE_L2_VARIANTS layer=33 step=1 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=33 step=1 apply=True overlap=[697, 621, 759, 772, 773, 710, 512, 750] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=33 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=33 step=1 span=47951-47957 candidate(any,all)=([0], [0]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=33 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=33 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=34 step=1 target_head_coverage={'production': [0, 5], 'mm_mean': [0, 5], 'mm_max': [0, 5], 'mm_top2_mean': [0, 5], 'mm_mean_max_average': [0, 5], 'avg_mean': [0, 5], 'avg_max': [0, 2], 'mm_mean_plus_avg_mean': [0, 5], 'mm_max_plus_avg_mean': [0, 5], 'exact_page_max_mean': [0, 6], 'exact_page_max_max': [2, 5], 'exact_page_lse_mean': [0, 6], 'exact_page_lse_max': [1, 4]}
+TRACE_L2_VARIANTS layer=34 step=1 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=34 step=1 apply=True overlap=[776, 703, 675, 291, 487, 245, 188, 643] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=34 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=34 step=1 span=47951-47957 candidate(any,all)=([1, 2, 3, 4, 5, 6], [1, 2, 3, 4, 5, 6]) middle(any,all)=([], []) historical(any,all)=([3, 6], [])
+TRACE_UNION layer=34 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=34 step=1 span=47951-47957 final(any,all)=([3, 6], [])
+TRACE_L1_VARIANTS layer=35 step=1 target_head_coverage={'production': [0, 1], 'mm_mean': [0, 1], 'mm_max': [0, 0], 'mm_top2_mean': [0, 1], 'mm_mean_max_average': [0, 1], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 1], 'mm_max_plus_avg_mean': [0, 0], 'exact_page_max_mean': [0, 0], 'exact_page_max_max': [0, 0], 'exact_page_lse_mean': [0, 0], 'exact_page_lse_max': [0, 0]}
+TRACE_L2_VARIANTS layer=35 step=1 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=35 step=1 apply=True overlap=[307, 371, 466, 520, 339, 331, 149, 334] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=35 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=35 step=1 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=35 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=35 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=0 step=2 target_head_coverage={'production': [0, 2], 'mm_mean': [0, 2], 'mm_max': [0, 2], 'mm_top2_mean': [0, 2], 'mm_mean_max_average': [0, 2], 'avg_mean': [0, 4], 'avg_max': [0, 4], 'mm_mean_plus_avg_mean': [0, 2], 'mm_max_plus_avg_mean': [0, 2], 'exact_page_max_mean': [0, 3], 'exact_page_max_max': [0, 5], 'exact_page_lse_mean': [0, 5], 'exact_page_lse_max': [0, 5]}
+TRACE_L2_VARIANTS layer=0 step=2 target_head_coverage={'historical_mean': [0, 1], 'probability_max': [0, 1], 'probability_top2_mean': [0, 1], 'probability_mean_max_average': [0, 1], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 2], 'logits_lse': [0, 2]}
+TRACE_HIST_L2 layer=0 step=2 apply=True overlap=[471, 243, 313, 438, 359, 340, 350, 403] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=0 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=0 step=2 span=47951-47957 candidate(any,all)=([0, 1, 2, 5, 6], [0, 1, 2, 5, 6]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=0 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=0 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=1 step=2 target_head_coverage={'production': [0, 2], 'mm_mean': [0, 2], 'mm_max': [0, 2], 'mm_top2_mean': [0, 2], 'mm_mean_max_average': [0, 2], 'avg_mean': [0, 1], 'avg_max': [0, 2], 'mm_mean_plus_avg_mean': [0, 2], 'mm_max_plus_avg_mean': [0, 2], 'exact_page_max_mean': [0, 1], 'exact_page_max_max': [0, 2], 'exact_page_lse_mean': [0, 1], 'exact_page_lse_max': [0, 2]}
+TRACE_L2_VARIANTS layer=1 step=2 target_head_coverage={'historical_mean': [0, 1], 'probability_max': [0, 1], 'probability_top2_mean': [0, 1], 'probability_mean_max_average': [0, 1], 'probability_lse': [0, 1], 'logits_mean': [0, 1], 'logits_max': [0, 1], 'logits_lse': [0, 1]}
+TRACE_HIST_L2 layer=1 step=2 apply=True overlap=[407, 278, 638, 589, 547, 475, 372, 453] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=1 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=1 step=2 span=47951-47957 candidate(any,all)=([1], [1]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=1 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=1 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=2 step=2 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0], 'exact_page_max_mean': [0, 0], 'exact_page_max_max': [0, 0], 'exact_page_lse_mean': [0, 0], 'exact_page_lse_max': [0, 0]}
+TRACE_L2_VARIANTS layer=2 step=2 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=2 step=2 apply=True overlap=[677, 518, 424, 497, 515, 454, 299, 632] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=2 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=2 step=2 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=2 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=2 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=3 step=2 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 2], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0], 'exact_page_max_mean': [0, 1], 'exact_page_max_max': [0, 0], 'exact_page_lse_mean': [0, 1], 'exact_page_lse_max': [0, 0]}
+TRACE_L2_VARIANTS layer=3 step=2 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=3 step=2 apply=True overlap=[346, 575, 580, 602, 489, 797, 142, 398] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=3 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=3 step=2 span=47951-47957 candidate(any,all)=([3], [3]) middle(any,all)=([3], []) historical(any,all)=([3], [])
+TRACE_UNION layer=3 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=3 step=2 span=47951-47957 final(any,all)=([3], [])
+TRACE_L1_VARIANTS layer=4 step=2 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0], 'exact_page_max_mean': [0, 0], 'exact_page_max_max': [0, 0], 'exact_page_lse_mean': [0, 0], 'exact_page_lse_max': [1, 0]}
+TRACE_L2_VARIANTS layer=4 step=2 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=4 step=2 apply=True overlap=[616, 419, 405, 467, 517, 635, 367, 426] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=4 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=4 step=2 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=4 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=4 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=5 step=2 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 1], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0], 'exact_page_max_mean': [0, 2], 'exact_page_max_max': [0, 1], 'exact_page_lse_mean': [0, 0], 'exact_page_lse_max': [0, 1]}
+TRACE_L2_VARIANTS layer=5 step=2 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=5 step=2 apply=True overlap=[530, 694, 335, 499, 172, 556, 536, 523] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=5 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=5 step=2 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=5 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=5 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=6 step=2 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 1], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0], 'exact_page_max_mean': [0, 0], 'exact_page_max_max': [0, 0], 'exact_page_lse_mean': [0, 0], 'exact_page_lse_max': [0, 0]}
+TRACE_L2_VARIANTS layer=6 step=2 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=6 step=2 apply=True overlap=[238, 513, 416, 518, 332, 192, 401, 361] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=6 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=6 step=2 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=6 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=6 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=7 step=2 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0], 'exact_page_max_mean': [0, 0], 'exact_page_max_max': [0, 1], 'exact_page_lse_mean': [0, 0], 'exact_page_lse_max': [0, 1]}
+TRACE_L2_VARIANTS layer=7 step=2 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=7 step=2 apply=True overlap=[545, 579, 309, 236, 224, 502, 110, 112] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=7 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=7 step=2 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=7 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=7 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=8 step=2 target_head_coverage={'production': [1, 0], 'mm_mean': [1, 0], 'mm_max': [1, 0], 'mm_top2_mean': [1, 1], 'mm_mean_max_average': [1, 0], 'avg_mean': [0, 0], 'avg_max': [0, 1], 'mm_mean_plus_avg_mean': [1, 0], 'mm_max_plus_avg_mean': [1, 0], 'exact_page_max_mean': [1, 0], 'exact_page_max_max': [1, 1], 'exact_page_lse_mean': [1, 0], 'exact_page_lse_max': [0, 0]}
+TRACE_L2_VARIANTS layer=8 step=2 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=8 step=2 apply=True overlap=[365, 528, 538, 401, 527, 387, 417, 541] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=8 step=2 span=15951-15957 candidate(any,all)=([4], [4]) middle(any,all)=([4], []) historical(any,all)=([4], [])
+TRACE_FILTER layer=8 step=2 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=8 step=2 span=15951-15957 final(any,all)=([4], [])
+TRACE_UNION layer=8 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=9 step=2 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [1, 2], 'mm_top2_mean': [0, 2], 'mm_mean_max_average': [1, 2], 'avg_mean': [0, 4], 'avg_max': [1, 1], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [1, 2], 'exact_page_max_mean': [0, 3], 'exact_page_max_max': [1, 0], 'exact_page_lse_mean': [0, 3], 'exact_page_lse_max': [1, 1]}
+TRACE_L2_VARIANTS layer=9 step=2 target_head_coverage={'historical_mean': [0, 1], 'probability_max': [0, 1], 'probability_top2_mean': [0, 1], 'probability_mean_max_average': [0, 1], 'probability_lse': [0, 0], 'logits_mean': [0, 1], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=9 step=2 apply=True overlap=[340, 225, 675, 554, 540, 523, 673, 544] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=9 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=9 step=2 span=47951-47957 candidate(any,all)=([1, 3, 6], [1, 3, 6]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=9 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=9 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=10 step=2 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 1], 'mm_top2_mean': [0, 1], 'mm_mean_max_average': [0, 1], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 1], 'exact_page_max_mean': [0, 1], 'exact_page_max_max': [0, 0], 'exact_page_lse_mean': [0, 0], 'exact_page_lse_max': [0, 0]}
+TRACE_L2_VARIANTS layer=10 step=2 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=10 step=2 apply=True overlap=[52, 251, 227, 104, 377, 249, 394, 77] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=10 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=10 step=2 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=10 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=10 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=11 step=2 target_head_coverage={'production': [0, 3], 'mm_mean': [0, 3], 'mm_max': [0, 1], 'mm_top2_mean': [0, 2], 'mm_mean_max_average': [0, 2], 'avg_mean': [0, 0], 'avg_max': [0, 1], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0], 'exact_page_max_mean': [0, 1], 'exact_page_max_max': [0, 1], 'exact_page_lse_mean': [0, 0], 'exact_page_lse_max': [0, 1]}
+TRACE_L2_VARIANTS layer=11 step=2 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=11 step=2 apply=True overlap=[371, 380, 365, 472, 255, 300, 371, 490] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=11 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=11 step=2 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=11 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=11 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=12 step=2 target_head_coverage={'production': [0, 4], 'mm_mean': [0, 4], 'mm_max': [0, 4], 'mm_top2_mean': [0, 5], 'mm_mean_max_average': [0, 5], 'avg_mean': [0, 1], 'avg_max': [1, 0], 'mm_mean_plus_avg_mean': [0, 2], 'mm_max_plus_avg_mean': [0, 3], 'exact_page_max_mean': [0, 2], 'exact_page_max_max': [0, 2], 'exact_page_lse_mean': [0, 2], 'exact_page_lse_max': [0, 0]}
+TRACE_L2_VARIANTS layer=12 step=2 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=12 step=2 apply=True overlap=[295, 479, 481, 436, 667, 607, 466, 448] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=12 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=12 step=2 span=47951-47957 candidate(any,all)=([4, 7], [4, 7]) middle(any,all)=([7], []) historical(any,all)=([], [])
+TRACE_UNION layer=12 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=12 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=13 step=2 target_head_coverage={'production': [2, 1], 'mm_mean': [2, 1], 'mm_max': [1, 0], 'mm_top2_mean': [2, 1], 'mm_mean_max_average': [1, 0], 'avg_mean': [0, 0], 'avg_max': [1, 1], 'mm_mean_plus_avg_mean': [1, 1], 'mm_max_plus_avg_mean': [0, 0], 'exact_page_max_mean': [3, 4], 'exact_page_max_max': [2, 2], 'exact_page_lse_mean': [2, 1], 'exact_page_lse_max': [1, 1]}
+TRACE_L2_VARIANTS layer=13 step=2 target_head_coverage={'historical_mean': [0, 1], 'probability_max': [0, 1], 'probability_top2_mean': [0, 1], 'probability_mean_max_average': [0, 1], 'probability_lse': [0, 0], 'logits_mean': [0, 1], 'logits_max': [0, 1], 'logits_lse': [0, 1]}
+TRACE_HIST_L2 layer=13 step=2 apply=True overlap=[577, 415, 401, 695, 567, 522, 256, 596] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=13 step=2 span=15951-15957 candidate(any,all)=([3, 7], [3, 7]) middle(any,all)=([3], []) historical(any,all)=([], [])
+TRACE_FILTER layer=13 step=2 span=47951-47957 candidate(any,all)=([3], [3]) middle(any,all)=([3], []) historical(any,all)=([3], [])
+TRACE_UNION layer=13 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=13 step=2 span=47951-47957 final(any,all)=([3], [])
+TRACE_L1_VARIANTS layer=14 step=2 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0], 'exact_page_max_mean': [1, 1], 'exact_page_max_max': [0, 1], 'exact_page_lse_mean': [0, 1], 'exact_page_lse_max': [0, 0]}
+TRACE_L2_VARIANTS layer=14 step=2 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=14 step=2 apply=True overlap=[242, 527, 353, 538, 587, 312, 531, 466] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=14 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=14 step=2 span=47951-47957 candidate(any,all)=([6], [6]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=14 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=14 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=15 step=2 target_head_coverage={'production': [1, 0], 'mm_mean': [1, 0], 'mm_max': [1, 0], 'mm_top2_mean': [1, 0], 'mm_mean_max_average': [1, 0], 'avg_mean': [0, 1], 'avg_max': [0, 1], 'mm_mean_plus_avg_mean': [1, 1], 'mm_max_plus_avg_mean': [1, 0], 'exact_page_max_mean': [2, 5], 'exact_page_max_max': [1, 4], 'exact_page_lse_mean': [1, 2], 'exact_page_lse_max': [0, 2]}
+TRACE_L2_VARIANTS layer=15 step=2 target_head_coverage={'historical_mean': [1, 1], 'probability_max': [1, 1], 'probability_top2_mean': [1, 1], 'probability_mean_max_average': [1, 1], 'probability_lse': [1, 0], 'logits_mean': [1, 1], 'logits_max': [0, 1], 'logits_lse': [0, 1]}
+TRACE_HIST_L2 layer=15 step=2 apply=True overlap=[456, 523, 594, 577, 645, 287, 440, 429] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=15 step=2 span=15951-15957 candidate(any,all)=([3], [3]) middle(any,all)=([3], []) historical(any,all)=([3], [])
+TRACE_FILTER layer=15 step=2 span=47951-47957 candidate(any,all)=([3, 4], [3, 4]) middle(any,all)=([3], []) historical(any,all)=([3], [])
+TRACE_UNION layer=15 step=2 span=15951-15957 final(any,all)=([3], [])
+TRACE_UNION layer=15 step=2 span=47951-47957 final(any,all)=([3], [])
+TRACE_L1_VARIANTS layer=16 step=2 target_head_coverage={'production': [0, 1], 'mm_mean': [0, 1], 'mm_max': [0, 0], 'mm_top2_mean': [0, 1], 'mm_mean_max_average': [0, 0], 'avg_mean': [1, 2], 'avg_max': [0, 2], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0], 'exact_page_max_mean': [1, 1], 'exact_page_max_max': [0, 1], 'exact_page_lse_mean': [1, 1], 'exact_page_lse_max': [0, 2]}
+TRACE_L2_VARIANTS layer=16 step=2 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=16 step=2 apply=True overlap=[673, 523, 435, 590, 597, 639, 494, 578] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=16 step=2 span=15951-15957 candidate(any,all)=([5], [5]) middle(any,all)=([5], []) historical(any,all)=([5], [])
+TRACE_FILTER layer=16 step=2 span=47951-47957 candidate(any,all)=([2], [2]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=16 step=2 span=15951-15957 final(any,all)=([5], [])
+TRACE_UNION layer=16 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=17 step=2 target_head_coverage={'production': [0, 1], 'mm_mean': [0, 1], 'mm_max': [0, 1], 'mm_top2_mean': [0, 1], 'mm_mean_max_average': [0, 1], 'avg_mean': [0, 2], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 1], 'mm_max_plus_avg_mean': [0, 1], 'exact_page_max_mean': [1, 1], 'exact_page_max_max': [1, 1], 'exact_page_lse_mean': [1, 2], 'exact_page_lse_max': [0, 1]}
+TRACE_L2_VARIANTS layer=17 step=2 target_head_coverage={'historical_mean': [0, 1], 'probability_max': [0, 1], 'probability_top2_mean': [0, 1], 'probability_mean_max_average': [0, 1], 'probability_lse': [0, 0], 'logits_mean': [0, 1], 'logits_max': [0, 1], 'logits_lse': [0, 1]}
+TRACE_HIST_L2 layer=17 step=2 apply=True overlap=[562, 661, 709, 654, 700, 804, 588, 428] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=17 step=2 span=15951-15957 candidate(any,all)=([4], [4]) middle(any,all)=([], []) historical(any,all)=([4], [])
+TRACE_FILTER layer=17 step=2 span=47951-47957 candidate(any,all)=([2, 4], [2, 4]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=17 step=2 span=15951-15957 final(any,all)=([4], [])
+TRACE_UNION layer=17 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=18 step=2 target_head_coverage={'production': [0, 1], 'mm_mean': [0, 1], 'mm_max': [0, 1], 'mm_top2_mean': [0, 1], 'mm_mean_max_average': [0, 1], 'avg_mean': [0, 2], 'avg_max': [0, 3], 'mm_mean_plus_avg_mean': [0, 1], 'mm_max_plus_avg_mean': [0, 1], 'exact_page_max_mean': [0, 0], 'exact_page_max_max': [1, 1], 'exact_page_lse_mean': [0, 1], 'exact_page_lse_max': [0, 1]}
+TRACE_L2_VARIANTS layer=18 step=2 target_head_coverage={'historical_mean': [0, 1], 'probability_max': [0, 1], 'probability_top2_mean': [0, 1], 'probability_mean_max_average': [0, 1], 'probability_lse': [0, 0], 'logits_mean': [0, 1], 'logits_max': [0, 1], 'logits_lse': [0, 1]}
+TRACE_HIST_L2 layer=18 step=2 apply=True overlap=[396, 719, 541, 632, 746, 558, 777, 693] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=18 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=18 step=2 span=47951-47957 candidate(any,all)=([5], [5]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=18 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=18 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=19 step=2 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [2, 0], 'avg_max': [1, 3], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0], 'exact_page_max_mean': [0, 3], 'exact_page_max_max': [0, 3], 'exact_page_lse_mean': [0, 2], 'exact_page_lse_max': [1, 4]}
+TRACE_L2_VARIANTS layer=19 step=2 target_head_coverage={'historical_mean': [0, 1], 'probability_max': [0, 1], 'probability_top2_mean': [0, 1], 'probability_mean_max_average': [0, 1], 'probability_lse': [0, 0], 'logits_mean': [0, 1], 'logits_max': [0, 1], 'logits_lse': [0, 1]}
+TRACE_HIST_L2 layer=19 step=2 apply=True overlap=[579, 527, 664, 687, 495, 281, 632, 630] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=19 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=19 step=2 span=47951-47957 candidate(any,all)=([1, 7], [1, 7]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=19 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=19 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=20 step=2 target_head_coverage={'production': [0, 2], 'mm_mean': [0, 2], 'mm_max': [0, 3], 'mm_top2_mean': [0, 3], 'mm_mean_max_average': [0, 2], 'avg_mean': [3, 6], 'avg_max': [4, 5], 'mm_mean_plus_avg_mean': [0, 5], 'mm_max_plus_avg_mean': [1, 5], 'exact_page_max_mean': [3, 5], 'exact_page_max_max': [4, 3], 'exact_page_lse_mean': [3, 5], 'exact_page_lse_max': [4, 4]}
+TRACE_L2_VARIANTS layer=20 step=2 target_head_coverage={'historical_mean': [0, 4], 'probability_max': [0, 4], 'probability_top2_mean': [0, 4], 'probability_mean_max_average': [0, 4], 'probability_lse': [0, 1], 'logits_mean': [0, 4], 'logits_max': [0, 4], 'logits_lse': [0, 4]}
+TRACE_HIST_L2 layer=20 step=2 apply=True overlap=[556, 452, 726, 594, 643, 632, 535, 545] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=20 step=2 span=15951-15957 candidate(any,all)=([3, 5, 7], [3, 5, 7]) middle(any,all)=([3, 5, 7], []) historical(any,all)=([3, 5], [])
+TRACE_FILTER layer=20 step=2 span=47951-47957 candidate(any,all)=([1, 3, 4, 5, 7], [1, 3, 4, 5, 7]) middle(any,all)=([1, 3, 4, 5, 7], []) historical(any,all)=([3, 4, 5, 7], [])
+TRACE_UNION layer=20 step=2 span=15951-15957 final(any,all)=([3, 5], [])
+TRACE_UNION layer=20 step=2 span=47951-47957 final(any,all)=([3, 4, 5, 7], [])
+TRACE_L1_VARIANTS layer=21 step=2 target_head_coverage={'production': [1, 2], 'mm_mean': [1, 2], 'mm_max': [0, 2], 'mm_top2_mean': [0, 1], 'mm_mean_max_average': [0, 1], 'avg_mean': [1, 5], 'avg_max': [2, 3], 'mm_mean_plus_avg_mean': [1, 4], 'mm_max_plus_avg_mean': [0, 2], 'exact_page_max_mean': [1, 1], 'exact_page_max_max': [1, 1], 'exact_page_lse_mean': [1, 3], 'exact_page_lse_max': [1, 3]}
+TRACE_L2_VARIANTS layer=21 step=2 target_head_coverage={'historical_mean': [0, 3], 'probability_max': [0, 2], 'probability_top2_mean': [0, 3], 'probability_mean_max_average': [0, 2], 'probability_lse': [0, 0], 'logits_mean': [0, 3], 'logits_max': [0, 3], 'logits_lse': [0, 3]}
+TRACE_HIST_L2 layer=21 step=2 apply=True overlap=[307, 686, 690, 490, 667, 726, 687, 693] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=21 step=2 span=15951-15957 candidate(any,all)=([4], [4]) middle(any,all)=([4], []) historical(any,all)=([4], [])
+TRACE_FILTER layer=21 step=2 span=47951-47957 candidate(any,all)=([1, 4, 7], [1, 4, 7]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=21 step=2 span=15951-15957 final(any,all)=([4], [])
+TRACE_UNION layer=21 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=22 step=2 target_head_coverage={'production': [4, 0], 'mm_mean': [4, 0], 'mm_max': [2, 1], 'mm_top2_mean': [2, 1], 'mm_mean_max_average': [2, 0], 'avg_mean': [3, 1], 'avg_max': [3, 1], 'mm_mean_plus_avg_mean': [4, 0], 'mm_max_plus_avg_mean': [2, 0], 'exact_page_max_mean': [2, 7], 'exact_page_max_max': [2, 6], 'exact_page_lse_mean': [3, 6], 'exact_page_lse_max': [3, 7]}
+TRACE_L2_VARIANTS layer=22 step=2 target_head_coverage={'historical_mean': [1, 1], 'probability_max': [0, 1], 'probability_top2_mean': [1, 1], 'probability_mean_max_average': [0, 1], 'probability_lse': [0, 0], 'logits_mean': [1, 2], 'logits_max': [1, 2], 'logits_lse': [0, 2]}
+TRACE_HIST_L2 layer=22 step=2 apply=True overlap=[571, 767, 422, 683, 652, 554, 389, 716] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=22 step=2 span=15951-15957 candidate(any,all)=([0, 1, 7], [0, 1, 7]) middle(any,all)=([1], []) historical(any,all)=([1], [])
+TRACE_FILTER layer=22 step=2 span=47951-47957 candidate(any,all)=([0, 1, 3, 4, 6, 7], [0, 1, 3, 4, 6, 7]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=22 step=2 span=15951-15957 final(any,all)=([1], [])
+TRACE_UNION layer=22 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=23 step=2 target_head_coverage={'production': [0, 5], 'mm_mean': [0, 5], 'mm_max': [0, 5], 'mm_top2_mean': [0, 5], 'mm_mean_max_average': [0, 5], 'avg_mean': [0, 7], 'avg_max': [0, 6], 'mm_mean_plus_avg_mean': [0, 8], 'mm_max_plus_avg_mean': [0, 7], 'exact_page_max_mean': [1, 5], 'exact_page_max_max': [0, 3], 'exact_page_lse_mean': [0, 6], 'exact_page_lse_max': [0, 3]}
+TRACE_L2_VARIANTS layer=23 step=2 target_head_coverage={'historical_mean': [0, 4], 'probability_max': [0, 4], 'probability_top2_mean': [0, 4], 'probability_mean_max_average': [0, 4], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 3], 'logits_lse': [0, 3]}
+TRACE_HIST_L2 layer=23 step=2 apply=True overlap=[610, 485, 686, 739, 254, 575, 442, 760] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=23 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=23 step=2 span=47951-47957 candidate(any,all)=([0, 1, 3, 4, 5, 6], [0, 1, 3, 4, 5, 6]) middle(any,all)=([1, 3, 5], []) historical(any,all)=([1, 3, 4, 5], [])
+TRACE_UNION layer=23 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=23 step=2 span=47951-47957 final(any,all)=([1, 3, 4, 5], [])
+TRACE_L1_VARIANTS layer=24 step=2 target_head_coverage={'production': [0, 2], 'mm_mean': [0, 2], 'mm_max': [1, 0], 'mm_top2_mean': [0, 1], 'mm_mean_max_average': [0, 1], 'avg_mean': [0, 3], 'avg_max': [0, 3], 'mm_mean_plus_avg_mean': [0, 2], 'mm_max_plus_avg_mean': [0, 2], 'exact_page_max_mean': [3, 4], 'exact_page_max_max': [1, 3], 'exact_page_lse_mean': [2, 4], 'exact_page_lse_max': [1, 3]}
+TRACE_L2_VARIANTS layer=24 step=2 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=24 step=2 apply=True overlap=[478, 629, 702, 725, 729, 707, 484, 756] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=24 step=2 span=15951-15957 candidate(any,all)=([4, 6], [4, 6]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=24 step=2 span=47951-47957 candidate(any,all)=([0, 2, 4, 6], [0, 2, 4, 6]) middle(any,all)=([0, 2], []) historical(any,all)=([0, 6], [])
+TRACE_UNION layer=24 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=24 step=2 span=47951-47957 final(any,all)=([0, 6], [])
+TRACE_L1_VARIANTS layer=25 step=2 target_head_coverage={'production': [0, 2], 'mm_mean': [0, 2], 'mm_max': [0, 5], 'mm_top2_mean': [0, 3], 'mm_mean_max_average': [0, 3], 'avg_mean': [0, 2], 'avg_max': [0, 2], 'mm_mean_plus_avg_mean': [0, 2], 'mm_max_plus_avg_mean': [0, 3], 'exact_page_max_mean': [3, 8], 'exact_page_max_max': [3, 7], 'exact_page_lse_mean': [2, 7], 'exact_page_lse_max': [2, 6]}
+TRACE_L2_VARIANTS layer=25 step=2 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=25 step=2 apply=True overlap=[451, 358, 670, 263, 351, 550, 503, 468] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=25 step=2 span=15951-15957 candidate(any,all)=([2, 5], [2, 5]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=25 step=2 span=47951-47957 candidate(any,all)=([0, 2, 3, 4, 5, 6, 7], [0, 2, 3, 4, 5, 6, 7]) middle(any,all)=([2, 4, 7], []) historical(any,all)=([], [])
+TRACE_UNION layer=25 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=25 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=26 step=2 target_head_coverage={'production': [0, 1], 'mm_mean': [0, 1], 'mm_max': [0, 1], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [2, 0], 'avg_max': [3, 1], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 1], 'exact_page_max_mean': [1, 2], 'exact_page_max_max': [2, 2], 'exact_page_lse_mean': [1, 2], 'exact_page_lse_max': [1, 2]}
+TRACE_L2_VARIANTS layer=26 step=2 target_head_coverage={'historical_mean': [1, 0], 'probability_max': [1, 0], 'probability_top2_mean': [1, 0], 'probability_mean_max_average': [1, 0], 'probability_lse': [0, 0], 'logits_mean': [1, 1], 'logits_max': [1, 1], 'logits_lse': [1, 1]}
+TRACE_HIST_L2 layer=26 step=2 apply=True overlap=[468, 688, 273, 431, 639, 638, 595, 679] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=26 step=2 span=15951-15957 candidate(any,all)=([6], [6]) middle(any,all)=([6], []) historical(any,all)=([6], [])
+TRACE_FILTER layer=26 step=2 span=47951-47957 candidate(any,all)=([1, 3], [1, 3]) middle(any,all)=([3], []) historical(any,all)=([], [])
+TRACE_UNION layer=26 step=2 span=15951-15957 final(any,all)=([6], [])
+TRACE_UNION layer=26 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=27 step=2 target_head_coverage={'production': [0, 2], 'mm_mean': [0, 2], 'mm_max': [0, 1], 'mm_top2_mean': [0, 2], 'mm_mean_max_average': [0, 2], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 1], 'mm_max_plus_avg_mean': [0, 1], 'exact_page_max_mean': [2, 7], 'exact_page_max_max': [3, 4], 'exact_page_lse_mean': [2, 4], 'exact_page_lse_max': [2, 4]}
+TRACE_L2_VARIANTS layer=27 step=2 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=27 step=2 apply=True overlap=[438, 491, 448, 372, 624, 650, 665, 698] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=27 step=2 span=15951-15957 candidate(any,all)=([5, 7], [5, 7]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=27 step=2 span=47951-47957 candidate(any,all)=([0, 2, 5, 7], [0, 2, 5, 7]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=27 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=27 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=28 step=2 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 1], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0], 'exact_page_max_mean': [1, 5], 'exact_page_max_max': [1, 3], 'exact_page_lse_mean': [1, 5], 'exact_page_lse_max': [1, 3]}
+TRACE_L2_VARIANTS layer=28 step=2 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=28 step=2 apply=True overlap=[614, 321, 612, 484, 670, 503, 258, 106] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=28 step=2 span=15951-15957 candidate(any,all)=([2], [2]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=28 step=2 span=47951-47957 candidate(any,all)=([0, 1, 2, 3, 5], [0, 1, 2, 3, 5]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=28 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=28 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=29 step=2 target_head_coverage={'production': [0, 3], 'mm_mean': [0, 3], 'mm_max': [0, 4], 'mm_top2_mean': [0, 3], 'mm_mean_max_average': [0, 4], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 3], 'mm_max_plus_avg_mean': [0, 4], 'exact_page_max_mean': [0, 6], 'exact_page_max_max': [0, 6], 'exact_page_lse_mean': [0, 6], 'exact_page_lse_max': [0, 6]}
+TRACE_L2_VARIANTS layer=29 step=2 target_head_coverage={'historical_mean': [0, 1], 'probability_max': [0, 1], 'probability_top2_mean': [0, 1], 'probability_mean_max_average': [0, 1], 'probability_lse': [0, 0], 'logits_mean': [0, 1], 'logits_max': [0, 1], 'logits_lse': [0, 1]}
+TRACE_HIST_L2 layer=29 step=2 apply=True overlap=[746, 672, 647, 749, 635, 452, 723, 507] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=29 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=29 step=2 span=47951-47957 candidate(any,all)=([0, 1, 4, 5, 6, 7], [0, 1, 4, 5, 6, 7]) middle(any,all)=([0], []) historical(any,all)=([], [])
+TRACE_UNION layer=29 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=29 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=30 step=2 target_head_coverage={'production': [0, 2], 'mm_mean': [0, 2], 'mm_max': [0, 2], 'mm_top2_mean': [0, 2], 'mm_mean_max_average': [0, 2], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0], 'exact_page_max_mean': [1, 7], 'exact_page_max_max': [1, 5], 'exact_page_lse_mean': [0, 4], 'exact_page_lse_max': [1, 5]}
+TRACE_L2_VARIANTS layer=30 step=2 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=30 step=2 apply=True overlap=[275, 166, 678, 242, 502, 513, 721, 39] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=30 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=30 step=2 span=47951-47957 candidate(any,all)=([0, 2, 4, 5], [0, 2, 4, 5]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=30 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=30 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=31 step=2 target_head_coverage={'production': [0, 2], 'mm_mean': [0, 2], 'mm_max': [0, 2], 'mm_top2_mean': [0, 2], 'mm_mean_max_average': [0, 2], 'avg_mean': [0, 2], 'avg_max': [0, 2], 'mm_mean_plus_avg_mean': [0, 2], 'mm_max_plus_avg_mean': [0, 2], 'exact_page_max_mean': [1, 6], 'exact_page_max_max': [1, 4], 'exact_page_lse_mean': [0, 4], 'exact_page_lse_max': [1, 4]}
+TRACE_L2_VARIANTS layer=31 step=2 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=31 step=2 apply=True overlap=[634, 784, 416, 651, 407, 552, 411, 736] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=31 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=31 step=2 span=47951-47957 candidate(any,all)=([0, 1, 4, 6], [0, 1, 4, 6]) middle(any,all)=([4, 6], []) historical(any,all)=([], [])
+TRACE_UNION layer=31 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=31 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=32 step=2 target_head_coverage={'production': [0, 5], 'mm_mean': [0, 5], 'mm_max': [0, 5], 'mm_top2_mean': [0, 4], 'mm_mean_max_average': [0, 5], 'avg_mean': [0, 4], 'avg_max': [0, 2], 'mm_mean_plus_avg_mean': [0, 5], 'mm_max_plus_avg_mean': [0, 5], 'exact_page_max_mean': [1, 6], 'exact_page_max_max': [1, 4], 'exact_page_lse_mean': [0, 4], 'exact_page_lse_max': [1, 4]}
+TRACE_L2_VARIANTS layer=32 step=2 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=32 step=2 apply=True overlap=[698, 707, 737, 396, 575, 460, 347, 179] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=32 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=32 step=2 span=47951-47957 candidate(any,all)=([0, 4, 5, 6], [0, 4, 5, 6]) middle(any,all)=([4, 5], []) historical(any,all)=([4], [])
+TRACE_UNION layer=32 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=32 step=2 span=47951-47957 final(any,all)=([4], [])
+TRACE_L1_VARIANTS layer=33 step=2 target_head_coverage={'production': [0, 1], 'mm_mean': [0, 1], 'mm_max': [0, 1], 'mm_top2_mean': [0, 1], 'mm_mean_max_average': [0, 1], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 1], 'mm_max_plus_avg_mean': [0, 1], 'exact_page_max_mean': [0, 4], 'exact_page_max_max': [0, 2], 'exact_page_lse_mean': [0, 4], 'exact_page_lse_max': [0, 2]}
+TRACE_L2_VARIANTS layer=33 step=2 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=33 step=2 apply=True overlap=[695, 619, 698, 781, 707, 634, 319, 762] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=33 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=33 step=2 span=47951-47957 candidate(any,all)=([0, 2, 3, 5], [0, 2, 3, 5]) middle(any,all)=([], []) historical(any,all)=([0], [])
+TRACE_UNION layer=33 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=33 step=2 span=47951-47957 final(any,all)=([0], [])
+TRACE_L1_VARIANTS layer=34 step=2 target_head_coverage={'production': [0, 5], 'mm_mean': [0, 5], 'mm_max': [0, 6], 'mm_top2_mean': [0, 5], 'mm_mean_max_average': [0, 6], 'avg_mean': [0, 6], 'avg_max': [1, 4], 'mm_mean_plus_avg_mean': [0, 6], 'mm_max_plus_avg_mean': [0, 6], 'exact_page_max_mean': [1, 7], 'exact_page_max_max': [2, 4], 'exact_page_lse_mean': [1, 7], 'exact_page_lse_max': [2, 5]}
+TRACE_L2_VARIANTS layer=34 step=2 target_head_coverage={'historical_mean': [0, 2], 'probability_max': [0, 2], 'probability_top2_mean': [0, 2], 'probability_mean_max_average': [0, 2], 'probability_lse': [0, 0], 'logits_mean': [0, 3], 'logits_max': [0, 3], 'logits_lse': [0, 3]}
+TRACE_HIST_L2 layer=34 step=2 apply=True overlap=[756, 750, 688, 352, 406, 196, 204, 598] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=34 step=2 span=15951-15957 candidate(any,all)=([2], [2]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=34 step=2 span=47951-47957 candidate(any,all)=([1, 2, 3, 4, 5, 6, 7], [1, 2, 3, 4, 5, 6, 7]) middle(any,all)=([], []) historical(any,all)=([3, 6, 7], [])
+TRACE_UNION layer=34 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=34 step=2 span=47951-47957 final(any,all)=([3, 6, 7], [])
+TRACE_L1_VARIANTS layer=35 step=2 target_head_coverage={'production': [0, 2], 'mm_mean': [0, 2], 'mm_max': [0, 0], 'mm_top2_mean': [0, 2], 'mm_mean_max_average': [0, 2], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0], 'exact_page_max_mean': [0, 0], 'exact_page_max_max': [0, 0], 'exact_page_lse_mean': [0, 0], 'exact_page_lse_max': [0, 0]}
+TRACE_L2_VARIANTS layer=35 step=2 target_head_coverage={'historical_mean': [0, 0], 'probability_max': [0, 0], 'probability_top2_mean': [0, 0], 'probability_mean_max_average': [0, 0], 'probability_lse': [0, 0], 'logits_mean': [0, 0], 'logits_max': [0, 0], 'logits_lse': [0, 0]}
+TRACE_HIST_L2 layer=35 step=2 apply=True overlap=[345, 326, 382, 486, 233, 140, 137, 318] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=35 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=35 step=2 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=35 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=35 step=2 span=47951-47957 final(any,all)=([], [])
+[nfa:niah_multikey_2:L65536] 13 in=65424 out=128 score=0.000000
+[ALL DONE] /tmp/nfa_selection_budget_diag_20261116/hist_l2variants_exactlse_mn128_v2/quality_manifest_L65536_s0of1.json

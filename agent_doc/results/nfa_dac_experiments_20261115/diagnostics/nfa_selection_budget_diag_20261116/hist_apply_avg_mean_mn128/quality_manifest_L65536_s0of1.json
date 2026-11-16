@@ -1,0 +1,248 @@
+{
+  "schema": "ruler-official-quality-manifest-v1",
+  "verification": "pending-independent-verification",
+  "method": "nfa",
+  "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+  "task": "niah_multikey_2",
+  "context_length": 65536,
+  "max_new_tokens": 128,
+  "min_new_tokens": 1,
+  "shard_index": 0,
+  "num_shards": 1,
+  "runtime": {
+    "implementation": "NFA GraphReadyPagedRegionCache and production selector",
+    "execution": "eager",
+    "batch_size": 1,
+    "prefill_mode": "single-request prefill",
+    "dtype": "torch.bfloat16",
+    "num_layers": 36,
+    "dense_or_torch_decode_fallback": false,
+    "nfa_selector_config": {
+      "subspace": "full",
+      "subspace_cmp_ratio": 4,
+      "level1_topk": 128,
+      "level2_topk": 1024,
+      "page_size": 64,
+      "near_pages": 32,
+      "near_tokens": "off",
+      "near_len": 4096,
+      "enable_layer_skip": false,
+      "sink_tokens": 4,
+      "sliding_window_size": 128,
+      "subspace_dim": 128,
+      "enable_subspace": false,
+      "dynamic_gate_epsilon": 0.1,
+      "dynamic_gate_rows": 256,
+      "near_method": "avg",
+      "far_method": "minmax",
+      "boundary_bypass": true
+    },
+    "nfa_quality_arm": "full_gate_off",
+    "source": {
+      "head": "2ddfd7416aedc03f0e43c6ea115c25c7212fa974",
+      "harness": "/tmp/nfa-dac-tailstats-diag-2ddfd741-20261116/benchmark/efficiency/benchmark_long_context_two_point.py",
+      "harness_sha256": "30ecca792c9cb1d7e8913a4f895d8235ec889e32ebd46d3d3cb71ba09fd394ae",
+      "source_diff_sha256": "1afa673c089c62d3ceafc1b2916921c3e7726c810d691a5963ad8aba81fe4993",
+      "quality_harness": "/tmp/nfa-dac-tailstats-diag-2ddfd741-20261116/benchmark/efficiency/benchmark_ruler_quality.py",
+      "quality_harness_sha256": "6d0d8eba73861d26e568ee4a6531a4e94e6825bd3cdbbbb95bfa2527b2cbd01c",
+      "quality_source_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "quality_protocol": {
+      "fixed_length_performance_receipts_reused": false,
+      "ruler_source_prompt_truncation": false,
+      "real_eos_min_new": true,
+      "official_scorer": "string_match_all",
+      "per_request_independent_cache": true,
+      "graph_session_released_at_request_boundary": true
+    }
+  },
+  "rows": 1,
+  "official_score": 0.0,
+  "prediction": "L65536/pred/niah_multikey_2-nfa_full_gate_off_eager_s0of1.jsonl",
+  "prediction_sha256": "254869bb18dfbf438779c22df0a5cc584c2e81e345065bb0be4549bbe9fa84a4",
+  "runcap": "L65536/pred/niah_multikey_2-nfa_full_gate_off_eager_s0of1.jsonl.runcap.json",
+  "receipts": "L65536/pred/niah_multikey_2-nfa_full_gate_off_eager_s0of1.receipts.json",
+  "receipts_sha256": "e1cd9a0a677c82a008e4ce2e63100e70fba6bc5bdc3c95e8f3126c3abff7124c",
+  "scores": "L65536/pred/niah_multikey_2-nfa_full_gate_off_eager_s0of1.scores.json",
+  "scores_sha256": "c5bc4dd1ab7b8af75c095c752bcd205aeb2ea6095b7c9fd53083020c56f4bb0c",
+  "source_manifest": "L65536/pred/niah_multikey_2-nfa_full_gate_off_eager_s0of1.jsonl.source_manifest.json",
+  "source_manifest_sha256": "d85e3c9a9dfe93d1266fdc3e5a6d7c88941c37b42c20070748bfeb511795ef60",
+  "data_sha256": "52b587a924defa07d36091824e3128310f657bca34a4f011c062879e757c5063",
+  "request_receipts": [
+    {
+      "generated_tokens": 128,
+      "stop_reason": "max_new_tokens",
+      "logical_decode_steps": 127,
+      "submitted_decode_forwards": 127,
+      "nfa_decode_steps": 127,
+      "graph_capture_count": 0,
+      "graph_replays": 0,
+      "graph_eager_fallbacks": 127,
+      "graph_pool_hits": 0,
+      "graph_pool_misses": 1,
+      "gate_epsilon": 0.0,
+      "gate_observation_rows": 256,
+      "gate_counts": {
+        "keep": 36,
+        "near": 0,
+        "far": 0,
+        "both": 0
+      },
+      "prefill_decisions": {
+        "0": {
+          "skip_near": false,
+          "skip_far": false
+        },
+        "1": {
+          "skip_near": false,
+          "skip_far": false
+        },
+        "2": {
+          "skip_near": false,
+          "skip_far": false
+        },
+        "3": {
+          "skip_near": false,
+          "skip_far": false
+        },
+        "4": {
+          "skip_near": false,
+          "skip_far": false
+        },
+        "5": {
+          "skip_near": false,
+          "skip_far": false
+        },
+        "6": {
+          "skip_near": false,
+          "skip_far": false
+        },
+        "7": {
+          "skip_near": false,
+          "skip_far": false
+        },
+        "8": {
+          "skip_near": false,
+          "skip_far": false
+        },
+        "9": {
+          "skip_near": false,
+          "skip_far": false
+        },
+        "10": {
+          "skip_near": false,
+          "skip_far": false
+        },
+        "11": {
+          "skip_near": false,
+          "skip_far": false
+        },
+        "12": {
+          "skip_near": false,
+          "skip_far": false
+        },
+        "13": {
+          "skip_near": false,
+          "skip_far": false
+        },
+        "14": {
+          "skip_near": false,
+          "skip_far": false
+        },
+        "15": {
+          "skip_near": false,
+          "skip_far": false
+        },
+        "16": {
+          "skip_near": false,
+          "skip_far": false
+        },
+        "17": {
+          "skip_near": false,
+          "skip_far": false
+        },
+        "18": {
+          "skip_near": false,
+          "skip_far": false
+        },
+        "19": {
+          "skip_near": false,
+          "skip_far": false
+        },
+        "20": {
+          "skip_near": false,
+          "skip_far": false
+        },
+        "21": {
+          "skip_near": false,
+          "skip_far": false
+        },
+        "22": {
+          "skip_near": false,
+          "skip_far": false
+        },
+        "23": {
+          "skip_near": false,
+          "skip_far": false
+        },
+        "24": {
+          "skip_near": false,
+          "skip_far": false
+        },
+        "25": {
+          "skip_near": false,
+          "skip_far": false
+        },
+        "26": {
+          "skip_near": false,
+          "skip_far": false
+        },
+        "27": {
+          "skip_near": false,
+          "skip_far": false
+        },
+        "28": {
+          "skip_near": false,
+          "skip_far": false
+        },
+        "29": {
+          "skip_near": false,
+          "skip_far": false
+        },
+        "30": {
+          "skip_near": false,
+          "skip_far": false
+        },
+        "31": {
+          "skip_near": false,
+          "skip_far": false
+        },
+        "32": {
+          "skip_near": false,
+          "skip_far": false
+        },
+        "33": {
+          "skip_near": false,
+          "skip_far": false
+        },
+        "34": {
+          "skip_near": false,
+          "skip_far": false
+        },
+        "35": {
+          "skip_near": false,
+          "skip_far": false
+        }
+      },
+      "task": "niah_multikey_2",
+      "context_length": 65536,
+      "source_index": 13,
+      "sample_id": "niah_multikey_2:13",
+      "input": {
+        "input_tokens": 65424,
+        "input_ids_sha256": "32ffa3b59dea8b7644a4d283666855bb782d88b78c838bb097b5ee6fad27d224",
+        "truncated": false
+      }
+    }
+  ]
+}

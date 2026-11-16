@@ -1,0 +1,152 @@
+diff --git a/benchmark/RULER/pred_ruler.py b/benchmark/RULER/pred_ruler.py
+index d7c6b3fb..f22c0bed 100644
+--- a/benchmark/RULER/pred_ruler.py
++++ b/benchmark/RULER/pred_ruler.py
+@@ -2,8 +2,9 @@
+ # （data/RULER/{4096,8192,16384,32768}/×11 任务×100 条，零外网；65536/131072
+ # 由 gen_ruler_long.py 循环体扩展生成）喂进本仓库 sparse_attn 管线
+ # （TIA/TLI/Quest/FullKV 同一 monkeypatch）。
+-# 口径对齐官方 RULER：prompt 原样（无 chat template）、max_new=64、
+-# min_length=context+1 防复读、string_match_all 打分（正式打分入口
++# 隔离诊断适配：prompt 原样（无 chat template）、max_new=128、
++# min_new=1 在 argmax 前屏蔽 EOS、只使用模型声明的真实 EOS；
++# string_match_all 打分（正式打分入口
+ # score_ruler_formal.py——legacy + #198 指针协议双通道；score_ruler.py
+ # 直接入口仅支持 legacy-direct 产物，pointer root 下 fail-closed，069）。
+ # 用法（run_ruler.sh 批量调度）：
+@@ -91,6 +92,8 @@ from sparse_attn.info import (  # noqa: E402
+ # 142（TL-FASA-CALIBRATION-IDENTITY）：FASA agreement 源/目标身份的
+ # 唯一 staging 口径（与 LongBench 入口、treatment 名三方同源）。
+ from sparse_attn.info import stage_fasa_agreement  # noqa: E402
++from benchmark.LongBench.run_cap_manifest import input_ids_sha256  # noqa: E402
++from benchmark.RULER.score_ruler import string_match_all  # noqa: E402
+ # 149（TL-MINFERENCE-PATTERN-IDENTITY）：MInference pattern 内容身份
+ # 的入口冻结（与 LongBench 入口、treatment 名三方同源）。
+ from sparse_attn.info import freeze_minference_pattern_sha8  # noqa: E402
+@@ -100,7 +103,8 @@ RULER_TASKS = [
+     "niah_multikey_1", "niah_multikey_2", "niah_multikey_3",
+     "niah_multiquery", "niah_multivalue", "cwe", "fwe", "vt",
+ ]
+-MAX_GEN = 64  # 官方 RULER 口径（全部任务统一）
++MAX_GEN = 128  # 隔离诊断：与当前 NIAH 正式协议一致
++MIN_NEW_TOKENS = 1
+ SEED = 42     # seed_everything 默认值（receipt 身份字段，057）
+ # Qwen3-8B 原生上下文上限（config.max_position_embeddings）
+ QWEN3_NATIVE_MPE = 40960
+@@ -123,6 +127,8 @@ def parse_args():
+     parser.add_argument("--pred_postfix", type=str, default="")
+     parser.add_argument("--max-num", type=int, default=500,
+                         help="每任务样本数（0=全量）")
++    parser.add_argument("--skip", type=int, default=0,
++                        help="隔离诊断：跳过前 N 个源样本")
+     parser.add_argument("--yarn", action="store_true",
+                         help="启用 YaRN 位置扩展（Qwen3 官方配方；"
+                              "65536/131072 档必开，32768 及以下档保持关闭"
+@@ -143,6 +149,29 @@ def seed_everything(seed=SEED):   # 057：默认值单源化（receipt 身份字
+     torch.backends.cudnn.deterministic = True
+ 
+ 
++def _ruler_eos_ids(model, tokenizer):
++    """隔离诊断：只收集模型声明的 EOS，不把换行或 pad 当停止符。"""
++    configured = getattr(
++        getattr(model, "generation_config", None), "eos_token_id", None)
++    if configured is None:
++        configured = ()
++    elif not isinstance(configured, (list, tuple)):
++        configured = (configured,)
++    candidates = (*configured, getattr(tokenizer, "eos_token_id", None))
++    return tuple(dict.fromkeys(
++        token for token in candidates
++        if isinstance(token, int) and not isinstance(token, bool) and token >= 0))
++
++
++def _greedy_next(logits, eos_ids, generated_count):
++    """隔离诊断：在不足 min-new 时先屏蔽 EOS，再执行 greedy argmax。"""
++    next_logits = logits[:, -1, :]
++    if generated_count < MIN_NEW_TOKENS and eos_ids:
++        next_logits = next_logits.clone()
++        next_logits[:, list(eos_ids)] = -float("inf")
++    return next_logits.argmax(dim=-1).unsqueeze(1)
++
++
+ def _extended_receipt_identity(args, data_file):
+     """可选的 run 级身份闭包；未设置环境变量时保持既有 RULER 路径。"""
+     config_path = os.environ.get("TLI_RECEIPT_RUN_CONFIG")
+@@ -232,6 +261,9 @@ def main():
+                              f"{args.task}.jsonl")
+     receipt_identity = _extended_receipt_identity(args, data_file)
+     rows = [json.loads(l) for l in open(data_file)]
++    if not 0 <= args.skip <= len(rows):
++        raise ValueError(f"skip={args.skip} 超出源样本人口 {len(rows)}")
++    rows = rows[args.skip:]
+     if args.max_num and len(rows) > args.max_num:
+         rows = rows[:args.max_num]  # topk 口径（确定性）
+     print(f"[ruler] task={args.task} L={args.context_length} "
+@@ -505,10 +537,7 @@ def main():
+     # 0233 A/B 实测 bitwise 相等保证；≤32K 档不启用，路径逐位不变）
+     keep_logits = args.context_length > 32768
+ 
+-    eos_ids = [tokenizer.eos_token_id]
+-    nl = tokenizer.encode("\n", add_special_tokens=False)
+-    if nl:
+-        eos_ids.append(nl[-1])
++    eos_ids = _ruler_eos_ids(model, tokenizer)
+ 
+     out_dir = os.path.join(args.output_dir, f"L{args.context_length}",
+                            f"pred{args.pred_postfix}")
+@@ -595,20 +624,23 @@ def main():
+                                    use_cache=True,
+                                    **({"logits_to_keep": 1} if keep_logits else {}))
+                     past = output.past_key_values
+-                    pred_idx = output.logits[:, -1, :].argmax(dim=-1).unsqueeze(1)
++                    pred_idx = _greedy_next(output.logits, eos_ids, 0)
+                     gen = [pred_idx.item()]
++                    stop_reason = "max_new_tokens"
+                     for _ in range(MAX_GEN - 1):
+-                        # min_length 语义：禁止在 context 结束前停（RULER 官方口径）
+-                        if len(gen) < 2 and pred_idx.item() in eos_ids:
+-                            pass  # 首位不许停（近似 min_length=context+1）
+                         out = model(input_ids=pred_idx, past_key_values=past,
+                                     use_cache=True)
+                         past = out.past_key_values
+-                        pred_idx = out.logits[:, -1, :].argmax(dim=-1).unsqueeze(1)
++                        pred_idx = _greedy_next(out.logits, eos_ids, len(gen))
+                         gen.append(pred_idx.item())
+-                        if pred_idx.item() in eos_ids and len(gen) > 1:
++                        if len(gen) >= MIN_NEW_TOKENS and pred_idx.item() in eos_ids:
++                            stop_reason = "eos"
+                             break
+             pred = tokenizer.decode(gen, skip_special_tokens=True)
++            official_score = string_match_all([pred], [row["outputs"]])
++            print(f"[historical-tli:{args.task}:L{args.context_length}] "
++                  f"{row['index']} in={context_length} out={len(gen)} "
++                  f"score={official_score:.6f} stop={stop_reason}", flush=True)
+             metrics = get_metrics()
+             budget = None if baseline_receipt else metrics.get_select_tokens()
+             metrics.clear()
+@@ -620,6 +652,16 @@ def main():
+                 **({"baseline_receipt": baseline_receipt} if baseline_receipt else {}),
+                 "pred": pred, "answers": row["outputs"],
+                 "length": row["length"], "budget": budget,
++                "source_index": row["index"],
++                "input_tokens": context_length,
++                "input_ids_sha256": input_ids_sha256(input_ids[0].tolist()),
++                "generated_token_ids": gen,
++                "generated_tokens": len(gen),
++                "stop_reason": stop_reason,
++                "official_score": official_score,
++                "scorer": "ruler-official-string_match_all",
++                "max_new_tokens": MAX_GEN,
++                "min_new_tokens": MIN_NEW_TOKENS,
+                 "_id": f"{args.task}:{row['index']}",
+                 "_answers_sha": hashlib.sha256(json.dumps(
+                     row["outputs"], ensure_ascii=False, sort_keys=True)
+@@ -664,6 +706,8 @@ def main():
+             native_mpe=native_mpe,
+             generation_params={
+                 "max_gen": MAX_GEN, "max_num": args.max_num, "seed": SEED,
++                "min_new_tokens": MIN_NEW_TOKENS, "skip": args.skip,
++                "eos_protocol": "model-declared-only",
+                 "method": args.method, "pred_postfix": args.pred_postfix,
+                 "t": args.t,
+             },

@@ -1,0 +1,588 @@
+DIAG sample=13 subspace=full K1=128 K2=1024 out=/tmp/nfa_selection_budget_diag_20261116/hist_l1_hist_l2_mn128
+RESOLVED K1=128 K2=1024 near_tokens=off max_new=128 dense_gather=False
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/5 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 5/5 [00:00<00:00, 189.45it/s]
+register qwen3 attn: [model.layers.0.self_attn]
+register iter91 rmsnorm: [model.layers.0.self_attn.q_norm]
+register iter91 rmsnorm: [model.layers.0.self_attn.k_norm]
+register iter91 rmsnorm: [model.layers.0.input_layernorm]
+register iter91 rmsnorm: [model.layers.0.post_attention_layernorm]
+register iter97 MLP SiLU+mul: [model.layers.0.mlp]
+TRACE_HIST_L2 layer=0 step=0 apply=True overlap=[406, 314, 355, 427, 396, 336, 332, 456] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_L2_REF layer=0 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=0 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=0 step=0 span=47951-47957 candidate(any,all)=([0, 6], [0, 6]) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=0 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=0 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=1 step=0 apply=True overlap=[462, 361, 566, 636, 516, 539, 385, 477] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_L2_REF layer=1 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=1 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=1 step=0 span=47951-47957 candidate(any,all)=([1], [1]) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=1 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=1 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=2 step=0 apply=True overlap=[651, 521, 549, 494, 588, 519, 373, 630] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_L2_REF layer=2 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=2 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=2 step=0 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=2 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=2 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=3 step=0 apply=True overlap=[357, 604, 683, 678, 430, 791, 86, 196] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_L2_REF layer=3 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=3 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=3 step=0 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=3 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=3 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=4 step=0 apply=True overlap=[658, 428, 445, 373, 553, 619, 403, 284] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_L2_REF layer=4 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=4 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=4 step=0 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=4 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=4 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=5 step=0 apply=True overlap=[483, 705, 303, 639, 163, 520, 546, 504] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_L2_REF layer=5 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=5 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=5 step=0 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=5 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=5 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=6 step=0 apply=True overlap=[391, 572, 449, 567, 307, 226, 365, 372] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_L2_REF layer=6 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=6 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=6 step=0 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=6 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=6 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=7 step=0 apply=True overlap=[597, 578, 421, 344, 214, 464, 157, 158] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_L2_REF layer=7 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=7 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=7 step=0 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=7 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=7 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=8 step=0 apply=True overlap=[367, 562, 542, 421, 655, 468, 480, 440] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_L2_REF layer=8 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=8 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=8 step=0 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=8 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=8 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=9 step=0 apply=True overlap=[440, 290, 683, 450, 427, 442, 615, 661] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_L2_REF layer=9 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=9 step=0 span=15951-15957 candidate(any,all)=([5], [5]) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=9 step=0 span=47951-47957 candidate(any,all)=([0], [0]) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=9 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=9 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=10 step=0 apply=True overlap=[66, 224, 212, 79, 276, 548, 223, 126] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_L2_REF layer=10 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=10 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=10 step=0 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=10 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=10 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=11 step=0 apply=True overlap=[459, 459, 487, 393, 316, 409, 340, 583] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_L2_REF layer=11 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=11 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=11 step=0 span=47951-47957 candidate(any,all)=([6, 7], [6, 7]) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=11 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=11 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=12 step=0 apply=True overlap=[362, 495, 514, 575, 608, 456, 540, 311] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_L2_REF layer=12 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=12 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=12 step=0 span=47951-47957 candidate(any,all)=([1, 3, 4], [1, 3, 4]) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=12 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=12 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=13 step=0 apply=True overlap=[661, 448, 499, 669, 676, 581, 523, 602] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_L2_REF layer=13 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=13 step=0 span=15951-15957 candidate(any,all)=([4, 5], [4, 5]) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=13 step=0 span=47951-47957 candidate(any,all)=([4, 5], [4, 5]) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=13 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=13 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=14 step=0 apply=True overlap=[328, 651, 422, 566, 634, 399, 585, 493] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_L2_REF layer=14 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=14 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=14 step=0 span=47951-47957 candidate(any,all)=([3], [3]) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=14 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=14 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=15 step=0 apply=True overlap=[653, 633, 668, 640, 746, 432, 566, 486] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_L2_REF layer=15 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=15 step=0 span=15951-15957 candidate(any,all)=([7], [7]) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=15 step=0 span=47951-47957 candidate(any,all)=([1, 5, 6, 7], [1, 5, 6, 7]) middle(any,all)=([1, 5, 7], []) historical(any,all)=([], []) reference(any,all)=([1, 5, 7], [])
+TRACE_UNION layer=15 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=15 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=16 step=0 apply=True overlap=[742, 585, 523, 658, 622, 600, 616, 663] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_L2_REF layer=16 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=16 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=16 step=0 span=47951-47957 candidate(any,all)=([2], [2]) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=16 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=16 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=17 step=0 apply=True overlap=[685, 686, 737, 757, 789, 795, 673, 715] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_L2_REF layer=17 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=17 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=17 step=0 span=47951-47957 candidate(any,all)=([0], [0]) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=17 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=17 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=18 step=0 apply=True overlap=[644, 767, 702, 761, 737, 700, 699, 769] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_L2_REF layer=18 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=18 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=18 step=0 span=47951-47957 candidate(any,all)=([0, 7], [0, 7]) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=18 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=18 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=19 step=0 apply=True overlap=[650, 571, 726, 771, 711, 488, 577, 728] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_L2_REF layer=19 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=19 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=19 step=0 span=47951-47957 candidate(any,all)=([2], [2]) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=19 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=19 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=20 step=0 apply=True overlap=[679, 592, 761, 764, 767, 597, 602, 813] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_L2_REF layer=20 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=20 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=20 step=0 span=47951-47957 candidate(any,all)=([7], [7]) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=20 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=20 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=21 step=0 apply=True overlap=[369, 570, 770, 521, 772, 651, 699, 751] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_L2_REF layer=21 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=21 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=21 step=0 span=47951-47957 candidate(any,all)=([3], [3]) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=21 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=21 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=22 step=0 apply=True overlap=[674, 777, 579, 686, 771, 522, 597, 642] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_L2_REF layer=22 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=22 step=0 span=15951-15957 candidate(any,all)=([0, 6], [0, 6]) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=22 step=0 span=47951-47957 candidate(any,all)=([0, 4, 6], [0, 4, 6]) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=22 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=22 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=23 step=0 apply=True overlap=[656, 442, 660, 716, 492, 595, 589, 759] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_L2_REF layer=23 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=23 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=23 step=0 span=47951-47957 candidate(any,all)=([0, 1, 5, 6], [0, 1, 5, 6]) middle(any,all)=([5], []) historical(any,all)=([1, 5], []) reference(any,all)=([5], [])
+TRACE_UNION layer=23 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=23 step=0 span=47951-47957 final(any,all)=([1, 5], [])
+TRACE_HIST_L2 layer=24 step=0 apply=True overlap=[556, 591, 722, 747, 729, 597, 628, 768] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_L2_REF layer=24 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=24 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=24 step=0 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=24 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=24 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=25 step=0 apply=True overlap=[505, 446, 725, 396, 421, 515, 581, 542] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_L2_REF layer=25 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=25 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=25 step=0 span=47951-47957 candidate(any,all)=([1, 4, 5, 7], [1, 4, 5, 7]) middle(any,all)=([1, 4], []) historical(any,all)=([], []) reference(any,all)=([1, 4], [])
+TRACE_UNION layer=25 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=25 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=26 step=0 apply=True overlap=[500, 732, 308, 544, 660, 611, 675, 722] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_L2_REF layer=26 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=26 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=26 step=0 span=47951-47957 candidate(any,all)=([1, 2], [1, 2]) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=26 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=26 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=27 step=0 apply=True overlap=[533, 578, 553, 413, 605, 629, 696, 737] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_L2_REF layer=27 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=27 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=27 step=0 span=47951-47957 candidate(any,all)=([0, 2], [0, 2]) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=27 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=27 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=28 step=0 apply=True overlap=[593, 400, 743, 470, 614, 563, 263, 85] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_L2_REF layer=28 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=28 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=28 step=0 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=28 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=28 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=29 step=0 apply=True overlap=[712, 657, 659, 717, 690, 595, 697, 493] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_L2_REF layer=29 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=29 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=29 step=0 span=47951-47957 candidate(any,all)=([1, 5, 7], [1, 5, 7]) middle(any,all)=([1], []) historical(any,all)=([1], []) reference(any,all)=([1], [])
+TRACE_UNION layer=29 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=29 step=0 span=47951-47957 final(any,all)=([1], [])
+TRACE_HIST_L2 layer=30 step=0 apply=True overlap=[409, 209, 671, 426, 593, 577, 741, 100] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_L2_REF layer=30 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=30 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=30 step=0 span=47951-47957 candidate(any,all)=([3], [3]) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=30 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=30 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=31 step=0 apply=True overlap=[706, 761, 488, 685, 445, 677, 419, 660] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_L2_REF layer=31 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=31 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=31 step=0 span=47951-47957 candidate(any,all)=([1, 4, 6], [1, 4, 6]) middle(any,all)=([4], []) historical(any,all)=([], []) reference(any,all)=([4], [])
+TRACE_UNION layer=31 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=31 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=32 step=0 apply=True overlap=[732, 666, 716, 480, 565, 487, 423, 166] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_L2_REF layer=32 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=32 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=32 step=0 span=47951-47957 candidate(any,all)=([3, 4, 5, 6], [3, 4, 5, 6]) middle(any,all)=([3, 6], []) historical(any,all)=([], []) reference(any,all)=([3, 6], [])
+TRACE_UNION layer=32 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=32 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=33 step=0 apply=True overlap=[665, 633, 680, 776, 763, 703, 464, 765] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_L2_REF layer=33 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=33 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=33 step=0 span=47951-47957 candidate(any,all)=([0], [0]) middle(any,all)=([], []) historical(any,all)=([0], []) reference(any,all)=([], [])
+TRACE_UNION layer=33 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=33 step=0 span=47951-47957 final(any,all)=([0], [])
+TRACE_HIST_L2 layer=34 step=0 apply=True overlap=[750, 760, 675, 356, 532, 242, 269, 617] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_L2_REF layer=34 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=34 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=34 step=0 span=47951-47957 candidate(any,all)=([2, 3, 4, 5, 6], [2, 3, 4, 5, 6]) middle(any,all)=([], []) historical(any,all)=([6], []) reference(any,all)=([], [])
+TRACE_UNION layer=34 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=34 step=0 span=47951-47957 final(any,all)=([6], [])
+TRACE_HIST_L2 layer=35 step=0 apply=True overlap=[268, 267, 460, 457, 339, 263, 195, 322] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_L2_REF layer=35 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=35 step=0 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=35 step=0 span=47951-47957 candidate(any,all)=([5, 6], [5, 6]) middle(any,all)=([], []) historical(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=35 step=0 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=35 step=0 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=0 step=1 apply=True overlap=[434, 316, 220, 419, 338, 272, 300, 389] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=0 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=0 step=1 span=47951-47957 candidate(any,all)=([0, 6], [0, 6]) middle(any,all)=([], []) historical(any,all)=([6], [])
+TRACE_UNION layer=0 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=0 step=1 span=47951-47957 final(any,all)=([6], [])
+TRACE_HIST_L2 layer=1 step=1 apply=True overlap=[401, 267, 534, 596, 426, 534, 441, 370] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=1 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=1 step=1 span=47951-47957 candidate(any,all)=([1], [1]) middle(any,all)=([], []) historical(any,all)=([1], [])
+TRACE_UNION layer=1 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=1 step=1 span=47951-47957 final(any,all)=([1], [])
+TRACE_HIST_L2 layer=2 step=1 apply=True overlap=[679, 582, 537, 521, 568, 522, 390, 602] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=2 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=2 step=1 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=2 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=2 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=3 step=1 apply=True overlap=[324, 579, 706, 709, 435, 772, 112, 223] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=3 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=3 step=1 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=3 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=3 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=4 step=1 apply=True overlap=[574, 450, 424, 435, 523, 672, 428, 367] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=4 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=4 step=1 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=4 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=4 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=5 step=1 apply=True overlap=[481, 695, 255, 626, 193, 519, 501, 460] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=5 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=5 step=1 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=5 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=5 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=6 step=1 apply=True overlap=[326, 607, 585, 610, 363, 267, 433, 312] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=6 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=6 step=1 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=6 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=6 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=7 step=1 apply=True overlap=[594, 628, 383, 312, 238, 510, 125, 157] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=7 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=7 step=1 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=7 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=7 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=8 step=1 apply=True overlap=[391, 603, 504, 423, 642, 407, 401, 551] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=8 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=8 step=1 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=8 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=8 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=9 step=1 apply=True overlap=[357, 255, 685, 507, 493, 568, 486, 664] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=9 step=1 span=15951-15957 candidate(any,all)=([5], [5]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=9 step=1 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=9 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=9 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=10 step=1 apply=True overlap=[57, 119, 190, 143, 299, 299, 289, 95] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=10 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=10 step=1 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=10 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=10 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=11 step=1 apply=True overlap=[461, 485, 424, 485, 333, 331, 304, 495] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=11 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=11 step=1 span=47951-47957 candidate(any,all)=([0, 6, 7], [0, 6, 7]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=11 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=11 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=12 step=1 apply=True overlap=[330, 470, 482, 497, 570, 541, 460, 437] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=12 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=12 step=1 span=47951-47957 candidate(any,all)=([1, 2, 3, 4], [1, 2, 3, 4]) middle(any,all)=([2], []) historical(any,all)=([], [])
+TRACE_UNION layer=12 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=12 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=13 step=1 apply=True overlap=[671, 431, 549, 686, 625, 558, 478, 446] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=13 step=1 span=15951-15957 candidate(any,all)=([5], [5]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=13 step=1 span=47951-47957 candidate(any,all)=([4], [4]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=13 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=13 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=14 step=1 apply=True overlap=[261, 592, 445, 533, 603, 417, 487, 433] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=14 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=14 step=1 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=14 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=14 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=15 step=1 apply=True overlap=[613, 519, 699, 571, 705, 347, 495, 518] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=15 step=1 span=15951-15957 candidate(any,all)=([7], [7]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=15 step=1 span=47951-47957 candidate(any,all)=([5], [5]) middle(any,all)=([5], []) historical(any,all)=([], [])
+TRACE_UNION layer=15 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=15 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=16 step=1 apply=True overlap=[697, 577, 475, 661, 625, 650, 574, 670] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=16 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=16 step=1 span=47951-47957 candidate(any,all)=([2], [2]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=16 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=16 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=17 step=1 apply=True overlap=[662, 667, 737, 716, 795, 824, 699, 645] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=17 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=17 step=1 span=47951-47957 candidate(any,all)=([0], [0]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=17 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=17 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=18 step=1 apply=True overlap=[561, 721, 672, 727, 730, 643, 700, 720] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=18 step=1 span=15951-15957 candidate(any,all)=([0], [0]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=18 step=1 span=47951-47957 candidate(any,all)=([7], [7]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=18 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=18 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=19 step=1 apply=True overlap=[548, 531, 703, 757, 613, 375, 493, 665] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=19 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=19 step=1 span=47951-47957 candidate(any,all)=([2], [2]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=19 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=19 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=20 step=1 apply=True overlap=[603, 513, 748, 750, 813, 633, 536, 822] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=20 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=20 step=1 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=20 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=20 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=21 step=1 apply=True overlap=[345, 630, 742, 454, 763, 651, 645, 716] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=21 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=21 step=1 span=47951-47957 candidate(any,all)=([3], [3]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=21 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=21 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=22 step=1 apply=True overlap=[370, 789, 488, 698, 722, 453, 562, 713] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=22 step=1 span=15951-15957 candidate(any,all)=([0, 6], [0, 6]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=22 step=1 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=22 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=22 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=23 step=1 apply=True overlap=[577, 455, 686, 735, 366, 569, 498, 758] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=23 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=23 step=1 span=47951-47957 candidate(any,all)=([0, 4, 5, 6], [0, 4, 5, 6]) middle(any,all)=([5, 6], []) historical(any,all)=([4], [])
+TRACE_UNION layer=23 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=23 step=1 span=47951-47957 final(any,all)=([4], [])
+TRACE_HIST_L2 layer=24 step=1 apply=True overlap=[468, 622, 666, 757, 709, 588, 592, 772] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=24 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=24 step=1 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=24 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=24 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=25 step=1 apply=True overlap=[446, 393, 739, 259, 413, 513, 615, 593] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=25 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=25 step=1 span=47951-47957 candidate(any,all)=([7], [7]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=25 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=25 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=26 step=1 apply=True overlap=[487, 605, 263, 483, 701, 694, 775, 734] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=26 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=26 step=1 span=47951-47957 candidate(any,all)=([1, 2], [1, 2]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=26 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=26 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=27 step=1 apply=True overlap=[575, 573, 481, 481, 666, 599, 667, 725] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=27 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=27 step=1 span=47951-47957 candidate(any,all)=([0, 2], [0, 2]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=27 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=27 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=28 step=1 apply=True overlap=[617, 421, 700, 616, 652, 597, 245, 62] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=28 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=28 step=1 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=28 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=28 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=29 step=1 apply=True overlap=[715, 666, 621, 617, 666, 513, 719, 579] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=29 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=29 step=1 span=47951-47957 candidate(any,all)=([5, 7], [5, 7]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=29 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=29 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=30 step=1 apply=True overlap=[436, 269, 712, 198, 585, 570, 767, 60] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=30 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=30 step=1 span=47951-47957 candidate(any,all)=([0, 3, 5], [0, 3, 5]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=30 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=30 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=31 step=1 apply=True overlap=[671, 759, 580, 725, 391, 652, 460, 742] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=31 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=31 step=1 span=47951-47957 candidate(any,all)=([4, 6], [4, 6]) middle(any,all)=([4, 6], []) historical(any,all)=([], [])
+TRACE_UNION layer=31 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=31 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=32 step=1 apply=True overlap=[704, 659, 769, 511, 617, 521, 417, 173] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=32 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=32 step=1 span=47951-47957 candidate(any,all)=([3, 4, 5, 6], [3, 4, 5, 6]) middle(any,all)=([3, 5, 6], []) historical(any,all)=([], [])
+TRACE_UNION layer=32 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=32 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=33 step=1 apply=True overlap=[677, 627, 760, 771, 761, 688, 542, 743] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=33 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=33 step=1 span=47951-47957 candidate(any,all)=([0], [0]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=33 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=33 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=34 step=1 apply=True overlap=[767, 688, 675, 320, 479, 269, 228, 626] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=34 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=34 step=1 span=47951-47957 candidate(any,all)=([2, 3, 4, 5, 6], [2, 3, 4, 5, 6]) middle(any,all)=([], []) historical(any,all)=([3, 6], [])
+TRACE_UNION layer=34 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=34 step=1 span=47951-47957 final(any,all)=([3, 6], [])
+TRACE_HIST_L2 layer=35 step=1 apply=True overlap=[317, 378, 499, 556, 354, 326, 164, 349] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=35 step=1 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=35 step=1 span=47951-47957 candidate(any,all)=([5], [5]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=35 step=1 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=35 step=1 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=0 step=2 apply=True overlap=[475, 246, 337, 455, 369, 342, 360, 413] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=0 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=0 step=2 span=47951-47957 candidate(any,all)=([0, 6], [0, 6]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=0 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=0 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=1 step=2 apply=True overlap=[402, 288, 629, 571, 539, 477, 365, 485] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=1 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=1 step=2 span=47951-47957 candidate(any,all)=([1, 3], [1, 3]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=1 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=1 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=2 step=2 apply=True overlap=[656, 498, 443, 489, 541, 436, 305, 594] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=2 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=2 step=2 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=2 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=2 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=3 step=2 apply=True overlap=[337, 574, 585, 630, 409, 780, 164, 337] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=3 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=3 step=2 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=3 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=3 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=4 step=2 apply=True overlap=[588, 422, 410, 474, 496, 623, 391, 473] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=4 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=4 step=2 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=4 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=4 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=5 step=2 apply=True overlap=[504, 672, 335, 501, 170, 558, 498, 512] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=5 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=5 step=2 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=5 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=5 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=6 step=2 apply=True overlap=[261, 500, 433, 510, 334, 203, 428, 382] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=6 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=6 step=2 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=6 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=6 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=7 step=2 apply=True overlap=[558, 567, 349, 259, 244, 509, 92, 113] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=7 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=7 step=2 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=7 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=7 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=8 step=2 apply=True overlap=[365, 551, 548, 408, 539, 403, 437, 561] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=8 step=2 span=15951-15957 candidate(any,all)=([4], [4]) middle(any,all)=([4], []) historical(any,all)=([4], [])
+TRACE_FILTER layer=8 step=2 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=8 step=2 span=15951-15957 final(any,all)=([4], [])
+TRACE_UNION layer=8 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=9 step=2 apply=True overlap=[347, 267, 660, 460, 545, 584, 668, 498] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=9 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=9 step=2 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=9 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=9 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=10 step=2 apply=True overlap=[54, 244, 239, 116, 391, 280, 386, 85] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=10 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=10 step=2 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=10 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=10 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=11 step=2 apply=True overlap=[371, 380, 362, 467, 257, 302, 365, 492] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=11 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=11 step=2 span=47951-47957 candidate(any,all)=([0, 1], [0, 1]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=11 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=11 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=12 step=2 apply=True overlap=[308, 498, 480, 421, 641, 577, 463, 459] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=12 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=12 step=2 span=47951-47957 candidate(any,all)=([1, 2, 3, 4], [1, 2, 3, 4]) middle(any,all)=([2], []) historical(any,all)=([], [])
+TRACE_UNION layer=12 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=12 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=13 step=2 apply=True overlap=[575, 422, 430, 669, 575, 448, 315, 575] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=13 step=2 span=15951-15957 candidate(any,all)=([4, 5], [4, 5]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=13 step=2 span=47951-47957 candidate(any,all)=([4], [4]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=13 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=13 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=14 step=2 apply=True overlap=[257, 567, 365, 570, 607, 329, 570, 474] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=14 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=14 step=2 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=14 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=14 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=15 step=2 apply=True overlap=[525, 515, 598, 600, 666, 350, 460, 490] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=15 step=2 span=15951-15957 candidate(any,all)=([7], [7]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=15 step=2 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=15 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=15 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=16 step=2 apply=True overlap=[668, 522, 456, 616, 613, 650, 521, 586] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=16 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=16 step=2 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=16 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=16 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=17 step=2 apply=True overlap=[584, 626, 708, 664, 693, 816, 588, 546] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=17 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=17 step=2 span=47951-47957 candidate(any,all)=([0], [0]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=17 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=17 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=18 step=2 apply=True overlap=[441, 717, 555, 649, 733, 558, 758, 690] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=18 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=18 step=2 span=47951-47957 candidate(any,all)=([7], [7]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=18 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=18 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=19 step=2 apply=True overlap=[612, 483, 654, 708, 495, 310, 552, 616] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=19 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=19 step=2 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=19 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=19 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=20 step=2 apply=True overlap=[561, 470, 747, 595, 669, 623, 543, 550] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=20 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=20 step=2 span=47951-47957 candidate(any,all)=([5, 7], [5, 7]) middle(any,all)=([5, 7], []) historical(any,all)=([5, 7], [])
+TRACE_UNION layer=20 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=20 step=2 span=47951-47957 final(any,all)=([5, 7], [])
+TRACE_HIST_L2 layer=21 step=2 apply=True overlap=[337, 668, 677, 496, 703, 659, 692, 677] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=21 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=21 step=2 span=47951-47957 candidate(any,all)=([3, 7], [3, 7]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=21 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=21 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=22 step=2 apply=True overlap=[515, 773, 434, 665, 666, 504, 404, 711] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=22 step=2 span=15951-15957 candidate(any,all)=([0, 2, 3, 6], [0, 2, 3, 6]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=22 step=2 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=22 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=22 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=23 step=2 apply=True overlap=[586, 418, 664, 722, 270, 572, 419, 727] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=23 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=23 step=2 span=47951-47957 candidate(any,all)=([0, 1, 4, 5, 6], [0, 1, 4, 5, 6]) middle(any,all)=([1, 5], []) historical(any,all)=([1, 4, 5], [])
+TRACE_UNION layer=23 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=23 step=2 span=47951-47957 final(any,all)=([1, 4, 5], [])
+TRACE_HIST_L2 layer=24 step=2 apply=True overlap=[500, 626, 684, 733, 709, 676, 535, 770] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=24 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=24 step=2 span=47951-47957 candidate(any,all)=([2], [2]) middle(any,all)=([2], []) historical(any,all)=([], [])
+TRACE_UNION layer=24 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=24 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=25 step=2 apply=True overlap=[479, 377, 681, 283, 384, 577, 479, 467] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=25 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=25 step=2 span=47951-47957 candidate(any,all)=([1, 5, 7], [1, 5, 7]) middle(any,all)=([1, 7], []) historical(any,all)=([], [])
+TRACE_UNION layer=25 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=25 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=26 step=2 apply=True overlap=[465, 673, 277, 446, 624, 595, 596, 659] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=26 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=26 step=2 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=26 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=26 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=27 step=2 apply=True overlap=[542, 546, 477, 416, 639, 633, 656, 640] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=27 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=27 step=2 span=47951-47957 candidate(any,all)=([0, 2], [0, 2]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=27 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=27 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=28 step=2 apply=True overlap=[596, 386, 605, 489, 634, 505, 278, 113] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=28 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=28 step=2 span=47951-47957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=28 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=28 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=29 step=2 apply=True overlap=[727, 661, 607, 725, 638, 481, 692, 510] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=29 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=29 step=2 span=47951-47957 candidate(any,all)=([1, 5, 7], [1, 5, 7]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=29 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=29 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=30 step=2 apply=True overlap=[337, 175, 643, 291, 450, 493, 718, 41] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=30 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=30 step=2 span=47951-47957 candidate(any,all)=([0, 3], [0, 3]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=30 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=30 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=31 step=2 apply=True overlap=[614, 763, 472, 648, 442, 580, 433, 712] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=31 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=31 step=2 span=47951-47957 candidate(any,all)=([4, 6], [4, 6]) middle(any,all)=([4, 6], []) historical(any,all)=([], [])
+TRACE_UNION layer=31 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=31 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=32 step=2 apply=True overlap=[671, 687, 694, 402, 571, 457, 358, 176] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=32 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=32 step=2 span=47951-47957 candidate(any,all)=([3, 4, 5, 6, 7], [3, 4, 5, 6, 7]) middle(any,all)=([3, 4], []) historical(any,all)=([4], [])
+TRACE_UNION layer=32 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=32 step=2 span=47951-47957 final(any,all)=([4], [])
+TRACE_HIST_L2 layer=33 step=2 apply=True overlap=[706, 592, 695, 768, 663, 632, 326, 749] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=33 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=33 step=2 span=47951-47957 candidate(any,all)=([0], [0]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=33 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=33 step=2 span=47951-47957 final(any,all)=([], [])
+TRACE_HIST_L2 layer=34 step=2 apply=True overlap=[718, 721, 683, 366, 405, 235, 248, 612] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=34 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=34 step=2 span=47951-47957 candidate(any,all)=([2, 3, 4, 5, 6], [2, 3, 4, 5, 6]) middle(any,all)=([], []) historical(any,all)=([3, 5, 6], [])
+TRACE_UNION layer=34 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=34 step=2 span=47951-47957 final(any,all)=([3, 5, 6], [])
+TRACE_HIST_L2 layer=35 step=2 apply=True overlap=[362, 348, 442, 506, 258, 168, 149, 336] current_counts=[892, 892, 892, 892, 892, 892, 892, 892] historical_counts=[892, 892, 892, 892, 892, 892, 892, 892]
+TRACE_FILTER layer=35 step=2 span=15951-15957 candidate(any,all)=([], []) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_FILTER layer=35 step=2 span=47951-47957 candidate(any,all)=([5, 6], [5, 6]) middle(any,all)=([], []) historical(any,all)=([], [])
+TRACE_UNION layer=35 step=2 span=15951-15957 final(any,all)=([], [])
+TRACE_UNION layer=35 step=2 span=47951-47957 final(any,all)=([], [])
+[nfa:niah_multikey_2:L65536] 13 in=65424 out=128 score=0.000000
+[ALL DONE] /tmp/nfa_selection_budget_diag_20261116/hist_l1_hist_l2_mn128/quality_manifest_L65536_s0of1.json

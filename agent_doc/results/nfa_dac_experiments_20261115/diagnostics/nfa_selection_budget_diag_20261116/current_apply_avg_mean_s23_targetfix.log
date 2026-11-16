@@ -1,0 +1,589 @@
+TARGET_TRUTH sample=23 answer=7824674 answer_ids=[22, 23, 17, 19, 21, 22, 19] spans=((15607, 15613), (47574, 47580)) blocks=(243, 743)
+DIAG sample=23 subspace=full K1=128 K2=1024 out=/tmp/nfa_selection_budget_diag_20261116/current_apply_avg_mean_s23_targetfix
+RESOLVED K1=128 K2=1024 near_tokens=off max_new=128 dense_gather=False
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/5 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 5/5 [00:00<00:00, 154.31it/s]
+register qwen3 attn: [model.layers.0.self_attn]
+register iter91 rmsnorm: [model.layers.0.self_attn.q_norm]
+register iter91 rmsnorm: [model.layers.0.self_attn.k_norm]
+register iter91 rmsnorm: [model.layers.0.input_layernorm]
+register iter91 rmsnorm: [model.layers.0.post_attention_layernorm]
+register iter97 MLP SiLU+mul: [model.layers.0.mlp]
+TRACE_L1_VARIANTS layer=0 step=0 target_head_coverage={'production': [0, 1], 'mm_mean': [0, 1], 'mm_max': [0, 1], 'mm_top2_mean': [0, 1], 'mm_mean_max_average': [0, 1], 'avg_mean': [0, 1], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 1], 'mm_max_plus_avg_mean': [0, 1]}
+TRACE_L2_REF layer=0 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=0 step=0 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=0 step=0 span=47574-47580 candidate(any,all)=([0], [0]) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=0 step=0 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=0 step=0 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=1 step=0 target_head_coverage={'production': [0, 1], 'mm_mean': [0, 1], 'mm_max': [0, 0], 'mm_top2_mean': [0, 1], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_L2_REF layer=1 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=1 step=0 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=1 step=0 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=1 step=0 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=1 step=0 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=2 step=0 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 1], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_L2_REF layer=2 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=2 step=0 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=2 step=0 span=47574-47580 candidate(any,all)=([7], [7]) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=2 step=0 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=2 step=0 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=3 step=0 target_head_coverage={'production': [1, 0], 'mm_mean': [1, 0], 'mm_max': [1, 0], 'mm_top2_mean': [1, 0], 'mm_mean_max_average': [1, 0], 'avg_mean': [2, 0], 'avg_max': [2, 0], 'mm_mean_plus_avg_mean': [2, 0], 'mm_max_plus_avg_mean': [2, 0]}
+TRACE_L2_REF layer=3 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=3 step=0 span=15607-15613 candidate(any,all)=([6, 7], [6, 7]) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=3 step=0 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=3 step=0 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=3 step=0 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=4 step=0 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_L2_REF layer=4 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=4 step=0 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=4 step=0 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=4 step=0 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=4 step=0 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=5 step=0 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_L2_REF layer=5 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=5 step=0 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=5 step=0 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=5 step=0 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=5 step=0 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=6 step=0 target_head_coverage={'production': [0, 1], 'mm_mean': [0, 1], 'mm_max': [0, 1], 'mm_top2_mean': [0, 1], 'mm_mean_max_average': [0, 1], 'avg_mean': [0, 2], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 2], 'mm_max_plus_avg_mean': [0, 1]}
+TRACE_L2_REF layer=6 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=6 step=0 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=6 step=0 span=47574-47580 candidate(any,all)=([3, 4], [3, 4]) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=6 step=0 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=6 step=0 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=7 step=0 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 1], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_L2_REF layer=7 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=7 step=0 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=7 step=0 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=7 step=0 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=7 step=0 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=8 step=0 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [1, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [1, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_L2_REF layer=8 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=8 step=0 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=8 step=0 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=8 step=0 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=8 step=0 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=9 step=0 target_head_coverage={'production': [0, 1], 'mm_mean': [0, 1], 'mm_max': [0, 2], 'mm_top2_mean': [0, 1], 'mm_mean_max_average': [0, 2], 'avg_mean': [0, 2], 'avg_max': [0, 1], 'mm_mean_plus_avg_mean': [0, 1], 'mm_max_plus_avg_mean': [0, 2]}
+TRACE_L2_REF layer=9 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=9 step=0 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=9 step=0 span=47574-47580 candidate(any,all)=([0, 1], [0, 1]) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=9 step=0 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=9 step=0 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=10 step=0 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_L2_REF layer=10 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=10 step=0 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=10 step=0 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=10 step=0 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=10 step=0 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=11 step=0 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [1, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_L2_REF layer=11 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=11 step=0 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=11 step=0 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=11 step=0 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=11 step=0 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=12 step=0 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_L2_REF layer=12 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=12 step=0 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=12 step=0 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=12 step=0 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=12 step=0 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=13 step=0 target_head_coverage={'production': [1, 0], 'mm_mean': [1, 0], 'mm_max': [1, 0], 'mm_top2_mean': [1, 0], 'mm_mean_max_average': [1, 0], 'avg_mean': [0, 2], 'avg_max': [1, 1], 'mm_mean_plus_avg_mean': [1, 0], 'mm_max_plus_avg_mean': [1, 0]}
+TRACE_L2_REF layer=13 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=13 step=0 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=13 step=0 span=47574-47580 candidate(any,all)=([2, 4], [2, 4]) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=13 step=0 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=13 step=0 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=14 step=0 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_L2_REF layer=14 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=14 step=0 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=14 step=0 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=14 step=0 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=14 step=0 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=15 step=0 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_L2_REF layer=15 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=15 step=0 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=15 step=0 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=15 step=0 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=15 step=0 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=16 step=0 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 1], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_L2_REF layer=16 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=16 step=0 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=16 step=0 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=16 step=0 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=16 step=0 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=17 step=0 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_L2_REF layer=17 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=17 step=0 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=17 step=0 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=17 step=0 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=17 step=0 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=18 step=0 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_L2_REF layer=18 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=18 step=0 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=18 step=0 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=18 step=0 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=18 step=0 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=19 step=0 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_L2_REF layer=19 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=19 step=0 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=19 step=0 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=19 step=0 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=19 step=0 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=20 step=0 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 1], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 2], 'avg_max': [0, 4], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 1]}
+TRACE_L2_REF layer=20 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=20 step=0 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=20 step=0 span=47574-47580 candidate(any,all)=([3, 4], [3, 4]) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=20 step=0 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=20 step=0 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=21 step=0 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 2], 'avg_max': [0, 3], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_L2_REF layer=21 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=21 step=0 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=21 step=0 span=47574-47580 candidate(any,all)=([2, 7], [2, 7]) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=21 step=0 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=21 step=0 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=22 step=0 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [1, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_L2_REF layer=22 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=22 step=0 span=15607-15613 candidate(any,all)=([0], [0]) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=22 step=0 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=22 step=0 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=22 step=0 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=23 step=0 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 1], 'avg_max': [0, 1], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_L2_REF layer=23 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=23 step=0 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=23 step=0 span=47574-47580 candidate(any,all)=([3], [3]) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=23 step=0 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=23 step=0 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=24 step=0 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 1], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_L2_REF layer=24 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=24 step=0 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=24 step=0 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=24 step=0 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=24 step=0 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=25 step=0 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_L2_REF layer=25 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=25 step=0 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=25 step=0 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=25 step=0 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=25 step=0 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=26 step=0 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_L2_REF layer=26 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=26 step=0 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=26 step=0 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=26 step=0 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=26 step=0 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=27 step=0 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_L2_REF layer=27 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=27 step=0 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=27 step=0 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=27 step=0 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=27 step=0 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=28 step=0 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_L2_REF layer=28 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=28 step=0 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=28 step=0 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=28 step=0 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=28 step=0 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=29 step=0 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_L2_REF layer=29 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=29 step=0 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=29 step=0 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=29 step=0 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=29 step=0 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=30 step=0 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_L2_REF layer=30 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=30 step=0 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=30 step=0 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=30 step=0 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=30 step=0 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=31 step=0 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 1], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_L2_REF layer=31 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=31 step=0 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=31 step=0 span=47574-47580 candidate(any,all)=([2], [2]) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=31 step=0 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=31 step=0 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=32 step=0 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_L2_REF layer=32 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=32 step=0 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=32 step=0 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=32 step=0 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=32 step=0 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=33 step=0 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_L2_REF layer=33 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=33 step=0 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=33 step=0 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=33 step=0 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=33 step=0 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=34 step=0 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 5], 'avg_max': [0, 3], 'mm_mean_plus_avg_mean': [0, 3], 'mm_max_plus_avg_mean': [0, 2]}
+TRACE_L2_REF layer=34 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=34 step=0 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=34 step=0 span=47574-47580 candidate(any,all)=([3, 4, 5, 6, 7], [3, 4, 5, 6, 7]) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=34 step=0 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=34 step=0 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=35 step=0 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_L2_REF layer=35 step=0 capacity=66112 token_bits=32 bitexact=True mismatch_heads=[]
+TRACE_FILTER layer=35 step=0 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_FILTER layer=35 step=0 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], []) reference(any,all)=([], [])
+TRACE_UNION layer=35 step=0 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=35 step=0 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=0 step=1 target_head_coverage={'production': [0, 1], 'mm_mean': [0, 1], 'mm_max': [0, 1], 'mm_top2_mean': [0, 1], 'mm_mean_max_average': [0, 1], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=0 step=1 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=0 step=1 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=0 step=1 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=0 step=1 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=1 step=1 target_head_coverage={'production': [0, 2], 'mm_mean': [0, 2], 'mm_max': [0, 2], 'mm_top2_mean': [0, 1], 'mm_mean_max_average': [0, 2], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 2], 'mm_max_plus_avg_mean': [0, 2]}
+TRACE_FILTER layer=1 step=1 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=1 step=1 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=1 step=1 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=1 step=1 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=2 step=1 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=2 step=1 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=2 step=1 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=2 step=1 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=2 step=1 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=3 step=1 target_head_coverage={'production': [1, 0], 'mm_mean': [1, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [1, 0], 'avg_max': [2, 0], 'mm_mean_plus_avg_mean': [1, 0], 'mm_max_plus_avg_mean': [1, 0]}
+TRACE_FILTER layer=3 step=1 span=15607-15613 candidate(any,all)=([7], [7]) middle(any,all)=([], [])
+TRACE_FILTER layer=3 step=1 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=3 step=1 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=3 step=1 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=4 step=1 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=4 step=1 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=4 step=1 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=4 step=1 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=4 step=1 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=5 step=1 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=5 step=1 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=5 step=1 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=5 step=1 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=5 step=1 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=6 step=1 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=6 step=1 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=6 step=1 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=6 step=1 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=6 step=1 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=7 step=1 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=7 step=1 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=7 step=1 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=7 step=1 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=7 step=1 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=8 step=1 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [1, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [1, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=8 step=1 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=8 step=1 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=8 step=1 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=8 step=1 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=9 step=1 target_head_coverage={'production': [0, 1], 'mm_mean': [0, 1], 'mm_max': [0, 2], 'mm_top2_mean': [0, 1], 'mm_mean_max_average': [0, 1], 'avg_mean': [0, 3], 'avg_max': [0, 1], 'mm_mean_plus_avg_mean': [0, 2], 'mm_max_plus_avg_mean': [0, 2]}
+TRACE_FILTER layer=9 step=1 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=9 step=1 span=47574-47580 candidate(any,all)=([0, 1, 5], [0, 1, 5]) middle(any,all)=([], [])
+TRACE_UNION layer=9 step=1 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=9 step=1 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=10 step=1 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=10 step=1 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=10 step=1 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=10 step=1 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=10 step=1 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=11 step=1 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=11 step=1 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=11 step=1 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=11 step=1 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=11 step=1 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=12 step=1 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=12 step=1 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=12 step=1 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=12 step=1 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=12 step=1 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=13 step=1 target_head_coverage={'production': [1, 0], 'mm_mean': [1, 0], 'mm_max': [1, 0], 'mm_top2_mean': [1, 0], 'mm_mean_max_average': [1, 0], 'avg_mean': [0, 1], 'avg_max': [0, 1], 'mm_mean_plus_avg_mean': [1, 1], 'mm_max_plus_avg_mean': [1, 0]}
+TRACE_FILTER layer=13 step=1 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=13 step=1 span=47574-47580 candidate(any,all)=([2], [2]) middle(any,all)=([], [])
+TRACE_UNION layer=13 step=1 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=13 step=1 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=14 step=1 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=14 step=1 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=14 step=1 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=14 step=1 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=14 step=1 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=15 step=1 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=15 step=1 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=15 step=1 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=15 step=1 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=15 step=1 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=16 step=1 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=16 step=1 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=16 step=1 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=16 step=1 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=16 step=1 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=17 step=1 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=17 step=1 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=17 step=1 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=17 step=1 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=17 step=1 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=18 step=1 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 1], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=18 step=1 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=18 step=1 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=18 step=1 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=18 step=1 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=19 step=1 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=19 step=1 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=19 step=1 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=19 step=1 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=19 step=1 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=20 step=1 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=20 step=1 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=20 step=1 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=20 step=1 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=20 step=1 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=21 step=1 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 1], 'avg_max': [0, 1], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=21 step=1 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=21 step=1 span=47574-47580 candidate(any,all)=([7], [7]) middle(any,all)=([], [])
+TRACE_UNION layer=21 step=1 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=21 step=1 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=22 step=1 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [1, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [1, 0], 'avg_max': [1, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=22 step=1 span=15607-15613 candidate(any,all)=([0], [0]) middle(any,all)=([], [])
+TRACE_FILTER layer=22 step=1 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=22 step=1 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=22 step=1 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=23 step=1 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 1], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=23 step=1 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=23 step=1 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=23 step=1 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=23 step=1 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=24 step=1 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=24 step=1 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=24 step=1 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=24 step=1 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=24 step=1 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=25 step=1 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=25 step=1 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=25 step=1 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=25 step=1 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=25 step=1 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=26 step=1 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=26 step=1 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=26 step=1 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=26 step=1 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=26 step=1 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=27 step=1 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=27 step=1 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=27 step=1 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=27 step=1 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=27 step=1 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=28 step=1 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=28 step=1 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=28 step=1 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=28 step=1 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=28 step=1 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=29 step=1 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=29 step=1 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=29 step=1 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=29 step=1 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=29 step=1 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=30 step=1 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=30 step=1 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=30 step=1 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=30 step=1 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=30 step=1 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=31 step=1 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=31 step=1 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=31 step=1 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=31 step=1 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=31 step=1 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=32 step=1 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=32 step=1 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=32 step=1 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=32 step=1 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=32 step=1 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=33 step=1 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=33 step=1 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=33 step=1 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=33 step=1 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=33 step=1 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=34 step=1 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 1], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 5], 'avg_max': [0, 4], 'mm_mean_plus_avg_mean': [0, 3], 'mm_max_plus_avg_mean': [0, 3]}
+TRACE_FILTER layer=34 step=1 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=34 step=1 span=47574-47580 candidate(any,all)=([3, 4, 5, 6, 7], [3, 4, 5, 6, 7]) middle(any,all)=([], [])
+TRACE_UNION layer=34 step=1 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=34 step=1 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=35 step=1 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=35 step=1 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=35 step=1 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=35 step=1 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=35 step=1 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=0 step=2 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 1], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=0 step=2 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=0 step=2 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=0 step=2 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=0 step=2 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=1 step=2 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 2], 'mm_top2_mean': [0, 1], 'mm_mean_max_average': [0, 2], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=1 step=2 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=1 step=2 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=1 step=2 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=1 step=2 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=2 step=2 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=2 step=2 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=2 step=2 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=2 step=2 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=2 step=2 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=3 step=2 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [2, 0], 'avg_max': [2, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=3 step=2 span=15607-15613 candidate(any,all)=([5, 7], [5, 7]) middle(any,all)=([], [])
+TRACE_FILTER layer=3 step=2 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=3 step=2 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=3 step=2 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=4 step=2 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 1], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 1], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=4 step=2 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=4 step=2 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=4 step=2 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=4 step=2 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=5 step=2 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=5 step=2 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=5 step=2 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=5 step=2 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=5 step=2 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=6 step=2 target_head_coverage={'production': [0, 2], 'mm_mean': [0, 2], 'mm_max': [0, 1], 'mm_top2_mean': [0, 1], 'mm_mean_max_average': [0, 1], 'avg_mean': [0, 2], 'avg_max': [0, 1], 'mm_mean_plus_avg_mean': [0, 2], 'mm_max_plus_avg_mean': [0, 1]}
+TRACE_FILTER layer=6 step=2 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=6 step=2 span=47574-47580 candidate(any,all)=([3, 4], [3, 4]) middle(any,all)=([], [])
+TRACE_UNION layer=6 step=2 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=6 step=2 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=7 step=2 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=7 step=2 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=7 step=2 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=7 step=2 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=7 step=2 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=8 step=2 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=8 step=2 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=8 step=2 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=8 step=2 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=8 step=2 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=9 step=2 target_head_coverage={'production': [0, 1], 'mm_mean': [0, 1], 'mm_max': [0, 1], 'mm_top2_mean': [0, 1], 'mm_mean_max_average': [0, 1], 'avg_mean': [0, 0], 'avg_max': [0, 1], 'mm_mean_plus_avg_mean': [0, 1], 'mm_max_plus_avg_mean': [0, 1]}
+TRACE_FILTER layer=9 step=2 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=9 step=2 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=9 step=2 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=9 step=2 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=10 step=2 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=10 step=2 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=10 step=2 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=10 step=2 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=10 step=2 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=11 step=2 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=11 step=2 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=11 step=2 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=11 step=2 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=11 step=2 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=12 step=2 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [1, 1], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=12 step=2 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=12 step=2 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=12 step=2 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=12 step=2 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=13 step=2 target_head_coverage={'production': [1, 0], 'mm_mean': [1, 0], 'mm_max': [1, 0], 'mm_top2_mean': [1, 0], 'mm_mean_max_average': [1, 0], 'avg_mean': [0, 2], 'avg_max': [0, 1], 'mm_mean_plus_avg_mean': [1, 0], 'mm_max_plus_avg_mean': [1, 0]}
+TRACE_FILTER layer=13 step=2 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=13 step=2 span=47574-47580 candidate(any,all)=([2, 4], [2, 4]) middle(any,all)=([], [])
+TRACE_UNION layer=13 step=2 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=13 step=2 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=14 step=2 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=14 step=2 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=14 step=2 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=14 step=2 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=14 step=2 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=15 step=2 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 1], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=15 step=2 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=15 step=2 span=47574-47580 candidate(any,all)=([3], [3]) middle(any,all)=([], [])
+TRACE_UNION layer=15 step=2 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=15 step=2 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=16 step=2 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=16 step=2 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=16 step=2 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=16 step=2 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=16 step=2 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=17 step=2 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=17 step=2 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=17 step=2 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=17 step=2 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=17 step=2 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=18 step=2 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 2], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 1]}
+TRACE_FILTER layer=18 step=2 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=18 step=2 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=18 step=2 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=18 step=2 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=19 step=2 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=19 step=2 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=19 step=2 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=19 step=2 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=19 step=2 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=20 step=2 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 1], 'avg_max': [0, 2], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=20 step=2 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=20 step=2 span=47574-47580 candidate(any,all)=([4], [4]) middle(any,all)=([], [])
+TRACE_UNION layer=20 step=2 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=20 step=2 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=21 step=2 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 1], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 5], 'avg_max': [0, 5], 'mm_mean_plus_avg_mean': [0, 1], 'mm_max_plus_avg_mean': [0, 3]}
+TRACE_FILTER layer=21 step=2 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=21 step=2 span=47574-47580 candidate(any,all)=([1, 2, 4, 6, 7], [1, 2, 4, 6, 7]) middle(any,all)=([2, 6, 7], [])
+TRACE_UNION layer=21 step=2 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=21 step=2 span=47574-47580 final(any,all)=([2, 6, 7], [])
+TRACE_L1_VARIANTS layer=22 step=2 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [2, 0], 'avg_max': [1, 1], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [1, 0]}
+TRACE_FILTER layer=22 step=2 span=15607-15613 candidate(any,all)=([0, 2], [0, 2]) middle(any,all)=([], [])
+TRACE_FILTER layer=22 step=2 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=22 step=2 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=22 step=2 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=23 step=2 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 1], 'mm_top2_mean': [0, 1], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 4], 'avg_max': [0, 2], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 2]}
+TRACE_FILTER layer=23 step=2 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=23 step=2 span=47574-47580 candidate(any,all)=([1, 2, 3, 7], [1, 2, 3, 7]) middle(any,all)=([], [])
+TRACE_UNION layer=23 step=2 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=23 step=2 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=24 step=2 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 2], 'avg_max': [0, 1], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=24 step=2 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=24 step=2 span=47574-47580 candidate(any,all)=([0, 1], [0, 1]) middle(any,all)=([], [])
+TRACE_UNION layer=24 step=2 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=24 step=2 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=25 step=2 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 1], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=25 step=2 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=25 step=2 span=47574-47580 candidate(any,all)=([7], [7]) middle(any,all)=([], [])
+TRACE_UNION layer=25 step=2 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=25 step=2 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=26 step=2 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [1, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=26 step=2 span=15607-15613 candidate(any,all)=([6], [6]) middle(any,all)=([], [])
+TRACE_FILTER layer=26 step=2 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=26 step=2 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=26 step=2 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=27 step=2 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=27 step=2 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=27 step=2 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=27 step=2 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=27 step=2 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=28 step=2 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=28 step=2 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=28 step=2 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=28 step=2 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=28 step=2 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=29 step=2 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=29 step=2 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=29 step=2 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=29 step=2 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=29 step=2 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=30 step=2 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=30 step=2 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=30 step=2 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=30 step=2 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=30 step=2 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=31 step=2 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 1], 'avg_max': [0, 2], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=31 step=2 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=31 step=2 span=47574-47580 candidate(any,all)=([2], [2]) middle(any,all)=([], [])
+TRACE_UNION layer=31 step=2 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=31 step=2 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=32 step=2 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 2], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=32 step=2 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=32 step=2 span=47574-47580 candidate(any,all)=([1, 7], [1, 7]) middle(any,all)=([], [])
+TRACE_UNION layer=32 step=2 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=32 step=2 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=33 step=2 target_head_coverage={'production': [0, 1], 'mm_mean': [0, 1], 'mm_max': [0, 1], 'mm_top2_mean': [0, 1], 'mm_mean_max_average': [0, 1], 'avg_mean': [0, 0], 'avg_max': [0, 1], 'mm_mean_plus_avg_mean': [0, 1], 'mm_max_plus_avg_mean': [0, 1]}
+TRACE_FILTER layer=33 step=2 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=33 step=2 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=33 step=2 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=33 step=2 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=34 step=2 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 1], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 1], 'avg_mean': [0, 5], 'avg_max': [0, 5], 'mm_mean_plus_avg_mean': [0, 3], 'mm_max_plus_avg_mean': [0, 3]}
+TRACE_FILTER layer=34 step=2 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=34 step=2 span=47574-47580 candidate(any,all)=([3, 4, 5, 6, 7], [3, 4, 5, 6, 7]) middle(any,all)=([], [])
+TRACE_UNION layer=34 step=2 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=34 step=2 span=47574-47580 final(any,all)=([], [])
+TRACE_L1_VARIANTS layer=35 step=2 target_head_coverage={'production': [0, 0], 'mm_mean': [0, 0], 'mm_max': [0, 0], 'mm_top2_mean': [0, 0], 'mm_mean_max_average': [0, 0], 'avg_mean': [0, 0], 'avg_max': [0, 0], 'mm_mean_plus_avg_mean': [0, 0], 'mm_max_plus_avg_mean': [0, 0]}
+TRACE_FILTER layer=35 step=2 span=15607-15613 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_FILTER layer=35 step=2 span=47574-47580 candidate(any,all)=([], []) middle(any,all)=([], [])
+TRACE_UNION layer=35 step=2 span=15607-15613 final(any,all)=([], [])
+TRACE_UNION layer=35 step=2 span=47574-47580 final(any,all)=([], [])
+[nfa:niah_multikey_2:L65536] 23 in=65469 out=128 score=0.000000
+[ALL DONE] /tmp/nfa_selection_budget_diag_20261116/current_apply_avg_mean_s23_targetfix/quality_manifest_L65536_s0of1.json

@@ -146,16 +146,27 @@ if ruler_audit_path.exists():
             produced["official_score"], produced["source_head"],
             f"ruler_formal/{arm}/L{length}", fullkv_score, delta, low, high)
 
-statsfix_audit_path = ROOT / "ruler_statsfix_2ddfd741/_audits/local_archive_reaudit.json"
-if statsfix_audit_path.exists():
+statsfix_arm_meta = {
+    "nfa_full_gate_off": ("A1_full_gate_off_statsfix", "full", "off"),
+    "nfa_full_gate_on": ("A3_full_gate_on_statsfix", "full", "on"),
+    "nfa_tail_gate_off": ("A2_tail32_gate_off_statsfix", "tail32", "off"),
+    "nfa_tail_gate_on": ("A4_tail32_gate_on_statsfix", "tail32", "on"),
+}
+seen_statsfix_cells = set()
+for statsfix_dir in ("ruler_statsfix_2ddfd741", "ruler_statsfix_matrix_2ddfd741"):
+    statsfix_audit_path = ROOT / statsfix_dir / "_audits/local_archive_reaudit.json"
+    if not statsfix_audit_path.exists():
+        continue
     statsfix_audit = load(statsfix_audit_path)
     if statsfix_audit["status"] != "pass-production-side":
         raise ValueError("statsfix RULER audit did not pass")
     for produced in statsfix_audit["results"]:
         arm = produced["arm"]
         length = produced["context_length"]
-        if (arm, length) != ("nfa_tail_gate_off", 32768):
-            raise ValueError(f"unregistered statsfix cell: {arm} {length}")
+        if (arm, length) in seen_statsfix_cells:
+            raise ValueError(f"duplicate statsfix cell: {arm} {length}")
+        seen_statsfix_cells.add((arm, length))
+        arm_name, subspace, gate = statsfix_arm_meta[arm]
         reference = cells[("flashinfer_fullkv", length)]
         if produced["ordered_input_sha256"] != reference["ordered_input_sha256"]:
             raise ValueError("statsfix RULER paired input mismatch")
@@ -163,7 +174,7 @@ if statsfix_audit_path.exists():
         reference_manifest = load(
             reference_root / f"quality_manifest_L{length}_s0of1.json")
         reference_scores = load(reference_root / reference_manifest["scores"])
-        cell_root = ROOT / "ruler_statsfix_2ddfd741" / arm
+        cell_root = ROOT / statsfix_dir / arm
         candidate_scores = []
         for shard in produced["shards"]:
             manifest = load(cell_root / (
@@ -176,9 +187,54 @@ if statsfix_audit_path.exists():
         delta, low, high = paired_ci(
             [row["official_score"] for row in candidate_scores],
             [row["official_score"] for row in reference_scores])
-        add("A2_tail32_gate_off_statsfix", "tail32", "off", "niah_multikey_2",
+        add(arm_name, subspace, gate, "niah_multikey_2",
             length, produced["rows"], produced["official_score"],
-            produced["source_head"], f"ruler_statsfix_2ddfd741/{arm}",
+            produced["source_head"], f"{statsfix_dir}/{arm}",
+            reference["recomputed_mean_score"], delta, low, high)
+
+avg_top2_dir = "ruler_avg_top2_64k_233d09af"
+avg_top2_audit_path = ROOT / avg_top2_dir / "_audits/local_archive_reaudit.json"
+if avg_top2_audit_path.exists():
+    avg_top2_audit = load(avg_top2_audit_path)
+    if avg_top2_audit["status"] != "pass-production-side":
+        raise ValueError("avg_top2 RULER audit did not pass")
+    avg_top2_arm_meta = {
+        "nfa_full_gate_off_far_avg_top2": ("A1_full_gate_off_avg_top2", "full", "off"),
+        "nfa_full_gate_on_far_avg_top2": ("A3_full_gate_on_avg_top2", "full", "on"),
+        "nfa_tail_gate_off_far_avg_top2": ("A2_tail32_gate_off_avg_top2", "tail32", "off"),
+        "nfa_tail_gate_on_far_avg_top2": ("A4_tail32_gate_on_avg_top2", "tail32", "on"),
+    }
+    seen_avg_top2_cells = set()
+    for produced in avg_top2_audit["results"]:
+        arm = produced["arm"]
+        length = produced["context_length"]
+        if (arm, length) in seen_avg_top2_cells:
+            raise ValueError(f"duplicate avg_top2 cell: {arm} {length}")
+        seen_avg_top2_cells.add((arm, length))
+        arm_name, subspace, gate = avg_top2_arm_meta[arm]
+        reference = cells[("flashinfer_fullkv", length)]
+        if produced["ordered_input_sha256"] != reference["ordered_input_sha256"]:
+            raise ValueError("avg_top2 RULER paired input mismatch")
+        reference_root = ROOT / "ruler_formal/flashinfer_fullkv" / f"L{length}"
+        reference_manifest = load(
+            reference_root / f"quality_manifest_L{length}_s0of1.json")
+        reference_scores = load(reference_root / reference_manifest["scores"])
+        cell_root = ROOT / avg_top2_dir / arm
+        candidate_scores = []
+        for shard in produced["shards"]:
+            manifest = load(cell_root / (
+                f"quality_manifest_L{length}_s{shard['shard_index']}of"
+                f"{produced['num_shards']}.json"))
+            candidate_scores.extend(load(cell_root / manifest["scores"]))
+        candidate_scores.sort(key=lambda row: row["source_index"])
+        if [row["_id"] for row in candidate_scores] != [row["_id"] for row in reference_scores]:
+            raise ValueError("avg_top2 RULER paired IDs mismatch")
+        delta, low, high = paired_ci(
+            [row["official_score"] for row in candidate_scores],
+            [row["official_score"] for row in reference_scores])
+        add(arm_name, subspace, gate, "niah_multikey_2",
+            length, produced["rows"], produced["official_score"],
+            produced["source_head"], f"{avg_top2_dir}/{arm}",
             reference["recomputed_mean_score"], delta, low, high)
 
 with (ROOT / "quality_ablation.csv").open("w", newline="", encoding="utf-8") as handle:

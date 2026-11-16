@@ -14,6 +14,7 @@ EXPECTED_HEADS = {
     "cdb83688c06f882b874e5aa20505057f1c13235d",
     "b70d8c08dcac64b5bfb4b86c78715a6956640e65",
     "2ddfd7416aedc03f0e43c6ea115c25c7212fa974",
+    "233d09afe535a697dc30038b3fe59f06b6304e00",
 }
 A_ARMS = {
     "nfa_full_gate_off": ("nfa", "full", "off"),
@@ -28,6 +29,16 @@ ARMS = {
     "nfa_tail64_gate_off": ("nfa", "tail", "off"),
     "tail16_gate_off": ("nfa", "tail", "off"),
     "tail64_gate_off": ("nfa", "tail", "off"),
+    "nfa_full_gate_off_far_avg_top2": ("nfa", "full", "off"),
+    "nfa_full_gate_on_far_avg_top2": ("nfa", "full", "on"),
+    "nfa_tail_gate_off_far_avg_top2": ("nfa", "tail", "off"),
+    "nfa_tail_gate_on_far_avg_top2": ("nfa", "tail", "on"),
+}
+FAR_METHODS = {
+    "nfa_full_gate_off_far_avg_top2": "avg_top2",
+    "nfa_full_gate_on_far_avg_top2": "avg_top2",
+    "nfa_tail_gate_off_far_avg_top2": "avg_top2",
+    "nfa_tail_gate_on_far_avg_top2": "avg_top2",
 }
 SUBSPACE_DIMS = {
     "nfa_full_gate_off": 128,
@@ -38,6 +49,10 @@ SUBSPACE_DIMS = {
     "nfa_tail64_gate_off": 64,
     "tail16_gate_off": 16,
     "tail64_gate_off": 64,
+    "nfa_full_gate_off_far_avg_top2": 128,
+    "nfa_full_gate_on_far_avg_top2": 128,
+    "nfa_tail_gate_off_far_avg_top2": 32,
+    "nfa_tail_gate_on_far_avg_top2": 32,
 }
 LENGTHS = (32768, 65536, 131072)
 
@@ -166,7 +181,8 @@ def audit_cell(manifest_path, expected_rows):
         assert config["level1_topk"] == 128 and config["level2_topk"] == 1024
         assert config["page_size"] == 64 and config["near_pages"] == 32
         assert config["near_tokens"] == "off" and config["near_len"] == 4096
-        assert config["near_method"] == "avg" and config["far_method"] == "minmax"
+        assert config["near_method"] == "avg"
+        assert config["far_method"] == FAR_METHODS.get(arm, "minmax")
         assert config["sink_tokens"] == 4 and config["sliding_window_size"] == 128
         expected_dim = SUBSPACE_DIMS[arm]
         expected_ratio = 4 if subspace == "full" else 128 // expected_dim
