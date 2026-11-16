@@ -56,6 +56,19 @@ def test_nfa_quality_far_method_reaches_real_indexer():
         resolve_nfa_quality_config("full", "off", far_method="unknown")
 
 
+@pytest.mark.parametrize("near_method,far_method", [
+    ("minmax", "minmax"), ("avg", "avg"),
+])
+def test_nfa_quality_regional_methods_reach_real_indexer(near_method, far_method):
+    patch_args, _ = resolve_nfa_quality_config(
+        "tail", "off", near_method=near_method, far_method=far_method)
+    indexer = NFAIndexer(patch_args)
+    assert indexer.near_method == near_method
+    assert indexer.far_method == far_method
+    with pytest.raises(ValueError, match="near_method"):
+        resolve_nfa_quality_config("tail", "off", near_method="unknown")
+
+
 def test_nfa_quality_2x2_rejects_unknown_arm():
     with pytest.raises(ValueError, match="full/tail"):
         resolve_nfa_quality_config("random", "off")

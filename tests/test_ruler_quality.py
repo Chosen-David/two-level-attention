@@ -15,6 +15,8 @@ from benchmark.LongBench.run_cap_manifest import (
 from benchmark.RULER.pred_ruler import MIN_NEW_TOKENS, _ruler_max_new_tokens
 from benchmark.efficiency.benchmark_ruler_quality import (
     load_ruler_rows,
+    nfa_quality_arm_name,
+    parse_args,
     ruler_official_score,
     run_quality,
     select_ruler_rows,
@@ -26,6 +28,25 @@ def test_niah_formal_generation_budget():
     assert MIN_NEW_TOKENS == 1
     with pytest.raises(ValueError, match="unknown RULER task"):
         _ruler_max_new_tokens("not-a-ruler-task")
+
+
+def test_regional_method_cli_and_arm_names(monkeypatch):
+    monkeypatch.setattr("sys.argv", [
+        "benchmark_ruler_quality", "--method", "nfa", "--task", "niah_multikey_2",
+        "--context-length", "32768", "--data-root", "/unused/data",
+        "--output-dir", "/unused/out", "--nfa-near-method", "minmax",
+        "--nfa-far-method", "minmax",
+    ])
+    args = parse_args()
+    assert args.nfa_near_method == "minmax"
+    assert args.nfa_far_method == "minmax"
+    assert nfa_quality_arm_name("tail", "off") == "tail_gate_off"
+    assert nfa_quality_arm_name(
+        "tail", "off", near_method="minmax", far_method="minmax"
+    ) == "tail_gate_off_near_minmax"
+    assert nfa_quality_arm_name(
+        "tail", "off", near_method="avg", far_method="avg"
+    ) == "tail_gate_off_far_avg"
 
 
 def _rows(count=5):

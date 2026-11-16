@@ -33,8 +33,14 @@ ARMS = {
     "nfa_full_gate_on_far_avg_top2": ("nfa", "full", "on"),
     "nfa_tail_gate_off_far_avg_top2": ("nfa", "tail", "off"),
     "nfa_tail_gate_on_far_avg_top2": ("nfa", "tail", "on"),
+    "nfa_tail_gate_off_near_minmax": ("nfa", "tail", "off"),
+    "nfa_tail_gate_off_far_avg": ("nfa", "tail", "off"),
+}
+NEAR_METHODS = {
+    "nfa_tail_gate_off_near_minmax": "minmax",
 }
 FAR_METHODS = {
+    "nfa_tail_gate_off_far_avg": "avg",
     "nfa_full_gate_off_far_avg_top2": "avg_top2",
     "nfa_full_gate_on_far_avg_top2": "avg_top2",
     "nfa_tail_gate_off_far_avg_top2": "avg_top2",
@@ -53,6 +59,8 @@ SUBSPACE_DIMS = {
     "nfa_full_gate_on_far_avg_top2": 128,
     "nfa_tail_gate_off_far_avg_top2": 32,
     "nfa_tail_gate_on_far_avg_top2": 32,
+    "nfa_tail_gate_off_near_minmax": 32,
+    "nfa_tail_gate_off_far_avg": 32,
 }
 LENGTHS = (32768, 65536, 131072)
 
@@ -181,7 +189,7 @@ def audit_cell(manifest_path, expected_rows):
         assert config["level1_topk"] == 128 and config["level2_topk"] == 1024
         assert config["page_size"] == 64 and config["near_pages"] == 32
         assert config["near_tokens"] == "off" and config["near_len"] == 4096
-        assert config["near_method"] == "avg"
+        assert config["near_method"] == NEAR_METHODS.get(arm, "avg")
         assert config["far_method"] == FAR_METHODS.get(arm, "minmax")
         assert config["sink_tokens"] == 4 and config["sliding_window_size"] == 128
         expected_dim = SUBSPACE_DIMS[arm]

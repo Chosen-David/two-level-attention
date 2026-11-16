@@ -74,12 +74,14 @@ def parse_args():
 
 def resolve_nfa_quality_config(subspace, gate, subspace_dim=None,
                                near_pages=None, near_tokens=None,
-                               far_method="minmax"):
+                               far_method="minmax", near_method="avg"):
     """返回模型 patch 与 prefill 标定共用的配置；尾维维度必须真实落到 ratio。"""
     if subspace not in {"full", "tail"} or gate not in {"off", "on"}:
         raise ValueError("NFA 质量臂只支持 full/tail × gate off/on")
     if far_method not in {"minmax", "avg", "avg_top2"}:
         raise ValueError(f"未知 NFA far_method: {far_method}")
+    if near_method not in {"avg", "minmax"}:
+        raise ValueError(f"未知 NFA near_method: {near_method}")
     if subspace_dim is None:
         subspace_dim = 128 if subspace == "full" else 32
     if subspace_dim not in {16, 32, 64, 128}:
@@ -89,6 +91,7 @@ def resolve_nfa_quality_config(subspace, gate, subspace_dim=None,
         raise ValueError(f"subspace_dim={subspace_dim} 必须使用 --nfa-subspace {expected_subspace}")
     patch_args = nfa_args(subspace)
     patch_args.nfa_far_method = far_method
+    patch_args.nfa_near_method = near_method
     if subspace == "tail":
         patch_args.tia_level2_cmp_ratio = 128 // subspace_dim
     if near_pages is not None:
