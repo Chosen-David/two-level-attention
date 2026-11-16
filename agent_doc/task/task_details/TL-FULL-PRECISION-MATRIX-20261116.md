@@ -61,6 +61,11 @@
 - 新增`run_lbv2_nfa.sh`隔离smoke/formal分片脚本，`bash -n`、ShellCheck和diff格式检查通过；每分片独立评分目录避免并行shard被同一source manifest误判。尚未真实GPU smoke，矩阵仅改为`implementation-ready-pending-gpu-smoke`，没有生成新精度结果。
 - 本轮再次实测pc33/pc02/pc40/pc31/pc32全部卡仍有其他compute app，未点火；正式请求数保持0。
 
+### 2026-11-16 MoBA缺失任务候选的跨身份排除
+
+- 在`results_longbench_moba`和`harvest_pc40_20261022`新定位到`samsum/trec/passage_count`的`moba_vendor`原始JSONL，但它们不属于e89既有13任务generation：同一HotpotQA首条中，e89为`Mi v. California`且无`_id`，vendor文件为`Miller v. California`且有`_id`；文件名身份也分别为`tli_64_128_1024_c4_A-moba`与`moba_vendor_c256_k4`。
+- e89同身份的`samsum/trec/passage_count-tli_64_128_1024_c4_A-moba.jsonl`在本机全部备份、harvest和恢复目录中精确检索均为0。故MoBA继续保持13任务部分覆盖，不把另一generation的三项嫁接成AVG16。配对record、三项候选路径/行数/SHA及精确检索范围已落盘为`ak_verify_results/full_matrix_recovered_20261116/audits/moba_missing_task_identity_audit.json`，SHA256=`dfef58404df6a16fe5ced739a1a6ad2108f8ecafbea1723426d18e4046156dc0`。
+
 ## 下一步
 
 1. 用落盘链脚本在真实空闲卡点火C2/C3，并先执行Qwen3-8B NFA LBv2一样本smoke；30秒内检查进程、compute app/显存和日志，smoke通过后再铺503请求。

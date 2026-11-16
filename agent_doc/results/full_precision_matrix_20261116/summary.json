@@ -78,7 +78,7 @@
         "rescore-only": ["FASA"],
         "partial": ["MoBA"],
         "missing_or_unrecovered": ["MInference", "SparQ", "ClusterKV", "HISA"],
-        "note": "FASA pred_fasa_1024恢复目录3750/3750、16/16 strict runcap及SHA通过，生产侧AVG16=33.31与fasa_lb_16.json逐任务一致；输入身份仅为legacy_strict。另一份AVG16=35.15的汇总source file已定位到sglang/exp/trace/results/qwen3_8b_longbench_fasa_vendor.json（SHA256=cf8659bb4b19bd000357475e32a324ce3152f4d8686ce44d7ef260fa1baeb098），但原始generation仍未定位，保留为独立report-only恢复候选，不覆盖33.31证据。MoBA原始13任务3150行已恢复，缺samsum/trec/passage_count且无run-cap sidecar；canonical difflib AVG13=49.04，显式Levenshtein复算逐任务吻合旧AVG13=49.19。"
+        "note": "FASA pred_fasa_1024恢复目录3750/3750、16/16 strict runcap及SHA通过，生产侧AVG16=33.31与fasa_lb_16.json逐任务一致；输入身份仅为legacy_strict。另一份AVG16=35.15的汇总source file已定位到sglang/exp/trace/results/qwen3_8b_longbench_fasa_vendor.json（SHA256=cf8659bb4b19bd000357475e32a324ce3152f4d8686ce44d7ef260fa1baeb098），但原始generation仍未定位，保留为独立report-only恢复候选，不覆盖33.31证据。MoBA原始13任务3150行已恢复，缺samsum/trec/passage_count且无run-cap sidecar；canonical difflib AVG13=49.04，显式Levenshtein复算逐任务吻合旧AVG13=49.19。另发现的moba_vendor缺失任务文件与e89首条prediction及record schema均不同，且e89同身份三文件全局检索为0，禁止跨generation补缺。"
       },
       "longbench_v2": {
         "reuse": ["FullKV", "Quest", "JSSA", "AsyncTLS"],
@@ -160,7 +160,7 @@
     ],
     "qwen8_extended_baseline": "15个历史运行归档、16500条prediction逐文件SHA/ID/answers/官方分复算通过；其中3个为替代或重复generation，不记为额外唯一覆盖。",
     "fasa_longbench": "pred_fasa_1024独立staging重评分完成16/16、3750/3750，AVG16=33.31，与exp/trace/results/fasa_lb_16.json逐任务一致；strict_validated=16、legacy_strict=16、v2_validated=0。另一份AVG16=35.15的汇总source file已定位到/home/wangyuanshuo02/sglang/exp/trace/results/qwen3_8b_longbench_fasa_vendor.json，SHA256=cf8659bb4b19bd000357475e32a324ce3152f4d8686ce44d7ef260fa1baeb098；其原始generation仍未定位，不与前者混池。",
-    "moba_longbench": "原始13任务、3150行及13项SHA256副本一致；缺samsum/trec/passage_count，strict_validated=0、legacy_no_sidecar=13、cap_effective=null、v2_validated=0、legacy_strict=0。canonical difflib重评分LCC/RepoBench=67.68/66.67、AVG13=49.04；显式Levenshtein 0.27.5复算为68.98/68.13、AVG13=49.19，逐任务吻合e89_moba_full.json，差异仅为已固定披露的代码相似度后端。",
+    "moba_longbench": "原始13任务、3150行及13项SHA256副本一致；缺samsum/trec/passage_count，strict_validated=0、legacy_no_sidecar=13、cap_effective=null、v2_validated=0、legacy_strict=0。canonical difflib重评分LCC/RepoBench=67.68/66.67、AVG13=49.04；显式Levenshtein 0.27.5复算为68.98/68.13、AVG13=49.19，逐任务吻合e89_moba_full.json，差异仅为已固定披露的代码相似度后端。后续在results_longbench_moba/harvest_pc40发现samsum/trec/passage_count的moba_vendor JSONL，但其首条HotpotQA prediction=Miller v. California且有_id，e89对应prediction=Mi v. California且无_id；e89同身份三个缺失文件名全局检索均为0，因此这些vendor文件是另一generation，不能补缺。身份审计=ak_verify_results/full_matrix_recovered_20261116/audits/moba_missing_task_identity_audit.json，SHA256=dfef58404df6a16fe5ced739a1a6ad2108f8ecafbea1723426d18e4046156dc0。",
     "qwen32b_nfa_longbench": "既有13任务原始generation已在host_backup_187/host_backup_wys2定位，3150行及两份备份、两份staging共四副本SHA一致；原始记录无_id且无run-cap sidecar。canonical difflib逐任务吻合旧result，AVG13=41.854615；Levenshtein仅改变LCC/RepoBench，不是旧报告口径。补缺3项各200行、strict runcap和v2输入身份，正式评分15.50/37.28/73.50。合并审计=ak_verify_results/full_matrix_recovered_20261116/audits/qwen32b_nfa_lbv1_merge_audit.json，SHA256=a81474457f03b1bd3c8d45377c31c97610ca9c207dacc0a569e0b5e3f02b14ce；跨代算术AVG16=41.899375仅参考，全16任务继续merge-audit。",
     "quest_jssa_recovery": "历史报告精确指向pc14:/tmp/tli-baseline-jssa-quest；pc14当前及历史旧地址均SSH超时，pc02/pc40/pc31/pc32的主仓、ak_verify_results和/tmp精确文件名检索均为0，四套RULER原始generation保持recover。"
   },
@@ -168,7 +168,7 @@
     "producer": "9f3e8057acd528a904aa8883b830d541b389e39f",
     "formal_requests_started": 0,
     "last_ignition_attempt": "pc32 C2/C3链因远程内联shell提前展开循环变量而在参数检查退出；无prediction、无正式worker。随后pc32亦出现其他计算PID。",
-    "resource_policy": "只使用点火前重新实测空闲的卡；最新pc33/pc02/pc40/pc31/pc32全部卡均有其他compute app，均不触碰；pc14两次SSH超时，不作为可用资源。",
+    "resource_policy": "只使用点火前重新实测空闲的卡；最新pc33/pc02/pc40/pc31/pc32全部卡均有其他compute app，均不触碰；pc14本轮复测仍SSH超时，不作为可用资源。",
     "next": "使用落盘链脚本重新点火C2/C3；Qwen3-8B NFA LBv2先做一样本GPU smoke再铺503请求；SparQ/HISA/ClusterKV缺口在vendor资产和空闲GPU同时满足后执行。"
   }
 }
