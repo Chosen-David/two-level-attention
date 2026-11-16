@@ -123,7 +123,7 @@
         "reuse": ["FullKV", "Quest", "JSSA", "AsyncTLS"],
         "merge-audit": ["NFA"],
         "missing_or_unrecovered": ["MInference", "SparQ", "MoBA", "ClusterKV", "HISA", "FASA"],
-        "note": "AsyncTLS正式summary为3750/3750、16/16、v2输入身份及独立重评分通过；TASK.md中的1150/3750是过时进度。NFA为13+3任务跨generation，先合并审计。"
+        "note": "AsyncTLS正式summary为3750/3750、16/16、v2输入身份及独立重评分通过；TASK.md中的1150/3750是过时进度。NFA历史TLI既有13任务原始generation已从两份本地备份恢复，3150行、四副本SHA一致，canonical AVG13=41.854615并与旧result逐任务一致；补缺3项为另一generation且有strict runcap/v2输入身份。16个任务名虽齐，但legacy13无sidecar/_id，继续merge-audit；跨代算术AVG16=41.899375仅作参考，不是统一协议正式臂。"
       },
       "longbench_v2": {
         "reuse": ["FullKV", "Quest"],
@@ -160,7 +160,7 @@
     "qwen8_extended_baseline": "15个历史运行归档、16500条prediction逐文件SHA/ID/answers/官方分复算通过；其中3个为替代或重复generation，不记为额外唯一覆盖。",
     "fasa_longbench": "pred_fasa_1024独立staging重评分完成16/16、3750/3750，AVG16=33.31，与exp/trace/results/fasa_lb_16.json逐任务一致；strict_validated=16、legacy_strict=16、v2_validated=0。另一份AVG16=35.15报告的qwen3_8b_longbench_fasa_vendor.json及原始generation未定位，不与前者混池。",
     "moba_longbench": "原始13任务、3150行及13项SHA256副本一致；缺samsum/trec/passage_count，strict_validated=0、legacy_no_sidecar=13、cap_effective=null、v2_validated=0、legacy_strict=0。canonical difflib重评分LCC/RepoBench=67.68/66.67、AVG13=49.04；显式Levenshtein 0.27.5复算为68.98/68.13、AVG13=49.19，逐任务吻合e89_moba_full.json，差异仅为已固定披露的代码相似度后端。",
-    "qwen32b_nfa_longbench": "三项补缺passage_count/samsum/trec各200行、strict runcap和v2输入身份已定位并正式评分15.50/37.28/73.50；既有13任务当前仅有result.json汇总，原始generation仍未恢复，因此全16任务继续merge-audit而非reuse。",
+    "qwen32b_nfa_longbench": "既有13任务原始generation已在host_backup_187/host_backup_wys2定位，3150行及两份备份、两份staging共四副本SHA一致；原始记录无_id且无run-cap sidecar。canonical difflib逐任务吻合旧result，AVG13=41.854615；Levenshtein仅改变LCC/RepoBench，不是旧报告口径。补缺3项各200行、strict runcap和v2输入身份，正式评分15.50/37.28/73.50。合并审计=ak_verify_results/full_matrix_recovered_20261116/audits/qwen32b_nfa_lbv1_merge_audit.json，SHA256=a81474457f03b1bd3c8d45377c31c97610ca9c207dacc0a569e0b5e3f02b14ce；跨代算术AVG16=41.899375仅参考，全16任务继续merge-audit。",
     "quest_jssa_recovery": "历史报告精确指向pc14:/tmp/tli-baseline-jssa-quest；pc14当前及历史旧地址均SSH超时，pc02/pc40/pc31/pc32的主仓、ak_verify_results和/tmp精确文件名检索均为0，四套RULER原始generation保持recover。"
   },
   "dispatch_state": {

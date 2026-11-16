@@ -18,6 +18,7 @@
 - Qwen3-8B扩展baseline的15个历史RULER运行归档完成16500条prediction的SHA、ID/answers和官方分复算；其中3个为替代/重复generation，不增加唯一覆盖。
 - Qwen3-8B FASA LongBench v1的`pred_fasa_1024`恢复目录完成16/16、3750/3750、strict runcap、SHA和独立staging评分，AVG16=33.31，且与`exp/trace/results/fasa_lb_16.json`逐任务一致；输入身份只有`legacy_strict`。另一份AVG16=35.15报告引用的`qwen3_8b_longbench_fasa_vendor.json`及原始generation尚未定位，作为独立report-only恢复候选保留，不覆盖也不混入33.31证据。
 - Qwen3-32B AsyncTLS LongBench v1正式summary已经确认3750/3750、16/16、v2输入身份和独立重评分通过；`TASK.md`旧1150/3750只是过时进度，不重跑。
+- Qwen3-32B历史TLI LongBench v1既有13任务原始generation已从`host_backup_187/host_backup_wys2`恢复，3150行、四副本SHA一致；canonical `difflib` AVG13=41.854615并逐任务吻合旧`result.json`。补缺3项为另一generation且有strict runcap/v2输入身份；legacy13无sidecar且原始记录无`_id`，所以16个任务名虽齐仍保持`merge-audit`，跨代算术AVG16=41.899375只作参考，不能冒充统一协议正式臂。
 - MoBA旧`e89_moba_full.json`实际只有13/16任务，原始generation已定位并完成3150行及13项SHA256副本核验，缺`samsum/trec/passage_count`且无run-cap sidecar。canonical `difflib`重评分LCC/RepoBench=67.68/66.67、AVG13=49.04；显式`Levenshtein 0.27.5`复算为68.98/68.13、AVG13=49.19，逐任务吻合旧报告，证明差异来自已披露的代码相似度后端而非prediction变化。两种评分口径分列，不能算完整LongBench v1。
 
 ### 立即可执行缺口
@@ -47,7 +48,7 @@
 
 - FASA两个LongBench v1来源已分列：`pred_fasa_1024`的3750请求、16任务、strict runcap、SHA与独立staging重评分均通过，AVG16=33.31并与`fasa_lb_16.json`逐任务一致；AVG16=35.15的另一份报告所引source file/generation仍未定位，不覆盖或混入前者。
 - MoBA原始13任务、3150行及13项SHA256副本一致；缺`samsum/trec/passage_count`且无run-cap sidecar。canonical `difflib` AVG13=49.04，显式`Levenshtein 0.27.5` AVG13=49.19并逐任务吻合旧报告，差异仅为代码相似度评分后端，两种口径均保留。
-- Qwen3-32B NFA的`passage_count/samsum/trec`三项原始generation、strict runcap、v2输入身份和正式评分已定位；既有13任务仍只有汇总result.json，因此全16任务继续`merge-audit`，不改标完整复用。
+- Qwen3-32B NFA既有13任务随后也在两份本地备份中定位并恢复，3150行、四副本SHA一致，canonical复评逐任务吻合旧汇总，AVG13=41.854615；补缺三项strict runcap/v2输入身份仍属另一generation。合并审计落盘为`ak_verify_results/full_matrix_recovered_20261116/audits/qwen32b_nfa_lbv1_merge_audit.json`（SHA256=`a81474457f03b1bd3c8d45377c31c97610ca9c207dacc0a569e0b5e3f02b14ce`）；legacy13无sidecar/_id，全16任务继续`merge-audit`，跨代算术AVG16=41.899375仅作参考。
 - 历史报告将GLM/Qwen3-32B Quest/JSSA原始现场精确定位到pc14 `/tmp/tli-baseline-jssa-quest`；pc14当前与历史地址均SSH超时，其余四机精确检索无匹配，四套RULER generation继续`recover`，不把“当前不可达”写成“从未运行”。
 - 最新实测pc33/pc02/pc40/pc31/pc32全部GPU均有其他compute app，本任务正式生成请求数仍为0；未触碰任何其他进程，也未把资源阻塞登记为实验完成。
 
@@ -55,6 +56,6 @@
 
 1. 用落盘链脚本在真实空闲卡点火C2/C3，30秒内检查进程、compute app/显存和日志。
 2. 同步SparQ/HISA/ClusterKV锁定vendor资产并做一样本隔离smoke，通过后执行64K/128K全量补格。
-3. 继续恢复GLM/Qwen3-32B Quest/JSSA原始generation和Qwen3-32B NFA LongBench既有13任务原始generation；FASA两个来源及MoBA双评分后端已分列闭合。
+3. 继续恢复GLM/Qwen3-32B Quest/JSSA原始generation；Qwen3-32B NFA既有13任务已恢复并完成双后端复评，若需要统一协议16任务正式臂则按现行NFA入口重跑legacy13，不与补缺3项直接拼接。
 4. 扩展现行NFA LongBench v2真实入口，逐方法核验其余模型支持；不可运行组合保留明确实现阻塞。
 5. 完成官方评分、输入身份、runcap、SHA256与生产侧审计后更新矩阵和`CURRENT_NARRATIVE.md`索引；独立验收前不作最终质量结论。
