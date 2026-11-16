@@ -1,5 +1,9 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+## 2026-11-16
+
+- [ ] [TL-FULL-PRECISION-MATRIX-20261116] 四模型×FullKV/NFA×全部现行baseline×LongBench v1/v2/RULER三长度的真实覆盖矩阵已落盘；历史Llama FullKV/NFA六单元、GLM/Qwen3-32B 32K TLI及Qwen3-8B扩展baseline完成恢复和生产侧复算，FASA来源差异、SparQ跨producer/人口缺口、MoBA13任务子集及模型入口限制均显式保留。C2/C3、SparQ/HISA/ClusterKV缺口的隔离派单脚本已实现；首次远程内联链在参数检查退出且未生成prediction，改用落盘链并等待实测空闲GPU，所有结果保持pending。([详情](task_details/TL-FULL-PRECISION-MATRIX-20261116.md)；[矩阵](../results/full_precision_matrix_20261116/summary.json))
+
 ## 2026-11-15
 
 - [ ] [TL-NFA-DAC-EXPERIMENTS-20261115] 恢复 NFA 投稿 DAC 消融、敏感性与统一性能数据；303 行可复现 inventory 已验证，旧 B 2000 条限定协议可复用。真实调用链修正后仅复用 FullKV HotpotQA/GovReport 共 400 请求；旧 NFA prefill epsilon0.05 不是新 gate-off，新 A 逻辑剩余 3100 请求。所有新 NFA 默认点显式登记 `near_tokens=off`，旧 host-wall 与新 CUDA-event 分组；结果独立验收前保持 pending。([详情](task_details/TL-NFA-DAC-EXPERIMENTS-20261115.md)；[inventory](../results/nfa_dac_experiments_20261115/inventory.csv))

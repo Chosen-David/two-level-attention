@@ -1,0 +1,170 @@
+{
+  "schema": "full-precision-matrix-v1",
+  "date": "2026-11-16",
+  "status": "inventory-usable-with-scope; generation and independent verification pending",
+  "verification": "pending-independent-verification",
+  "scope": {
+    "models": ["GLM-4.7-Flash", "Llama-3.1-8B", "Qwen3-8B", "Qwen3-32B"],
+    "datasets": {
+      "longbench_v1": "English16; 3750 requests per complete arm",
+      "longbench_v2": "503 requests per complete arm",
+      "ruler": "11 tasks x 100 rows at each of 32768/65536/131072; 3300 requests per complete model-method arm"
+    },
+    "methods": ["FullKV", "NFA", "Quest", "JSSA", "AsyncTLS", "MInference", "SparQ", "MoBA", "ClusterKV", "HISA", "FASA"]
+  },
+  "action_semantics": {
+    "reuse": "完整历史或当前人口已定位；保留原协议身份，独立验收前不重跑、不用于新结论",
+    "rescore-only": "原始 generation 已恢复并完成生产侧正式重评分；仍需独立验收",
+    "merge-audit": "存在多 generation、跨 producer 或分片合并问题，禁止直接拼成正式臂",
+    "rerun": "已确认人口或统一协议缺口且当前有真实运行入口",
+    "recover": "有报告或 source hash，但原始 generation 尚未完整恢复",
+    "implementation-blocked": "当前生产入口不支持该模型/数据集/方法组合，需真实扩展而非换标签",
+    "resource-blocked": "代码和输入可运行，但当前无经实测空闲的 GPU"
+  },
+  "coverage": {
+    "GLM-4.7-Flash": {
+      "longbench_v1": {
+        "reuse": ["FullKV", "NFA", "Quest", "JSSA", "AsyncTLS"],
+        "note": "NFA=threshold0.1、dual region skip、Graph 的3750闭集；旧full-region NFA另存，不混池。"
+      },
+      "longbench_v2": {
+        "reuse": ["FullKV"],
+        "implementation-blocked": ["NFA"],
+        "missing_or_unrecovered": ["Quest", "JSSA", "AsyncTLS", "MInference", "SparQ", "MoBA", "ClusterKV", "HISA", "FASA"]
+      },
+      "ruler_32768": {
+        "reuse": ["FullKV", "Quest", "JSSA"],
+        "rescore-only": ["NFA"],
+        "note": "本轮恢复的历史TLI为ABD+layer-skip身份，AVG11=19.94；另有full/dual NFA报告AVG11=35.01/34.82，三者不混池。Quest/JSSA原始generation仍需恢复。"
+      },
+      "ruler_65536": {
+        "missing_or_partial": ["FullKV", "NFA", "Quest", "JSSA", "AsyncTLS", "MInference", "SparQ", "MoBA", "ClusterKV", "HISA", "FASA"],
+        "note": "MultiKey2单任务历史数据不冒充11任务完整RULER。"
+      },
+      "ruler_131072": {
+        "missing_or_partial": ["FullKV", "NFA", "Quest", "JSSA", "AsyncTLS", "MInference", "SparQ", "MoBA", "ClusterKV", "HISA", "FASA"]
+      }
+    },
+    "Llama-3.1-8B": {
+      "longbench_v1": {
+        "reuse": ["FullKV", "NFA", "Quest", "JSSA", "AsyncTLS"]
+      },
+      "longbench_v2": {
+        "reuse": ["FullKV"],
+        "implementation-blocked": ["NFA"],
+        "missing_or_unrecovered": ["Quest", "JSSA", "AsyncTLS", "MInference", "SparQ", "MoBA", "ClusterKV", "HISA", "FASA"]
+      },
+      "ruler_32768": {
+        "rescore-only": ["FullKV", "NFA"],
+        "missing_or_unrecovered": ["Quest", "JSSA", "AsyncTLS", "MInference", "SparQ", "MoBA", "ClusterKV", "HISA", "FASA"]
+      },
+      "ruler_65536": {
+        "rescore-only": ["FullKV", "NFA"],
+        "missing_or_unrecovered": ["Quest", "JSSA", "AsyncTLS", "MInference", "SparQ", "MoBA", "ClusterKV", "HISA", "FASA"]
+      },
+      "ruler_131072": {
+        "rescore-only": ["FullKV", "NFA"],
+        "missing_or_unrecovered": ["Quest", "JSSA", "AsyncTLS", "MInference", "SparQ", "MoBA", "ClusterKV", "HISA", "FASA"]
+      },
+      "historical_scores": {
+        "FullKV_AVG11": {"32768": 85.53, "65536": 77.67, "131072": 71.63},
+        "NFA_K1_128_AVG11": {"32768": 86.08, "65536": 76.16, "131072": 61.05}
+      }
+    },
+    "Qwen3-8B": {
+      "longbench_v1": {
+        "reuse": ["FullKV", "NFA", "Quest", "JSSA", "AsyncTLS"],
+        "merge-audit": ["FASA"],
+        "partial": ["MoBA"],
+        "missing_or_unrecovered": ["MInference", "SparQ", "ClusterKV", "HISA"],
+        "note": "FASA恢复目录3750/3750、16/16 strict runcap及SHA通过，但高层报告与恢复generation分数来源不一致，且输入身份为legacy_strict；MoBA旧full文件实际只有13/16任务。"
+      },
+      "longbench_v2": {
+        "reuse": ["FullKV", "Quest", "JSSA", "AsyncTLS"],
+        "implementation-blocked": ["NFA"],
+        "missing_or_unrecovered": ["MInference", "SparQ", "MoBA", "ClusterKV", "HISA", "FASA"],
+        "note": "official Quest与旧vendor Quest为不同implementation identity；现行NFA LongBench质量入口只接受英文16任务，不能把旧full/mavg/aavg结果改标为当前gate-off NFA。"
+      },
+      "ruler_32768": {
+        "reuse": ["FullKV", "NFA", "AsyncTLS", "MInference", "FASA", "SparQ", "HISA", "ClusterKV"],
+        "recover": ["Quest", "JSSA"],
+        "missing_or_unrecovered": ["MoBA"]
+      },
+      "ruler_65536": {
+        "reuse": ["FullKV", "NFA", "AsyncTLS", "MInference", "FASA"],
+        "rerun": ["SparQ", "HISA", "ClusterKV"],
+        "recover": ["Quest", "JSSA"],
+        "missing_or_unrecovered": ["MoBA"],
+        "note": "SparQ两个producer script generation不能合并，统一producer全臂重跑。"
+      },
+      "ruler_131072": {
+        "reuse": ["FullKV", "NFA", "AsyncTLS", "MInference", "FASA"],
+        "rerun": ["SparQ", "HISA", "ClusterKV"],
+        "recover": ["Quest", "JSSA"],
+        "missing_or_unrecovered": ["MoBA"],
+        "note": "SparQ 10/11任务完整，MultiKey1仅96/100且无committed pointer；为保证同代统一协议，全臂重跑而非只把4行嫁接到旧generation。"
+      },
+      "nfa_regional_method_gaps": {
+        "task": "niah_multikey_2",
+        "rows_per_arm_length": 100,
+        "rerun": [
+          "near=minmax,far=minmax@32768",
+          "near=minmax,far=minmax@65536",
+          "near=minmax,far=minmax@131072",
+          "near=avg,far=avg@32768",
+          "near=avg,far=avg@65536",
+          "near=avg,far=avg@131072"
+        ],
+        "reference_only": "near=avg,far=minmax既有数据仅作同输入配对参考，不重复生成、不混池"
+      }
+    },
+    "Qwen3-32B": {
+      "longbench_v1": {
+        "reuse": ["FullKV", "Quest", "JSSA", "AsyncTLS"],
+        "merge-audit": ["NFA"],
+        "missing_or_unrecovered": ["MInference", "SparQ", "MoBA", "ClusterKV", "HISA", "FASA"],
+        "note": "AsyncTLS正式summary为3750/3750、16/16、v2输入身份及独立重评分通过；TASK.md中的1150/3750是过时进度。NFA为13+3任务跨generation，先合并审计。"
+      },
+      "longbench_v2": {
+        "reuse": ["FullKV", "Quest"],
+        "implementation-blocked": ["NFA"],
+        "missing_or_unrecovered": ["JSSA", "AsyncTLS", "MInference", "SparQ", "MoBA", "ClusterKV", "HISA", "FASA"]
+      },
+      "ruler_32768": {
+        "reuse": ["FullKV"],
+        "rescore-only": ["NFA"],
+        "recover": ["Quest", "JSSA"],
+        "missing_or_unrecovered": ["AsyncTLS", "MInference", "SparQ", "MoBA", "ClusterKV", "HISA", "FASA"],
+        "note": "历史冠军TLI原始现场正式复算AVG11=50.70，与旧报告一致。"
+      },
+      "ruler_65536": {
+        "missing_or_unrecovered": ["FullKV", "NFA", "Quest", "JSSA", "AsyncTLS", "MInference", "SparQ", "MoBA", "ClusterKV", "HISA", "FASA"]
+      },
+      "ruler_131072": {
+        "missing_or_unrecovered": ["FullKV", "NFA", "Quest", "JSSA", "AsyncTLS", "MInference", "SparQ", "MoBA", "ClusterKV", "HISA", "FASA"]
+      }
+    }
+  },
+  "new_recovery_evidence": {
+    "root": "/home/wangyuanshuo02/ak_verify_results/full_matrix_recovered_20261116",
+    "completed_formal_rescores": [
+      "glm_tli_L32768_rescore.json",
+      "qwen32b_tli_L32768_rescore.json",
+      "llama_fullkv_L32768_rescore.json",
+      "llama_fullkv_L65536_rescore.json",
+      "llama_fullkv_L131072_rescore.json",
+      "llama_nfa_k128_L32768_rescore.json",
+      "llama_nfa_k128_L65536_rescore.json",
+      "llama_nfa_k128_L131072_rescore.json"
+    ],
+    "qwen8_extended_baseline": "15个历史运行归档、16500条prediction逐文件SHA/ID/answers/官方分复算通过；其中3个为替代或重复generation，不记为额外唯一覆盖。",
+    "fasa_longbench": "独立staging重评分完成16/16、3750/3750；strict_validated=16、legacy_strict=16、v2_validated=0。"
+  },
+  "dispatch_state": {
+    "producer": "9f3e8057acd528a904aa8883b830d541b389e39f",
+    "formal_requests_started": 0,
+    "last_ignition_attempt": "pc32 C2/C3链因远程内联shell提前展开循环变量而在参数检查退出；无prediction、无正式worker。随后pc32亦出现其他计算PID。",
+    "resource_policy": "只使用点火前重新实测空闲的卡；pc02/pc40/pc31/pc32出现的其他计算进程均不触碰。",
+    "next": "使用落盘链脚本重新点火C2/C3；SparQ/HISA/ClusterKV缺口在vendor资产和空闲GPU同时满足后执行。"
+  }
+}
