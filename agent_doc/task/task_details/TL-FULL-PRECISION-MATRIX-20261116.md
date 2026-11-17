@@ -4,7 +4,7 @@
 
 盘点并补齐 GLM-4.7-Flash、Llama-3.1-8B、Qwen3-8B、Qwen3-32B 的 FullKV、NFA 与全部现行 baseline 在 LongBench v1 英文16任务、LongBench v2、RULER 11任务×32K/64K/128K 的精度证据。完整人口分别为3750、503、每模型方法3300请求；MultiKey2单任务不能冒充完整RULER。
 
-方法范围为 FullKV、NFA、Quest、JSSA、AsyncTLS、MInference、SparQ、MoBA、ClusterKV、HISA、FASA。官方实现、vendor适配、论文语义复现和历史TLI是不同implementation identity，不混池。所有新恢复或生成结果在不同owner独立验收前保持 `pending-independent-verification`。
+历史盘点方法范围为 FullKV、NFA、Quest、JSSA、AsyncTLS、MInference、SparQ、MoBA、ClusterKV、HISA、FASA。2026-11-17 用户明确将后续 baseline 执行范围缩为 Quest、JSSA、AsyncTLS，其余 MInference、SparQ、MoBA、ClusterKV、HISA、FASA 全部取消；FullKV 参考臂与 NFA 本方法不在取消范围。官方实现、vendor适配、论文语义复现和历史TLI是不同implementation identity，不混池。所有新恢复或生成结果在不同owner独立验收前保持 `pending-independent-verification`。
 
 ## 已核实结论
 
@@ -24,15 +24,15 @@
 ### 立即可执行缺口
 
 - Qwen3-8B RULER MultiKey2的C2 near/far=minmax/minmax与C3 avg/avg，三长度各100条，共600请求；既有avg/minmax只作配对参考。
-- SparQ 64K存在跨producer script漂移，128K MultiKey1只有96/100且无committed pointer。为保持同一代统一协议，64K/128K均按当前producer全11任务重跑，不把4行嫁接到旧generation。
-- HISA和ClusterKV 64K/128K没有完整闭集，按各11任务×100补齐；32K历史完整结果复用。
+- SparQ 64K存在跨producer script漂移，128K MultiKey1只有96/100且无committed pointer；这些历史缺口原样保留，但用户已取消SparQ后续补跑，不把4行嫁接到旧generation。
+- HISA和ClusterKV 64K/128K没有完整闭集；32K历史完整结果仅按原身份复用，64K/128K后续补格已按用户指令取消。
 - 现行NFA LongBench质量入口已复用共享`run_quality()`扩展Qwen3-8B `lbv2`唯一任务门禁，不能把旧LongBench v2 full/mavg/aavg结果改标为当前NFA；主机契约测试和分片脚本已完成，仍需真实GPU smoke及503请求生成。
 - 非Qwen3-8B官方Quest/JSSA RULER入口当前有明确模型限制；其他vendor方法也必须逐个验证真实adapter，不能由Qwen3脚本存在推断四模型都可运行。
 
 ## 派单实现
 
 - `agent_doc/results/full_precision_matrix_20261116/_dispatch/run_regional_chain.sh`：落盘的C2/C3三长度×双分片链，避免远程内联shell变量提前展开。
-- `agent_doc/results/full_precision_matrix_20261116/_dispatch/run_ruler_vendor_gap.sh`：SparQ/HISA/ClusterKV 64K/128K独立输出、固定HEAD、干净worktree、GPU占用检查、全量日志、11任务生成及formal scorer硬门禁。
+- `agent_doc/results/full_precision_matrix_20261116/_dispatch/run_ruler_vendor_gap.sh`：取消前用于SparQ/HISA/ClusterKV 64K/128K独立输出、固定HEAD、干净worktree、GPU占用检查、全量日志、11任务生成及formal scorer硬门禁；现仅归档，不再执行这些已取消方法。
 - `agent_doc/results/full_precision_matrix_20261116/_dispatch/run_lbv2_nfa.sh`：Qwen3-8B NFA LBv2的隔离一样本smoke与503请求确定性分片；固定HEAD、干净worktree、实测GPU、完整日志、逐分片runcap/source manifest评分，评分目录按分片隔离以避免跨分片ID误合并。
 - C2/C3固定producer为`9f3e8057acd528a904aa8883b830d541b389e39f`，输出与历史目录隔离。vendor资产位于被忽略的`exp/vendor_baselines`，clean worktree不会自动携带，必须在点火前同步并记录哈希；ClusterKV还需要`ckv_env.sh`。
 
@@ -89,10 +89,24 @@
 - C2 32K两片已各50条闭集，`audit_ruler_results.py --rows 100 --cells 1 --formal`复核输入身份、runcap、逐样本官方分、全部哈希和36层keep均PASS，official_score=88.0；审计=`ak_verify_results/nfa_dac_ruler_regional_9f3e8057_20261116/_audits/c2_32k_production_audit.json`，SHA256=`9f2b232881afcec51641b3fd50cc29b2edf5d2e34e50d99aea00f6efa653c0ea`，仅为MultiKey2单任务且继续pending-independent-verification。C2 64K shard0已接力，Python PID=682573，日志已出现真实生成。
 - C3 128K shard0已完成50条，已只收割该完整分片的prediction、receipts、scores、runcap、source manifest、quality manifest、日志和done标记，共6个`s0of2`prediction相关文件；shard1随后接力，Python PID=2232243，模型加载及逐请求日志正常。pc32 GPU1同时出现另一会话gate-sensitivity worker，未触碰其进程；C3 128K必须等shard1闭集后再合并审计，当前不把单片当完整结果。
 
+### 2026-11-17 三 vendor 六格 smoke 闭集、正式补格铺满与C2 64K审计
+
+- SparQ 64K首次真实重试前，已把漏传`--baseline-execute`的preflight失败日志单独保留；orchestration仅给SparQ补该既有显式执行闸，被测producer仍固定`cc48075695a827840c25d35df917df3a1079838d`。修复后SparQ 64K/128K、HISA 64K/128K、ClusterKV 64K/128K六份`niah_single_1`单样本smoke均真实生成并完成正式评分，六格均1/1、official_score=100.00；六份原始prediction、formal scorer、日志、done标记和SHA已收割到本机`ak_verify_results/full_precision_matrix_cc480756_20261116`。这些分数只证明真实入口可运行，不能外推为11任务人口精度。
+- ClusterKV首次128K smoke被producer洁净门禁拦截，唯一变化是上一次ClusterKV运行生成的未跟踪`rmm_log.txt`；未删除或放宽门禁，而是把日志移入对应smoke证据目录后重试。ClusterKV 64K正式臂使用同HEAD、同资产SHA的独立clean worktree`/tmp/full-precision-matrix-cc480756-ckv64`，避免与128K共用RMM日志和运行时工作树。
+- 六个正式单元现已全部点火并做进程、显存/compute app和日志三重验证：pc02 GPU0=SparQ 64K、GPU1=HISA 64K、GPU2=ClusterKV 64K、GPU3=ClusterKV 128K；pc31 GPU0=SparQ 128K、GPU1=HISA 128K。每格均为11任务×100，输出互相隔离，smoke与正式目录也不混用。pc02的SparQ/HISA 64K前两次正式点火只被`rmm_log.txt`洁净门禁拦截，未生成prediction；修正工作树状态后才有点火和真实生成。
+- C2 64K两片已各50条闭集，与32K共同通过`audit_ruler_results.py --rows 100 --cells 2 --formal`：official_score=88.0/78.0，输入身份、runcap、逐样本官方分、全部哈希及36层keep均PASS。审计=`ak_verify_results/nfa_dac_ruler_regional_9f3e8057_20261116/_audits/c2_32k_64k_production_audit.json`，SHA256=`5cafcde8e5f0aa9e7943565b869945fda2b68a40948c9423b8cbec92a83ad3f1`；仅为MultiKey2单任务且继续pending-independent-verification。C2 128K shard0已在pc33 GPU0接力；C3 128K shard1继续在pc32 GPU1生成，未把未闭集分片并入审计。
+
+### 2026-11-17 用户取消其他 baseline，六个正式 partial 全部停止
+
+- 用户明确指令：“只管Quest,JSSA,AsyncTLS，其他的HISA这些baseline全部取消”。后续 baseline 执行范围因此仅保留 Quest、JSSA、AsyncTLS；MInference、SparQ、MoBA、ClusterKV、HISA、FASA 不再补跑、评分或恢复。FullKV 参考臂与 NFA 本方法不属于本次取消范围。
+- 上一节“六个正式单元现已全部点火”仅为取消前历史状态，现已被本节覆盖。pc02 的父shell/Python分别为3763698/3763699、3764994/3764995、3765301/3765302、3765942/3765943，pc31为842328/842329、842813/842814；均先停止父shell再停止Python，未使用模糊`pkill`，未触碰其他进程。
+- 停车后pc02四卡和pc31双卡显存均释放至1 MiB，无本任务残留Python，六格均无done标记。SparQ 64K/128K、HISA 64K/128K、ClusterKV 64K/128K的partial行数依次27/10、24/11、5/4；这些partial及日志已收割到本机`ak_verify_results/full_precision_matrix_cc480756_20261116`，状态统一为`cancelled-by-user`，不评分、不闭集、不并入正式精度矩阵。
+- 六份取消前单样本smoke继续保留为历史入口证据，不能外推人口精度，也不再扩展。被中断的旧提交没有创建，相关暂存已撤销；SparQ脚本的临时`--baseline-execute`修改已恢复，不随取消状态提交。
+
 ## 下一步
 
 1. LBv2 503已完成canonical merge、官方strict评分和44项SHA复核，不再重复生成；保留pending-independent-verification并交不同owner验收。
-2. 保持pc32 C3 128K链运行，资源允许时启动C2；两臂完成后分别合并三长度各100条并正式评分，不与avg/minmax混池。
-3. 将SparQ/HISA/ClusterKV锁定资产同步到独立新producer worktree，逐方法执行64K/128K单样本smoke，通过后执行各11任务×100正式补格。
-4. 继续恢复GLM/Qwen3-32B Quest/JSSA原始generation及FASA 35.15原始prediction；Qwen3-32B NFA若需统一协议16任务正式臂则重跑legacy13，不直接拼接13+3。
-5. 逐方法核验其余模型与数据集支持；完成官方评分、输入身份、runcap、SHA256和生产侧审计后更新矩阵及`CURRENT_NARRATIVE.md`，独立验收前不作最终质量结论。
+2. 继续未取消的pc32 C3与pc33 C2 128K链；两臂闭集后分别合并三长度各100条并正式审计，不与avg/minmax混池。
+3. 后续baseline只处理Quest、JSSA、AsyncTLS的真实恢复与必要补格；已取消的六个vendor partial只保留证据，不继续运行、评分或闭集。
+4. 继续恢复GLM/Qwen3-32B Quest/JSSA原始generation；Qwen3-32B NFA若需统一协议16任务正式臂则重跑legacy13，不直接拼接13+3。FASA 35.15原始prediction不再恢复。
+5. 仅在Quest/JSSA/AsyncTLS及未取消的FullKV/NFA范围核验其余模型与数据集支持；完成官方评分、输入身份、runcap、SHA256和生产侧审计后更新矩阵及`CURRENT_NARRATIVE.md`，独立验收前不作最终质量结论。
