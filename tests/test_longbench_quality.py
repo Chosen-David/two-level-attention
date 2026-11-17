@@ -51,6 +51,16 @@ def test_nfa_quality_2x2_uses_one_config_for_patch_and_prefill(subspace, gate):
     assert gate_config.rows == 256
 
 
+@pytest.mark.parametrize("level2_topk", [256, 512, 1024, 2048])
+def test_nfa_quality_level2_topk_reaches_real_indexer(level2_topk):
+    patch_args, _ = resolve_nfa_quality_config(
+        "full", "off", 128, level2_topk=level2_topk)
+    indexer = NFAIndexer(patch_args)
+    assert indexer.args.tia_level2_topk == level2_topk
+    with pytest.raises(ValueError, match="L2 token budget"):
+        resolve_nfa_quality_config("full", "off", 128, level2_topk=768)
+
+
 def test_nfa_quality_numeric_near_quota_reaches_real_indexer():
     patch_args, _ = resolve_nfa_quality_config(
         "tail", "off", near_pages=32, near_tokens=448)

@@ -56,6 +56,8 @@ def parse_args():
     parser.add_argument("--nfa-subspace", choices=("full", "tail"), default="tail")
     parser.add_argument("--nfa-subspace-dim", type=int, choices=(16, 32, 64, 128), default=None)
     parser.add_argument("--nfa-gate", choices=("off", "on"), default="off")
+    parser.add_argument("--nfa-level2-topk", type=int,
+                        choices=(256, 512, 1024, 2048), default=1024)
     parser.add_argument("--nfa-far-method", choices=("minmax", "avg", "avg_top2"),
                         default="minmax")
     parser.add_argument("--model-path", default="/home/wangyuanshuo02/Qwen3-8B")
@@ -82,7 +84,8 @@ def validate_longbench_quality_tasks(tasks):
 
 def resolve_nfa_quality_config(subspace, gate, subspace_dim=None,
                                near_pages=None, near_tokens=None,
-                               far_method="minmax", near_method="avg"):
+                               far_method="minmax", near_method="avg",
+                               level2_topk=1024):
     """返回模型 patch 与 prefill 标定共用的配置；尾维维度必须真实落到 ratio。"""
     if subspace not in {"full", "tail"} or gate not in {"off", "on"}:
         raise ValueError("NFA 质量臂只支持 full/tail × gate off/on")
@@ -94,10 +97,13 @@ def resolve_nfa_quality_config(subspace, gate, subspace_dim=None,
         subspace_dim = 128 if subspace == "full" else 32
     if subspace_dim not in {16, 32, 64, 128}:
         raise ValueError("NFA 子空间维度只支持 16/32/64/128")
+    if level2_topk not in {256, 512, 1024, 2048}:
+        raise ValueError("NFA L2 token budget 只支持 256/512/1024/2048")
     expected_subspace = "full" if subspace_dim == 128 else "tail"
     if subspace != expected_subspace:
         raise ValueError(f"subspace_dim={subspace_dim} 必须使用 --nfa-subspace {expected_subspace}")
     patch_args = nfa_args(subspace)
+    patch_args.tia_level2_topk = level2_topk
     patch_args.nfa_far_method = far_method
     patch_args.nfa_near_method = near_method
     if subspace == "tail":
@@ -200,6 +206,7 @@ class RequestQualityEngine(RequestTwoPointEngine):
                 subspace=selector.nfa_subspace,
                 subspace_dim=subspace_dim,
                 subspace_cmp_ratio=selector.tia_level2_cmp_ratio,
+                level2_topk=selector.tia_level2_topk,
                 enable_subspace=selector.nfa_subspace != "full",
                 enable_layer_skip=selector.nfa_enable_layer_skip,
                 dynamic_gate_epsilon=selector.nfa_dyn_dgate_eps,
@@ -212,7 +219,8 @@ class RequestQualityEngine(RequestTwoPointEngine):
             )
             self.runtime["nfa_quality_arm"] = (
                 f"{'full' if selector.nfa_subspace == 'full' else f'tail{subspace_dim}'}_"
-                f"gate_{'on' if selector.nfa_enable_layer_skip else 'off'}")
+                f"gate_{'on' if selector.nfa_enable_layer_skip else 'off'}_"
+                f"k2{selector.tia_level2_topk}")
 
     def generate(self, ids, max_new_tokens, ignore_eos, stop_token_ids=None,
                  min_new_tokens=0, stop_strings=None):
@@ -427,11 +435,13 @@ def main():
     if args.method == "nfa":
         args.nfa_patch_args, args.nfa_gate_config = resolve_nfa_quality_config(
             args.nfa_subspace, args.nfa_gate, args.nfa_subspace_dim,
-            far_method=args.nfa_far_method)
+            far_method=args.nfa_far_method,
+            level2_topk=args.nfa_level2_topk)
         arm = (
             f"{args.nfa_subspace}_gate_{args.nfa_gate}"
             if args.nfa_subspace_dim in (None, 32, 128)
             else f"tail{args.nfa_subspace_dim}_gate_{args.nfa_gate}")
+        arm += f"_k2{args.nfa_level2_topk}"
         if args.nfa_far_method != "minmax":
             arm += f"_far_{args.nfa_far_method}"
     else:
