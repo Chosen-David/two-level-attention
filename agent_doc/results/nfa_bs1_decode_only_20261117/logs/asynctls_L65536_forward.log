@@ -1,0 +1,28 @@
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/5 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 5/5 [00:00<00:00, 177.96it/s]
+{
+  "context_length": 65536,
+  "batch_size": 1,
+  "measurement_mode": "clean-e2e",
+  "tpot_ms_median": 24.259008407592773,
+  "asynctls_runtime": {
+    "implementation": "independent PyTorch semantic reimplementation; not official TileLang",
+    "paper_pdf_verified": true,
+    "source_verified_official": false,
+    "block_size": 64,
+    "top_kb": 128,
+    "candidate_tokens_including_current": 8193,
+    "channels_per_kv_group": 32,
+    "token_budget": 1024,
+    "pipeline": "Stage2 uses previous-step coarse blocks M_(t-1)",
+    "int4": "per-token 16-level quantize-dequantize; storage remains BF16",
+    "offload": "none; no claim of asynchronous host offload",
+    "stage3": "exact full-dimensional Q/K/V attention on selected tokens",
+    "kv_cache_layout": "[layer,batch,position,H_kv,D] BF16 K and V",
+    "block_metadata": "incremental per-block BF16 K min/max",
+    "prefill_attention": "HF SDPA with original Qwen3 RoPE",
+    "prefill_calls": 36,
+    "decode_calls_warmup_and_capture": 72
+  },
+  "output": "/tmp/nfa-bs1-attribution-20261117/agent_doc/results/nfa_bs1_decode_only_20261117/clean/asynctls_L65536_forward.json"
+}

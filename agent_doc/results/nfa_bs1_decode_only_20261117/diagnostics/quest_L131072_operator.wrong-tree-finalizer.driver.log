@@ -1,0 +1,11 @@
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/measure_quest_official_operator.py", line 157, in <module>
+    main()
+  File "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/measure_quest_official_operator.py", line 143, in main
+    result = finalize(json.loads(output.read_text()), args.sqlite, args.nsys_rep)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/measure_quest_official_operator.py", line 76, in finalize
+    raise ValueError(f"官方 Quest 调用计数不符合单次 T(1)+T(33): {recorded}")
+ValueError: 官方 Quest 调用计数不符合单次 T(1)+T(33): {'prefill_forward': 36, 'decode_estimate': 1088, 'decode_topk': 1088, 'decode_sparse_attn': 1152, 'dense_or_torch_fallback': 0}

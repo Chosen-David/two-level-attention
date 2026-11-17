@@ -1,0 +1,297 @@
+{
+  "schema": "nfa-selector-and-e2e-v2",
+  "source": {
+    "head": "0fa07ea80b67d8369c6c26359e768f510dd4eef4",
+    "diff_sha256": "86a8cff4e3cebb72c740fab1457eb8f06fd477ebef04a3410bb0f7c0fed17d70",
+    "harness_sha256": "d4a76ebd77db50175b11b321c1f5ddd59ddb4ccba5fa7b21d3e83e59ad83581b"
+  },
+  "method": "nfa",
+  "measurement_mode": "clean-e2e",
+  "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+  "context_length": 32768,
+  "batch_size": 1,
+  "execution": "graph",
+  "subspace": "tail",
+  "l2_subspace": "same",
+  "score_dimensions": {
+    "head_dim": 128,
+    "l1_score_dims": 32,
+    "l2_score_dims": 32
+  },
+  "gate_epsilon": 0.05,
+  "force_skip_mode": "natural",
+  "operator_mode": "off",
+  "task": "niah_multikey_2",
+  "sample_index": 2,
+  "input_provenance": "repeated-needle-body-extension",
+  "visible_len": 8192,
+  "input": {
+    "path": "/tmp/nfa_kernel_inputs/32768/niah_multikey_2.jsonl",
+    "sha256": "073bae295bd94baa1880f33c4b0ccaec3a4d510dac2b31935b3ce488ad698fe8",
+    "sample_index": 2,
+    "sample_id": 0,
+    "file_row_index": 0,
+    "actual_prompt_tokens": 32082,
+    "provenance": "repeated-needle-body-extension",
+    "performance_input_mode": "replicate one prompt across all batch rows"
+  },
+  "warmup_steps": 3,
+  "profile_repeat": 5,
+  "decode_steps": 29,
+  "measured_decode_steps": 29,
+  "profiled_decode_steps": 0,
+  "profiler_clean_e2e_isolated": true,
+  "profile_backend": null,
+  "nsys_profile_finalized": null,
+  "operator_time_basis": "nsys/CUPTI graph kernel trace observed time; tracing may significantly perturb short kernels and runtime scheduling",
+  "host_overhead_derivable_by_subtraction": false,
+  "cross_mode_comparison_rule": "Do not subtract profiled nfa_operator_total_ms from clean decode TPOT and do not interpret their difference as Python/host overhead.",
+  "timing_scope": "clean-e2e uses a separate process and CUDA events around complete decode steps, including host scheduling/metadata, model/selector execution and argmax; operator-profile has no clean TPOT",
+  "timing_metric": "end-to-end decode TPOT, not pure attention/operator latency",
+  "prefill_seconds": 8.279967918992043,
+  "long_prefill_mlp_chunk_tokens": null,
+  "prefill_decisions": {
+    "0": {
+      "0": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "1": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "2": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "3": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "4": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "5": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "6": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "7": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "8": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "9": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "10": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "11": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "12": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "13": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "14": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "15": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "16": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "17": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "18": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "19": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "20": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "21": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "22": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "23": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "24": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "25": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "26": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "27": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "28": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "29": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "30": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "31": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "32": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "33": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "34": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "35": {
+        "skip_near": false,
+        "skip_far": false
+      }
+    }
+  },
+  "skip": {
+    "0": {
+      "n_layers": 36,
+      "near_layers": [],
+      "far_layers": [],
+      "both_layers": []
+    }
+  },
+  "operator_summary": null,
+  "kernel_summary": null,
+  "region_kernel_audit": null,
+  "timing": {
+    "decode_steps": 29,
+    "tpot_ms_median": 10.314720153808594,
+    "steady_tpot_ms_median": 10.314720153808594,
+    "tpot_ms_all": [
+      10.35654354095459,
+      10.327936172485352,
+      10.313568115234375,
+      10.320799827575684,
+      10.376319885253906,
+      10.326784133911133,
+      10.296544075012207,
+      10.322751998901367,
+      10.307552337646484,
+      10.304672241210938,
+      10.313088417053223,
+      10.294272422790527,
+      10.306079864501953,
+      10.336223602294922,
+      10.332863807678223,
+      10.311840057373047,
+      10.300127983093262,
+      10.307647705078125,
+      10.295455932617188,
+      10.314720153808594,
+      10.305215835571289,
+      10.300928115844727,
+      10.301983833312988,
+      10.400575637817383,
+      10.411392211914062,
+      10.356767654418945,
+      10.325407981872559,
+      10.328415870666504,
+      10.323328018188477
+    ],
+    "warmup_steps_excluded_from_steady": 0,
+    "decode_host_wall_ms": 300.2714812755585,
+    "decode_host_tpot_ms": 10.354189009502017,
+    "measured_decode_steps": 29,
+    "host_timing_scope": "host wall from after warmup synchronization through the remaining decode loop, token-history writes and final synchronization"
+  },
+  "generated_token_ids": [
+    [
+      576,
+      3281,
+      10963,
+      1372,
+      369,
+      65202,
+      291,
+      28783,
+      8631,
+      8023,
+      374,
+      220,
+      21,
+      15,
+      22,
+      18,
+      16,
+      21,
+      15,
+      624,
+      32313,
+      11,
+      1077,
+      752,
+      1430,
+      311,
+      7071,
+      700,
+      279,
+      4226,
+      1588,
+      13,
+      576
+    ]
+  ],
+  "graph_capture_count": 1,
+  "graph_replays": 32,
+  "graph_eager_fallbacks": 0,
+  "max_memory_allocated_gib": 23.055856704711914,
+  "max_memory_reserved_gib": 23.60546875,
+  "torch_version": "2.8.0+cu128",
+  "cuda_allocator_config": "expandable_segments:True"
+}

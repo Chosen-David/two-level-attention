@@ -1,0 +1,113 @@
+{
+  "skip": {
+    "n_layers": 36,
+    "near_layers": [
+      0,
+      1,
+      5,
+      7,
+      8,
+      9,
+      10,
+      12,
+      13,
+      14,
+      17,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31,
+      32,
+      33,
+      34,
+      35
+    ],
+    "far_layers": [],
+    "both_layers": []
+  },
+  "steps": 29,
+  "finalized": true,
+  "operator_summary": {
+    "l1_score_ms": {
+      "total_ms": 16.247949000000013,
+      "mean_ms_per_step": 0.5602741034482763
+    },
+    "l1_topk_ms": {
+      "total_ms": 13.815491000000016,
+      "mean_ms_per_step": 0.4763962413793109
+    },
+    "candidate_ms": {
+      "total_ms": 4.854520999999994,
+      "mean_ms_per_step": 0.16739727586206876
+    },
+    "l2_score_ms": {
+      "total_ms": 22.184775999999932,
+      "mean_ms_per_step": 0.7649922758620666
+    },
+    "l2_topk_ms": {
+      "total_ms": 37.56139400000003,
+      "mean_ms_per_step": 1.2952204827586216
+    },
+    "selection_union_ms": {
+      "total_ms": 6.9617600000000115,
+      "mean_ms_per_step": 0.2400606896551728
+    },
+    "selected_attention_ms": {
+      "total_ms": 29.518517000000116,
+      "mean_ms_per_step": 1.0178798965517282
+    },
+    "pure_l1_score_ms": {
+      "total_ms": 9.95108399999997,
+      "mean_ms_per_step": 0.34314082758620584
+    },
+    "pure_l2_score_ms": {
+      "total_ms": 20.514686999999938,
+      "mean_ms_per_step": 0.7074029999999979
+    },
+    "l1_ms": {
+      "total_ms": 34.91796100000002,
+      "mean_ms_per_step": 1.204067620689656
+    },
+    "l2_ms": {
+      "total_ms": 66.70792999999998,
+      "mean_ms_per_step": 2.300273448275861
+    },
+    "topk_total_ms": {
+      "total_ms": 51.376885000000044,
+      "mean_ms_per_step": 1.7716167241379326
+    },
+    "main_attention_ms": {
+      "total_ms": 29.518517000000116,
+      "mean_ms_per_step": 1.0178798965517282
+    },
+    "nfa_operator_total_ms": {
+      "total_ms": 131.1444080000001,
+      "mean_ms_per_step": 4.522220965517246
+    }
+  },
+  "region_kernel_audit": {
+    "expected_calls_per_step": {
+      "generic_l1": 12,
+      "near_only_l1": 0,
+      "far_only_l1": 24,
+      "active_page_stats": 36,
+      "active_candidate": 36,
+      "active_fine_score": 36
+    },
+    "observed_calls_per_step": {
+      "generic_l1": 12.0,
+      "near_only_l1": 0.0,
+      "far_only_l1": 24.0,
+      "active_page_stats": 36.0,
+      "active_candidate": 36.0,
+      "active_fine_score": 36.0
+    },
+    "passed": true,
+    "interpretation": "calls are per layer for the whole batch, not per request; generic=non-skip or mixed-batch, near_only=skip-far, far_only=skip-near; uniform both-skip contributes zero to every active selector entry"
+  }
+}

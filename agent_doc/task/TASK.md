@@ -1,5 +1,10 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+- [ ] [TL-QUEST-BATCH-RULER-PERF-20261116/BS1-DECODE-ONLY] 32K/64K BS1 decode-stage e2e 补格：Quest/JSSA/AsyncTLS 已闭集，NFA 32K/64K natural gate 全空 fail-closed；结果归档 `agent_doc/results/nfa_bs1_decode_only_20261117/`，保持 pending-independent-verification。
+## 2026-11-17
+
+- [ ] [TL-LONGBENCH-8TASK-VENDOR-SWEEP-20261117] 本地 main `8736a965` 干净基线，LongBench 8 任务 × {NFA/LoDA, Quest, JSSA, AsyncTLS} × {256,512,1024,2048} 精度对比，共 128 jobs。NFA 走 `benchmark_longbench_quality.py`（eager/tail/gate-off/k1=128/k2=budget），Quest/AsyncTLS 走 `pred.py`，JSSA 直接走 `third-party/JSSA/adapters/longbench_v1_jssa.py`；统一 `eval.py` 评分（QA-F1 / gov_report-ROUGE-L）。10 workers 分片：pc02 4 卡 + pc32 2 卡 + pc40 2 卡 + pc31 2 卡，本机两卡保持空闲，已点火并真实生成中。结果目录各远端 `~/longbench_results_8736a965`，全部 pending-independent-verification。([详情](task_details/TL-LONGBENCH-8TASK-VENDOR-SWEEP-20261117.md))
+
 ## 2026-11-16
 
 - [ ] [TL-QUEST-BATCH-RULER-PERF-20261116] Quest官方CUDA真batch化已完成32K/64K及128K B2/B4逐token门禁，当前扩展52abaae8的完整Quest回归278 passed/43 skipped，主仓普通/-O各34 passed/1 skipped/23 subtests。修复版六格clean与八格operator共14格已逐格审计通过，完整矩阵仅缺B4 128K operator；该格首试因另一计算进程竞争显存OOM，失败产物已哈希隔离，独占重试仍等待GPU0真实空闲。B4 128K clean三repeat TPOT=51.568/177.919/411.219ms，TTFT稳定而decode wall单调增长，正确性/协议pass不等于性能稳定，原始样本保留且根因未关闭；旧formal_input_order失败产物不混用，全部结果保持pending。([详情](task_details/TL-QUEST-BATCH-RULER-PERF-20261116.md))
