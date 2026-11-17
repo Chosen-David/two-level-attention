@@ -2,7 +2,8 @@
 set -euo pipefail
 GPU="${1:?usage: $0 <GPU> <sparq|hisa|clusterkv> <65536|131072>}"
 METHOD="${2:?usage: $0 <GPU> <sparq|hisa|clusterkv> <65536|131072>}"
-LENGTH="${3:?usage: $0 <GPU> <sparq|hisa|clusterkv> <65536|131072>}"
+LENGTH="${3:?usage: $0 <GPU> <sparq|hisa|clusterkv> <65536|131072> [smoke|formal]}"
+MODE="${4:-formal}"
 EXPECTED_HEAD="${EXPECTED_HEAD:?set EXPECTED_HEAD to the clean producer commit}"
 WT="${WT:-/tmp/full-precision-matrix-${EXPECTED_HEAD:0:8}}"
 ROOT="${ROOT:-$HOME/ak_verify_results/full_precision_matrix_${EXPECTED_HEAD:0:8}_20261116}"
@@ -17,6 +18,18 @@ case "$LENGTH" in
   65536) YARN_FACTOR=2.0 ;;
   131072) YARN_FACTOR=4.0 ;;
   *) printf 'length must be 65536 or 131072\n' >&2; exit 3 ;;
+esac
+case "$MODE" in
+  smoke)
+    TASKS=(niah_single_1)
+    MAX_NUM=1
+    CELL_SUFFIX=_smoke
+    ;;
+  formal)
+    MAX_NUM=100
+    CELL_SUFFIX=
+    ;;
+  *) printf 'mode must be smoke or formal\n' >&2; exit 3 ;;
 esac
 if [[ "$(git -C "$WT" rev-parse HEAD)" != "$EXPECTED_HEAD" ]]; then
   printf 'unexpected source HEAD\n' >&2
@@ -35,21 +48,21 @@ if [[ -n "$apps" ]]; then
   printf 'GPU%s occupied by compute PID=%s\n' "$GPU" "$apps" >&2
   exit 4
 fi
-OUTPUT="$ROOT/${METHOD}_L${LENGTH}"
+OUTPUT="$ROOT/${METHOD}_L${LENGTH}${CELL_SUFFIX}"
 PRED_ROOT="$OUTPUT/L${LENGTH}/pred_full_matrix"
-LOG="$ROOT/_logs/${METHOD}_L${LENGTH}.log"
+LOG="$ROOT/_logs/${METHOD}_L${LENGTH}${CELL_SUFFIX}.log"
 if [[ -e "$PRED_ROOT" ]]; then
   printf 'REFUSE existing prediction generation directory %s\n' "$PRED_ROOT" >&2
   exit 5
 fi
 mkdir -p "$ROOT/_logs" "$ROOT/_status"
-exec 9>"$ROOT/_status/${METHOD}_L${LENGTH}_gpu${GPU}.lock"
+exec 9>"$ROOT/_status/${METHOD}_L${LENGTH}${CELL_SUFFIX}_gpu${GPU}.lock"
 if ! flock -n 9; then
   printf 'GPU%s method-length cell already running\n' "$GPU" >&2
   exit 3
 fi
-printf 'START host=%s gpu=%s method=%s length=%s rows_per_task=100 head=%s shell_pid=%s time=%s\n' \
-  "$(hostname)" "$GPU" "$METHOD" "$LENGTH" "$EXPECTED_HEAD" "$$" "$(date -Is)" >"$LOG"
+printf 'START host=%s gpu=%s mode=%s method=%s length=%s rows_per_task=%s head=%s shell_pid=%s time=%s\n' \
+  "$(hostname)" "$GPU" "$MODE" "$METHOD" "$LENGTH" "$MAX_NUM" "$EXPECTED_HEAD" "$$" "$(date -Is)" >"$LOG"
 EXTRA_ENV=()
 if [[ "$METHOD" == clusterkv ]]; then
   # ClusterKV 使用其锁定依赖环境；不改变其他方法的 Python 身份。
@@ -75,7 +88,7 @@ for TASK in "${TASKS[@]}"; do
       --model Qwen3-8B --model_path "$MODEL" --task "$TASK" \
       --context_length "$LENGTH" --method "${METHOD}_vendor" \
       --t "full-matrix-${EXPECTED_HEAD:0:8}" --pred_postfix _full_matrix \
-      --data-root "$DATA" --output-dir "$OUTPUT" --max-num 100 --yarn \
+      --data-root "$DATA" --output-dir "$OUTPUT" --max-num "$MAX_NUM" --yarn \
       "${METHOD_FLAGS[@]}"
   ) >>"$LOG" 2>&1
   printf 'TASK_DONE method=%s length=%s task=%s time=%s\n' \
@@ -86,11 +99,11 @@ done
   env PYTHONUNBUFFERED=1 HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
     "$PYTHON_BIN" benchmark/RULER/score_ruler_formal.py \
     --root "$OUTPUT" --pred-postfix _full_matrix --data-root "$DATA" \
-    --out "$OUTPUT/formal_score.json" --expect-tasks 11 --min-samples 100 \
+    --out "$OUTPUT/formal_score.json" --expect-tasks "${#TASKS[@]}" --min-samples "$MAX_NUM" \
     --model-path "$MODEL" --yarn --yarn-factor "$YARN_FACTOR" --rope-policy legacy
 ) >>"$LOG" 2>&1
-printf 'DONE host=%s gpu=%s method=%s length=%s rows=1100 time=%s\n' \
-  "$(hostname)" "$GPU" "$METHOD" "$LENGTH" "$(date -Is)" >>"$LOG"
-printf 'host=%s gpu=%s method=%s length=%s status=complete time=%s\n' \
-  "$(hostname)" "$GPU" "$METHOD" "$LENGTH" "$(date -Is)" \
-  >"$ROOT/_status/${METHOD}_L${LENGTH}.done"
+printf 'DONE host=%s gpu=%s mode=%s method=%s length=%s rows=%s time=%s\n' \
+  "$(hostname)" "$GPU" "$MODE" "$METHOD" "$LENGTH" "$((MAX_NUM * ${#TASKS[@]}))" "$(date -Is)" >>"$LOG"
+printf 'host=%s gpu=%s mode=%s method=%s length=%s status=complete time=%s\n' \
+  "$(hostname)" "$GPU" "$MODE" "$METHOD" "$LENGTH" "$(date -Is)" \
+  >"$ROOT/_status/${METHOD}_L${LENGTH}${CELL_SUFFIX}.done"

@@ -20,6 +20,7 @@
     "recover": "有报告或 source hash，但原始 generation 尚未完整恢复",
     "implementation-blocked": "当前生产入口不支持该模型/数据集/方法组合，需真实扩展而非换标签",
     "implementation-ready-pending-gpu-smoke": "入口代码和主机契约测试已完成，但尚未通过真实GPU smoke，未生成精度结果",
+    "generating": "真实GPU smoke已通过，正式请求正在确定性分片生成；尚未闭集，不作精度结论",
     "resource-blocked": "代码和输入可运行，但当前无经实测空闲的 GPU"
   },
   "coverage": {
@@ -82,9 +83,9 @@
       },
       "longbench_v2": {
         "reuse": ["FullKV", "Quest", "JSSA", "AsyncTLS"],
-        "implementation-ready-pending-gpu-smoke": ["NFA"],
+        "generating": ["NFA"],
         "missing_or_unrecovered": ["MInference", "SparQ", "MoBA", "ClusterKV", "HISA", "FASA"],
-        "note": "official Quest与旧vendor Quest为不同implementation identity；现行NFA质量入口已复用共享run_quality扩展lbv2唯一任务门禁，普通/-O各29项主机契约测试通过，隔离smoke/formal分片脚本已落盘；尚未真实GPU smoke或生成503请求，不能把旧full/mavg/aavg结果改标为当前gate-off NFA。"
+        "note": "official Quest与旧vendor Quest为不同implementation identity；现行NFA质量入口复用共享run_quality，普通/-O各29项主机契约测试通过。2026-11-17 pc32真实单样本smoke已生成31512-token输入、23-token输出，补齐同版jieba/rouge后仅重跑评分并通过official-strict、strict runcap和v2输入身份；正式world=8的shard0已启动63请求，其余7片待空闲卡，尚未形成503闭集或新AVG。"
       },
       "ruler_32768": {
         "reuse": ["FullKV", "NFA", "AsyncTLS", "MInference", "FASA", "SparQ", "HISA", "ClusterKV"],
@@ -165,10 +166,19 @@
     "quest_jssa_recovery": "历史报告精确指向pc14:/tmp/tli-baseline-jssa-quest；pc14当前及历史旧地址均SSH超时，pc02/pc40/pc31/pc32的主仓、ak_verify_results和/tmp精确文件名检索均为0，四套RULER原始generation保持recover。"
   },
   "dispatch_state": {
-    "producer": "9f3e8057acd528a904aa8883b830d541b389e39f",
-    "formal_requests_started": 0,
-    "last_ignition_attempt": "pc32 C2/C3链因远程内联shell提前展开循环变量而在参数检查退出；无prediction、无正式worker。随后pc32亦出现其他计算PID。",
-    "resource_policy": "只使用点火前重新实测空闲的卡；最新pc33/pc02/pc40/pc31/pc32全部卡均有其他compute app，均不触碰；pc14本轮复测仍SSH超时，不作为可用资源。",
-    "next": "使用落盘链脚本重新点火C2/C3；Qwen3-8B NFA LBv2先做一样本GPU smoke再铺503请求；SparQ/HISA/ClusterKV缺口在vendor资产和空闲GPU同时满足后执行。"
+    "producers": {
+      "ruler_regional": "9f3e8057acd528a904aa8883b830d541b389e39f",
+      "qwen3_8b_nfa_lbv2": "b3ee770f8865549ef7271bc83f73968a328950d1"
+    },
+    "active_formal_workers": [
+      {"host": "pc32", "gpu": 0, "arm": "Qwen3-8B NFA LongBench v2", "shard": "0/8", "expected_rows": 63},
+      {"host": "pc32", "gpu": 1, "arm": "Qwen3-8B RULER C3 near/far=avg/avg", "cell": "32768 shard0/2", "expected_rows": 50}
+    ],
+    "queued_regional_requests": {"c2": 300, "c3_after_current_worker": 250},
+    "qwen3_8b_nfa_lbv2_smoke": "1/1 generation and official-strict scoring PASS; input=31512, output=23, strict_runcap=1, v2_identity=1; smoke score is not a full-population accuracy claim",
+    "last_ignition_attempt": "pc33 GPU1在LBv2脚本GPU门禁前被另一会话性能worker占用，未生成请求；pc32旧regional worktree缺少后新增链脚本，C2/C3首次启动立即退出且无prediction。链脚本随后投送到producer外部路径，C3和LBv2 smoke/formal均完成三重验证后真实运行。",
+    "resource_policy": "只使用点火前重新实测空闲的卡；当前pc33/pc02/pc40/pc31均有其他compute app，pc32双卡由本任务两个worker使用；pc14两次直接sshpass密码登录均连接超时，不作为可用资源。",
+    "vendor_assets": "SparQ关键patch在本机/pc02/pc40 SHA一致；HISA已从pc02恢复，ClusterKV vendor及third_party/ClusterKV已从pc40恢复。vendor runner新增隔离单任务单样本smoke模式，尚未真实GPU smoke。",
+    "next": "在新增空闲卡启动LBv2剩余1/8至7/8分片；C3链完成后继续C2；同步锁定vendor资产到独立新producer worktree并做三方法64K/128K smoke，通过后执行全量补格。"
   }
 }

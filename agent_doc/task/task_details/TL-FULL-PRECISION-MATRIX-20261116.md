@@ -66,10 +66,20 @@
 - 在`results_longbench_moba`和`harvest_pc40_20261022`新定位到`samsum/trec/passage_count`的`moba_vendor`原始JSONL，但它们不属于e89既有13任务generation：同一HotpotQA首条中，e89为`Mi v. California`且无`_id`，vendor文件为`Miller v. California`且有`_id`；文件名身份也分别为`tli_64_128_1024_c4_A-moba`与`moba_vendor_c256_k4`。
 - e89同身份的`samsum/trec/passage_count-tli_64_128_1024_c4_A-moba.jsonl`在本机全部备份、harvest和恢复目录中精确检索均为0。故MoBA继续保持13任务部分覆盖，不把另一generation的三项嫁接成AVG16。配对record、三项候选路径/行数/SHA及精确检索范围已落盘为`ak_verify_results/full_matrix_recovered_20261116/audits/moba_missing_task_identity_audit.json`，SHA256=`dfef58404df6a16fe5ced739a1a6ad2108f8ecafbea1723426d18e4046156dc0`。
 
+### 2026-11-17 LBv2真实smoke、正式分片与C3点火
+
+- 资源复测一度发现8张空卡，但实际点火前pc02四卡、pc31双卡及pc33双卡陆续被其他compute app占用；只在仍实测空闲的pc32 GPU0/1派单，未触碰其他进程。pc14两次直接`sshpass`密码登录均为连接超时，Quest/JSSA继续保持recover。
+- pc33 LBv2首次smoke在GPU门禁发现新占用后退出，未创建日志/prediction。pc32旧producer `/tmp/nfa-dac-ruler-regional-9f3e8057`不含后新增的`run_regional_chain.sh`，首次C2/C3启动立即报文件不存在且无prediction；将同一脚本投送到`/tmp/run_regional_chain_9f3e8057.sh`后重新点火，producer仍固定为`9f3e8057`，没有修改旧工作树。
+- C3（near/far=avg/avg）已在pc32 GPU1启动三长度双分片链，当前32K shard0/2共50请求；进程PID=2143738，显存约25–30GB，日志已出现多条逐请求`score=100.000000`。C2尚未点火，不能与既有avg/minmax混池。
+- pc32缺少最新LBv2 producer对象且其origin镜像未同步，使用本地`9f3e8057..HEAD` git bundle传输5个提交并创建干净detached worktree，HEAD=`b3ee770f8865549ef7271bc83f73968a328950d1`。pc02/pc31/pc40也已准备同HEAD工作树，GPU占用不改变。
+- Qwen3-8B NFA LBv2真实单样本smoke已在pc32 GPU0完成生成：原始长文tokenization出现284105>131072警告，共享`build_input()`随后按31500 cap截断，实际输入31512、输出23。首轮生成成功但评分子进程缺`jieba`；从本机`local_pylibs`复制同版`jieba/rouge`后仅重跑官方评分，1/1、official-strict、strict runcap和v2输入身份全PASS，不重复生成。smoke单分不是503人口精度结论。
+- smoke通过后已启动正式`world=8`的shard0（63请求），进程PID=2161646、显存与日志三重验证通过；其余7片只保留明确待派状态，未写成已生成。正式输出与smoke隔离，每片评分目录也隔离。
+- SparQ关键patch在本机/pc02/pc40的SHA256一致（`qwen3_sparq_patch.py=97040f44...`、`sparq_attention_official.py=b0f8929b...`）；HISA已从pc02恢复（`qwen3_hisa_patch.py=96186a77...`），ClusterKV vendor和`third_party/ClusterKV`已从pc40恢复（`ckv_env.sh=c120d745...`、patch=`bb5f58ca...`）。`run_ruler_vendor_gap.sh`新增可选`smoke|formal`模式，smoke只跑`niah_single_1`一条并使用独立输出/锁/评分门禁；已通过`bash -n`、ShellCheck和diff检查，尚未真实GPU smoke。
+
 ## 下一步
 
-1. 用落盘链脚本在真实空闲卡点火C2/C3，并先执行Qwen3-8B NFA LBv2一样本smoke；30秒内检查进程、compute app/显存和日志，smoke通过后再铺503请求。
-2. 同步SparQ/HISA/ClusterKV锁定vendor资产并做一样本隔离smoke，通过后执行64K/128K全量补格。
-3. 继续恢复GLM/Qwen3-32B Quest/JSSA原始generation及FASA 35.15原始prediction；Qwen3-32B NFA既有13任务已恢复并完成双后端复评，若需要统一协议16任务正式臂则按现行NFA入口重跑legacy13，不与补缺3项直接拼接。
-4. 逐方法核验其余模型与数据集支持；不可运行组合保留明确实现阻塞。
-5. 完成官方评分、输入身份、runcap、SHA256与生产侧审计后更新矩阵和`CURRENT_NARRATIVE.md`索引；独立验收前不作最终质量结论。
+1. 新增空卡优先启动LBv2 `1/8`至`7/8`互斥分片；每片点火后完成PID、compute app/显存和日志三重验证，最终按官方`_id`闭集503。
+2. 保持pc32 C3链运行，资源允许时启动C2；两臂完成后分别合并三长度各100条并正式评分，不与avg/minmax混池。
+3. 将SparQ/HISA/ClusterKV锁定资产同步到独立新producer worktree，逐方法执行64K/128K单样本smoke，通过后执行各11任务×100正式补格。
+4. 继续恢复GLM/Qwen3-32B Quest/JSSA原始generation及FASA 35.15原始prediction；Qwen3-32B NFA若需统一协议16任务正式臂则重跑legacy13，不直接拼接13+3。
+5. 逐方法核验其余模型与数据集支持；完成官方评分、输入身份、runcap、SHA256和生产侧审计后更新矩阵及`CURRENT_NARRATIVE.md`，独立验收前不作最终质量结论。
