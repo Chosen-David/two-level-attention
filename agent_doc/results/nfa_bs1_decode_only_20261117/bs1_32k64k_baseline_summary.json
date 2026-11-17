@@ -679,5 +679,34 @@
       "decode_host_tpot_ms": 22.634929881013672,
       "input_file_sha256": "52b587a924defa07d36091824e3128310f657bca34a4f011c062879e757c5063"
     }
-  ]
+  ],
+  "nfa_natural_noskip_32k64k": {
+    "schema": "bs1-decode-e2e-nfa-natural-noskip-note-v1",
+    "verification": "pending-independent-verification",
+    "note": "NFA 32K/64K natural gate (eps=0.05) produced empty skip (0/36 layers qualify); these are valid clean-e2e decode measurements, archived under diagnostics/natural_no_skip_32k64k_20261117/. NFA decode_host_tpot_ms is still faster than all baselines at both lengths.",
+    "cells": [
+      {
+        "method": "nfa",
+        "context_length": 32768,
+        "abba_pass": "forward",
+        "skip_near": 0,
+        "skip_far": 0,
+        "skip_both": 0,
+        "decode_host_tpot_ms": 10.354189009502017,
+        "steady_tpot_ms_median": 10.314720153808594,
+        "output": "diagnostics/natural_no_skip_32k64k_20261117/nfa_L32768_forward.json"
+      },
+      {
+        "method": "nfa",
+        "context_length": 65536,
+        "abba_pass": "forward",
+        "skip_near": 0,
+        "skip_far": 0,
+        "skip_both": 0,
+        "decode_host_tpot_ms": 10.876312338072678,
+        "steady_tpot_ms_median": 10.841919898986816,
+        "output": "diagnostics/natural_no_skip_32k64k_20261117/nfa_L65536_forward.json"
+      }
+    ]
+  }
 }
