@@ -62,3 +62,13 @@
 - FlashInfer/NFA clean TPOT 加速比：32K 0.778、64K 0.838、128K 1.027、256K 1.391、512K 2.176；纯 attention kernel 加速比 512K 约 23.28×，selection+attention 路径 512K 约 3.05×。
 - 归档：`agent_doc/results/qwen3_lb_subspace_full_perf_20261117/`（`summary.json`、`perf_summary.csv`、四臂 raw JSON/nsys/sqlite）。
 - 状态：`pending-independent-verification`。
+
+## K2 budget ablation (GovReport / HotpotQA)
+- 代码基线：`9f3e8057acd528a904aa8883b830d541b389e39f`，补丁仅暴露 `--level2-topk`（与 main `8736a965` 的 `--nfa-level2-topk` 同义）。
+- 协议：`benchmark.efficiency.benchmark_longbench_quality --method nfa --execution eager --nfa-subspace full --nfa-subspace-dim 128 --nfa-gate off --visible-len 8192 --level2-topk {256,512,1024,2048}`；`hotpotqa`、`gov_report` 各 200 请求。
+- 分布：pc40/pc31/pc32 共 6 卡；pc02 的独立 `8736a965` K2 消融保持不动。中途部分进程被外部清理，已按 `--sample-indices` 补跑缺失行并合并去重。
+- 合并评分（官方 `eval.py` legacy 复跑一致，200/200、`_id` 0..199 无缺无重）：
+  - hotpotqa：k256 58.94 / k512 59.38 / k1024 59.12 / k2048 59.12
+  - gov_report：k256 33.45 / k512 33.64 / k1024 33.63 / k2048 33.47
+- 归档：`agent_doc/results/qwen3_lb_k2_budget_ablation_20261117/`（`budget_ablation_raw.csv/json`、`verification_report.json`、各 cell merged pred、`raw_host_components/`）。
+- 状态：`pending-independent-verification`；独立验收通过前不作为最终结论。

@@ -2,6 +2,8 @@
 
 - [ ] [TL-QUEST-BATCH-RULER-PERF-20261116/BS1-DECODE-ONLY] BS1 decode-stage e2e 闭集：Quest/JSSA/AsyncTLS 32K/64K 与 NFA 128K/256K/512K 已测；NFA 32K/64K natural gate(eps=0.05) skip=0/36 层，但 decode_host_tpot_ms 仍快于全部 baseline（NFA 32K=10.354、64K=10.876 ms；JSSA 32K=11.368、64K=11.959 ms，Quest/AsyncTLS 更慢）；NFA 128K/256K/512K skip near=4/15/24 层，decode 10.935/10.944/11.215 ms，均快于 JSSA 12.642/13.945/16.585 ms。结果归档 `agent_doc/results/nfa_bs1_decode_only_20261117/`，保持 pending-independent-verification。
 ## 2026-11-17
+- [ ] [TL-QWEN3-LB-K2-BUDGET-ABLATION-20261117] 基于 `9f3e8057` 补齐 LongBench HotpotQA/GovReport × `level2_topk` {256,512,1024,2048} 的 8 单元精度消融，每单元 200/200。官方 `eval.py` legacy 复跑一致：hotpotqa 58.94/59.38/59.12/59.12，gov_report 33.45/33.64/33.63/33.47。结果归档 `agent_doc/results/qwen3_lb_k2_budget_ablation_20261117/`，保持 pending-independent-verification。([详情](task_details/TL-QWEN3-LB-SUBSPACE-SENS-20261116.md))
+
 - [ ] [TL-QUEST-BATCH-RULER-PERF-20261116/BS1-DECODE-ONLY] NFA gate=0.1 重测 5 长度 BS1 decode e2e，结果归档 `agent_doc/results/nfa_bs1_decode_only_gate01_20261117/`，保持 pending-independent-verification。
 
 
