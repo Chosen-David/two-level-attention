@@ -2,6 +2,8 @@
 
 - [ ] [TL-QUEST-BATCH-RULER-PERF-20261116/BS1-DECODE-ONLY] BS1 decode-stage e2e 闭集：Quest/JSSA/AsyncTLS 32K/64K 与 NFA 128K/256K/512K 已测；NFA 32K/64K natural gate(eps=0.05) skip=0/36 层，但 decode_host_tpot_ms 仍快于全部 baseline（NFA 32K=10.354、64K=10.876 ms；JSSA 32K=11.368、64K=11.959 ms，Quest/AsyncTLS 更慢）；NFA 128K/256K/512K skip near=4/15/24 层，decode 10.935/10.944/11.215 ms，均快于 JSSA 12.642/13.945/16.585 ms。结果归档 `agent_doc/results/nfa_bs1_decode_only_20261117/`，保持 pending-independent-verification。
 ## 2026-11-17
+- [ ] [TL-QUEST-BATCH-RULER-PERF-20261116/BS1-DECODE-ONLY] NFA gate=0.1 重测 5 长度 BS1 decode e2e，结果归档 `agent_doc/results/nfa_bs1_decode_only_gate01_20261117/`，保持 pending-independent-verification。
+
 
 - [ ] [TL-LONGBENCH-8TASK-VENDOR-SWEEP-20261117] 本地 main `8736a965` 干净基线，LongBench 8 任务 × {NFA/LoDA, Quest, JSSA, AsyncTLS} × {256,512,1024,2048} 精度对比，共 128 jobs。NFA 走 `benchmark_longbench_quality.py`（eager/tail/gate-off/k1=128/k2=budget），Quest/AsyncTLS 走 `pred.py`，JSSA 直接走 `third-party/JSSA/adapters/longbench_v1_jssa.py`；统一 `eval.py` 评分（QA-F1 / gov_report-ROUGE-L）。10 workers 分片：pc02 4 卡 + pc32 2 卡 + pc40 2 卡 + pc31 2 卡，本机两卡保持空闲，已点火并真实生成中。结果目录各远端 `~/longbench_results_8736a965`，全部 pending-independent-verification。([详情](task_details/TL-LONGBENCH-8TASK-VENDOR-SWEEP-20261117.md))
 

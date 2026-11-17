@@ -1,0 +1,60 @@
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/5 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 5/5 [00:00<00:00, 181.21it/s]
+register qwen3 attn: [model.layers.0.self_attn]
+register iter91 rmsnorm: [model.layers.0.self_attn.q_norm]
+register iter91 rmsnorm: [model.layers.0.self_attn.k_norm]
+register iter91 rmsnorm: [model.layers.0.input_layernorm]
+register iter91 rmsnorm: [model.layers.0.post_attention_layernorm]
+register iter97 MLP SiLU+mul: [model.layers.0.mlp]
+{
+  "context_length": 131072,
+  "batch_size": 1,
+  "execution": "graph",
+  "measurement_mode": "clean-e2e",
+  "subspace": "tail",
+  "l2_subspace": "same",
+  "score_dimensions": {
+    "head_dim": 128,
+    "l1_score_dims": 32,
+    "l2_score_dims": 32
+  },
+  "gate_epsilon": 0.1,
+  "force_skip_mode": "natural",
+  "operator_mode": "off",
+  "operator_summary": null,
+  "steady_tpot_ms_median": 10.5513277053833,
+  "prefill_seconds": 71.6260129660368,
+  "skip": {
+    "0": {
+      "n_layers": 36,
+      "near_layers": [
+        0,
+        7,
+        8,
+        9,
+        10,
+        12,
+        13,
+        17,
+        20,
+        21,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35
+      ],
+      "far_layers": [],
+      "both_layers": []
+    }
+  },
+  "saved": "/tmp/nfa-bs1-attribution-20261117/agent_doc/results/nfa_bs1_decode_only_gate01_20261117/gpu0/clean/nfa_L131072_forward.json"
+}
