@@ -84,6 +84,8 @@
 - C3的32K/64K完整证据已收割并通过`audit_ruler_results.py`生产侧正式审计：每长度100个source index恰好闭合，逐样本官方分、输入身份、runcap、prediction/receipts/scores/source manifest SHA及36层全部keep均PASS；official_score分别80.0/78.0。审计=`ak_verify_results/nfa_dac_ruler_regional_9f3e8057_20261116/_audits/c3_32k_64k_production_audit.json`，SHA256=`0ef40778577e5e1b07e390be01190e819b1b89d205d57a4b5aca090bd19b4905`；仅为MultiKey2单任务且继续pending-independent-verification，128K尚未闭集。审计器仅新增允许实际producer `9f3e8057`，未放宽任何数据门禁。
 - 四台远端已用bundle部署独立clean producer `/tmp/full-precision-matrix-cc480756`，HEAD=`cc48075695a827840c25d35df917df3a1079838d`，并同步被忽略的SparQ/HISA/ClusterKV源码资产，关键文件SHA一致。pc02的4.5GB ClusterKV环境已恢复，`libcublas.so.12`就位，`torch 2.8.0+cu128 + pylibraft.cluster + rmm`真实导入PASS；这只解除环境阻塞，三方法仍未完成真实GPU smoke。
 - 最新GPU复核没有发现可安全新增任务的空卡；vendor smoke和C2保持待派，不能以环境就绪代替生成结果。LBv2八片齐后复用现有`merge_longbench_quality.py`按source index恢复503顺序，重建canonical runcap/source manifest，再在隔离目录用官方strict scorer评分；所有结果继续`pending-independent-verification`。
+- 11:30再次复测发现pc33 GPU0已空闲，本机clean producer `/tmp/nfa-dac-ruler-regional-9f3e8057`的HEAD=`9f3e8057acd528a904aa8883b830d541b389e39f`、工作树、模型和RULER数据预检均通过，C2输出目录为空。已从当前main的链脚本启动C2，实际生成仍使用旧producer内runner；32K shard0的runner PID=606271、Python PID=606301，GPU0约25GB显存且有compute app，模型加载日志正常，三重验证通过。链内后续250请求保持待跑，未写成完成；pc33 GPU1及其他机器上的计算进程均未触碰。
+- 随后pc33 GPU1一度释放，本机已创建独立clean producer `/tmp/full-precision-matrix-cc480756`并同步SparQ/HISA/ClusterKV资产；HEAD=`cc48075695a827840c25d35df917df3a1079838d`，SparQ/HISA关键patch SHA256分别与锁定值`97040f44...`/`96186a77...`一致。SparQ 64K smoke正式点火时GPU门禁发现新compute PID=1896650并按设计退出，未创建正式smoke日志、prediction或done标记，不能记为smoke通过；未触碰该占用进程，也未持续重试抢卡。
 
 ## 下一步
 
