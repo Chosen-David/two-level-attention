@@ -63,21 +63,33 @@ def _validate_quest_rope_mode(config, rope_mode):
 
 
 def _apply_hf_position_embeddings(query_states, key_states, position_embeddings):
-    """在 Quest 的 [L,H,D] 布局消费 HF cos/sin；Q/K 各旋转且仅旋转一次。"""
+    """在 [B,L,H,D] 上消费 HF cos/sin；Q/K 各旋转且仅旋转一次。"""
     if position_embeddings is None or len(position_embeddings) != 2:
         raise RuntimeError("Quest HF RoPE 模式缺少 position_embeddings=(cos,sin)")
     cos, sin = position_embeddings
     if cos.ndim != 3 or sin.ndim != 3 or cos.shape != sin.shape:
         raise RuntimeError("Qwen3 HF cos/sin 必须为同形 [B,L,D]")
-    if cos.shape[0] != 1 or cos.shape[1] != query_states.shape[0]:
-        raise RuntimeError("Qwen3 HF cos/sin 与 Quest B1/q_len 布局不一致")
+    if cos.shape[:2] != query_states.shape[:2]:
+        raise RuntimeError("Qwen3 HF cos/sin 与 Quest batch/q_len 布局不一致")
     if cos.shape[-1] != query_states.shape[-1] or key_states.shape[-1] != cos.shape[-1]:
         raise RuntimeError("Qwen3 HF cos/sin 与 Q/K head_dim 不一致")
-    # HF 对 [B,L,H,D] 使用 unsqueeze_dim=2；去掉唯一的 B 维后等价于
-    # 对 [L,H,D] 使用 unsqueeze_dim=1。cos/sin 已由 HF rotary 转为模型 dtype。
     return apply_rotary_pos_emb(
-        query_states, key_states, cos[0], sin[0], unsqueeze_dim=1
+        query_states, key_states, cos, sin, unsqueeze_dim=2
     )
+
+
+def _batch_invariant_decode_rmsnorm(original, hidden_states):
+    """逐行复用 B1 RMSNorm 归约，避免 batch shape 改变 FP32 variance 舍入。"""
+    if (
+        hidden_states.ndim < 3
+        or hidden_states.shape[0] <= 1
+        or hidden_states.shape[1] != 1
+    ):
+        return original(hidden_states)
+    return torch.cat([
+        original(hidden_states[batch_idx:batch_idx + 1])
+        for batch_idx in range(hidden_states.shape[0])
+    ], dim=0)
 
 
 def _tokenwise_prefill_chunk(original, hidden_states, chunk_tokens):
@@ -87,6 +99,10 @@ def _tokenwise_prefill_chunk(original, hidden_states, chunk_tokens):
     token_dim = 1 if hidden_states.ndim >= 3 else 0
     if hidden_states.shape[token_dim] <= chunk_tokens:
         return original(hidden_states)
+    # B4×128K 的单个 64K-token MLP 中间张量需 6GiB，超过 H20 剩余显存；
+    # 只缩小该长 prefill 的 token 分块，短输入与 B1/B2 路径不变。
+    if hidden_states.shape[0] == 4:
+        chunk_tokens //= 2
     output = torch.empty_like(hidden_states)
     for start in range(0, hidden_states.shape[token_dim], chunk_tokens):
         stop = min(start + chunk_tokens, hidden_states.shape[token_dim])
@@ -102,8 +118,14 @@ def _enable_long_prefill_tokenwise_chunk(model):
         if not isinstance(module, (Qwen3MLP, Qwen3RMSNorm)):
             continue
         original = module.forward
+        is_rmsnorm = isinstance(module, Qwen3RMSNorm)
 
-        def forward(self, hidden_states, _original=original):
+        def forward(self, hidden_states, _original=original, _is_rmsnorm=is_rmsnorm):
+            if (
+                _is_rmsnorm and hidden_states.ndim >= 3
+                and hidden_states.shape[0] > 1 and hidden_states.shape[1] == 1
+            ):
+                return _batch_invariant_decode_rmsnorm(_original, hidden_states)
             return _tokenwise_prefill_chunk(
                 _original, hidden_states, LONG_PREFILL_TOKENWISE_CHUNK
             )
@@ -122,9 +144,11 @@ def _qwen3_quest_forward(
 ) -> Tuple[torch.Tensor, None]:
     del attention_mask
     bsz, q_len, _ = hidden_states.shape
-    if bsz != 1:
-        raise RuntimeError("Quest 官方 CUDA runtime 仅支持 batch_size=1")
     controller = self._quest_controller
+    if bsz != controller.batch_size:
+        raise RuntimeError(
+            f"Quest controller batch_size={controller.batch_size} 与输入 B={bsz} 不一致"
+        )
 
     if self.layer_idx == 0:
         controller.prepare_metadata(q_len)
@@ -147,34 +171,50 @@ def _qwen3_quest_forward(
         bsz, q_len, self.num_key_value_heads, self.head_dim
     )
 
-    query_states = query_states.reshape(q_len, self.num_heads, self.head_dim)
-    key_states = key_states.reshape(q_len, self.num_key_value_heads, self.head_dim)
-    value_states = value_states.reshape(q_len, self.num_key_value_heads, self.head_dim)
-
     past_len = controller.kv_cache.seqlen - q_len
     rope_theta = float(self._quest_rope_theta)
     if self._quest_rope_mode == "native":
-        quest_utils.apply_rope_in_place(
-            query_states, key_states, past_len, rope_scale=1.0, rope_theta=rope_theta
-        )
+        if q_len > 1:
+            for batch_idx in range(bsz):
+                quest_utils.apply_rope_in_place(
+                    query_states[batch_idx], key_states[batch_idx], past_len,
+                    rope_scale=1.0, rope_theta=rope_theta,
+                )
+        else:
+            query_states = query_states.reshape(bsz, self.num_heads, self.head_dim)
+            key_states = key_states.reshape(bsz, self.num_key_value_heads, self.head_dim)
+            value_states = value_states.reshape(bsz, self.num_key_value_heads, self.head_dim)
+            quest_utils.apply_rope_in_place(
+                query_states, key_states, past_len, rope_scale=1.0,
+                rope_theta=rope_theta, position_stride=0,
+            )
     else:
         query_states, key_states = _apply_hf_position_embeddings(
             query_states, key_states, position_embeddings
         )
-    # Quest prefill/decode CUDA 内部均为 RotaryMode::kNone；此处是唯一旋转点。
-    quest_utils.append_kv(key_states, value_states, controller, self.layer_idx)
+        if q_len == 1:
+            query_states = query_states.reshape(bsz, self.num_heads, self.head_dim)
+            key_states = key_states.reshape(bsz, self.num_key_value_heads, self.head_dim)
+            value_states = value_states.reshape(bsz, self.num_key_value_heads, self.head_dim)
 
+    # B>1 仅 prefill 逐行复用官方 B1 kernel；decode 四件套均为真实 batch。
     stats = self._quest_stats
     if q_len > 1:
-        attn_output = quest_utils.prefill_forward(
-            query_states,
-            controller,
-            self.layer_idx,
-            rope_scale=1.0,
-            rope_theta=rope_theta,
-        )
-        stats["prefill_forward"] += 1
+        attn_rows = []
+        for batch_idx in range(bsz):
+            row_batch_idx = batch_idx if bsz > 1 else None
+            quest_utils.append_kv(
+                key_states[batch_idx], value_states[batch_idx], controller,
+                self.layer_idx, batch_idx=row_batch_idx,
+            )
+            attn_rows.append(quest_utils.prefill_forward(
+                query_states[batch_idx], controller, self.layer_idx,
+                batch_idx=row_batch_idx, rope_scale=1.0, rope_theta=rope_theta,
+            ))
+        attn_output = torch.stack(attn_rows, dim=0)
+        stats["prefill_forward"] += bsz
     else:
+        quest_utils.append_kv(key_states, value_states, controller, self.layer_idx)
         if controller.need_estimate():
             estimated_attn_score = quest_utils.decode_estimate(
                 query_states, controller, self.layer_idx
@@ -195,7 +235,7 @@ def _qwen3_quest_forward(
         )
         stats["decode_sparse_attn"] += 1
 
-    attn_output = attn_output.unsqueeze(0).reshape(bsz, q_len, self.hidden_size)
+    attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
     attn_output = self.o_proj(attn_output)
     if self.layer_idx == controller._quest_num_layers - 1:
         controller.end_forward()
@@ -210,8 +250,8 @@ def _qwen3_quest_forward(
             cache_kwargs["sin"] = position_embeddings[0]
             cache_kwargs["cos"] = position_embeddings[1]
         past_key_values.update(
-            key_states.unsqueeze(0).transpose(1, 2),
-            value_states.unsqueeze(0).transpose(1, 2),
+            key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2),
+            value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2),
             self.layer_idx,
             cache_kwargs,
         )
@@ -225,6 +265,7 @@ def enable_quest(
     max_seq_len: int = 40960,
     page_size: int = 16,
     rope_mode: str = "native",
+    batch_size: int = 1,
 ) -> int:
     """将全部 Qwen3Attention 绑定到官方 Quest kernel，禁止回退。"""
     if min(token_budget, chunk_size, max_seq_len, page_size) <= 0:
@@ -255,6 +296,7 @@ def enable_quest(
         dtype=torch.float16,
         device=device,
         num_kv_heads=num_kv_heads,
+        batch_size=batch_size,
     )
     controller._quest_num_layers = num_layers
     controller._quest_skip_layer = 2
