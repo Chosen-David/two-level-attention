@@ -1,0 +1,861 @@
+{
+  "schema": "qwen3-ruler-bs1-vendor-performance-v1",
+  "verification": "pending-independent-verification",
+  "status": "complete",
+  "producer_audit": "PASS",
+  "scope": "Qwen3-8B RULER niah_multikey_2 sample-index2/扩展文件第0行，32K/64K/128K/256K/512K，BS1，K2/token budget=1024；clean 与 nsys 独立进程。",
+  "clean_protocol": "1 warmup + 3 repeats；固定33 token、忽略EOS；完整request host wall TPOT=(T(33)-T(1))/32；不按batch归一化。",
+  "clean_completed_cells": 15,
+  "operator_completed_cells": 15,
+  "jssa_blocked_cells": {
+    "clean_e2e": 5,
+    "operator_profile": 5
+  },
+  "pending": [],
+  "clean_matrix": [
+    {
+      "context_length": 32768,
+      "batch_size": 1,
+      "cells": {
+        "nfa": {
+          "status": "complete",
+          "median_tpot_ms": 12.587632983922958
+        },
+        "quest": {
+          "status": "complete",
+          "median_tpot_ms": 19.416291266679764
+        },
+        "asynctls": {
+          "status": "complete",
+          "median_tpot_ms": 23.957791039720178
+        },
+        "jssa": {
+          "status": "blocked",
+          "reason": "官方 radix Top-K binding 缺失；禁止 Torch fallback 或替换 wheel"
+        }
+      }
+    },
+    {
+      "context_length": 65536,
+      "batch_size": 1,
+      "cells": {
+        "nfa": {
+          "status": "complete",
+          "median_tpot_ms": 14.933991245925426
+        },
+        "quest": {
+          "status": "complete",
+          "median_tpot_ms": 22.98422041349113
+        },
+        "asynctls": {
+          "status": "complete",
+          "median_tpot_ms": 24.202101165428758
+        },
+        "jssa": {
+          "status": "blocked",
+          "reason": "官方 radix Top-K binding 缺失；禁止 Torch fallback 或替换 wheel"
+        }
+      }
+    },
+    {
+      "context_length": 131072,
+      "batch_size": 1,
+      "cells": {
+        "nfa": {
+          "status": "complete",
+          "median_tpot_ms": 18.85277288965881
+        },
+        "quest": {
+          "status": "complete",
+          "median_tpot_ms": 24.684969102963805
+        },
+        "asynctls": {
+          "status": "complete",
+          "median_tpot_ms": 24.291045498102903
+        },
+        "jssa": {
+          "status": "blocked",
+          "reason": "官方 radix Top-K binding 缺失；禁止 Torch fallback 或替换 wheel"
+        }
+      }
+    },
+    {
+      "context_length": 262144,
+      "batch_size": 1,
+      "cells": {
+        "nfa": {
+          "status": "complete",
+          "median_tpot_ms": 26.20357763953507
+        },
+        "quest": {
+          "status": "complete",
+          "median_tpot_ms": 29.122937936335802
+        },
+        "asynctls": {
+          "status": "complete",
+          "median_tpot_ms": 24.989341152831912
+        },
+        "jssa": {
+          "status": "blocked",
+          "reason": "官方 radix Top-K binding 缺失；禁止 Torch fallback 或替换 wheel"
+        }
+      }
+    },
+    {
+      "context_length": 524288,
+      "batch_size": 1,
+      "cells": {
+        "nfa": {
+          "status": "complete",
+          "median_tpot_ms": 61.052299570292234
+        },
+        "quest": {
+          "status": "complete",
+          "median_tpot_ms": 83.82336678914726
+        },
+        "asynctls": {
+          "status": "complete",
+          "median_tpot_ms": 26.295981602743268
+        },
+        "jssa": {
+          "status": "blocked",
+          "reason": "官方 radix Top-K binding 缺失；禁止 Torch fallback 或替换 wheel"
+        }
+      }
+    }
+  ],
+  "nfa_relative_performance": [
+    {
+      "context_length": 32768,
+      "nfa_median_tpot_ms": 12.587632983922958,
+      "nfa_speedup_vs_quest": 1.5424894649755383,
+      "nfa_faster_than_quest": true,
+      "nfa_speedup_vs_asynctls": 1.903280074206111,
+      "nfa_faster_than_asynctls": true
+    },
+    {
+      "context_length": 65536,
+      "nfa_median_tpot_ms": 14.933991245925426,
+      "nfa_speedup_vs_quest": 1.5390540971263873,
+      "nfa_faster_than_quest": true,
+      "nfa_speedup_vs_asynctls": 1.6206050189049115,
+      "nfa_faster_than_asynctls": true
+    },
+    {
+      "context_length": 131072,
+      "nfa_median_tpot_ms": 18.85277288965881,
+      "nfa_speedup_vs_quest": 1.3093548226268663,
+      "nfa_faster_than_quest": true,
+      "nfa_speedup_vs_asynctls": 1.2884600923308802,
+      "nfa_faster_than_asynctls": true
+    },
+    {
+      "context_length": 262144,
+      "nfa_median_tpot_ms": 26.20357763953507,
+      "nfa_speedup_vs_quest": 1.1114107522629315,
+      "nfa_faster_than_quest": true,
+      "nfa_speedup_vs_asynctls": 0.9536614235122169,
+      "nfa_faster_than_asynctls": false
+    },
+    {
+      "context_length": 524288,
+      "nfa_median_tpot_ms": 61.052299570292234,
+      "nfa_speedup_vs_quest": 1.3729764051334001,
+      "nfa_faster_than_quest": true,
+      "nfa_speedup_vs_asynctls": 0.43071238573851806,
+      "nfa_faster_than_asynctls": false
+    }
+  ],
+  "negative_results": [
+    {
+      "context_length": 262144,
+      "baseline": "asynctls",
+      "nfa_speedup": 0.9536614235122169,
+      "handling": "保留负结果；未删除 repeat、修改计时或宣称 NFA 全格领先"
+    },
+    {
+      "context_length": 524288,
+      "baseline": "asynctls",
+      "nfa_speedup": 0.43071238573851806,
+      "handling": "保留负结果；未删除 repeat、修改计时或宣称 NFA 全格领先"
+    }
+  ],
+  "nfa_skip_audit": "clean enable_layer_skip=false；五份 operator profile 的36层 near/far skip 均false，region kernel audit均generic/no-skip，未把收益归因于动态skip。",
+  "operator_interpretation": "NFA 同时报告纯L1/L2打分与宽阶段；Quest 报告estimate/RAFT/canonicalize/sparse-attention；AsyncTLS仅报告可唯一归属的Top-K/sort/gather family，不伪造K1/K2/selected-attention总时延。",
+  "timing_caveat": "所有原始repeat原样保留。512K两点法对独立prefill墙钟敏感；中位数不代表每次repeat稳定，profiler TPOT永不进入clean排名。",
+  "implementation_caveat": "Quest为官方CUDA；NFA为本项目生产Graph；AsyncTLS为独立PyTorch语义复现，非官方TileLang且无真实异步offload；JSSA官方binding blocked。",
+  "clean_rows": [
+    {
+      "method": "quest",
+      "context_length": 32768,
+      "batch_size": 1,
+      "status": "complete",
+      "measurement_origin": "current-rerun",
+      "new_gpu_measurement": true,
+      "source_head": "b3ee770f8865549ef7271bc83f73968a328950d1",
+      "harness_sha256": "9154276939ebff8355136c921dd8d9e771ddd7a4dbf41285e4286c7185fd34ce",
+      "harness_path": "/home/wangyuanshuo02/two-level-attention/benchmark/official_baselines/long_context_official.py",
+      "input_ids_sha256": "2bf914fe345a47dc1b73ef1451b2e155e9cb73bcff1a33bf3f0091f6ae331e8c",
+      "input_file_sha256": "073bae295bd94baa1880f33c4b0ccaec3a4d510dac2b31935b3ce488ad698fe8",
+      "actual_prompt_tokens": 32082,
+      "repeat_tpot_ms": [
+        18.72939383611083,
+        19.439252791926265,
+        19.416291266679764
+      ],
+      "median_tpot_ms": 19.416291266679764,
+      "path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/quest/quest_b1_32k_current.json",
+      "sha256": "826587b4509951468e47b037687e5b94b7c40006295675a7f9ac4392c9fb6c38",
+      "kernel_extension_sha256": "52abaae86e945d0aff1620f6890eba85fe17164a16b6939a414b1a69ec241de4",
+      "quest_diff_sha256": "ee05de473447c02bb1dee0f28599680222dc455ce6eab589d0735ca82713f9fb"
+    },
+    {
+      "method": "quest",
+      "context_length": 65536,
+      "batch_size": 1,
+      "status": "complete",
+      "measurement_origin": "reused-closed-result",
+      "new_gpu_measurement": false,
+      "source_head": "19edfebd404cfffadeadc30de7378f9fbe3e0069",
+      "harness_sha256": "9154276939ebff8355136c921dd8d9e771ddd7a4dbf41285e4286c7185fd34ce",
+      "harness_path": "/tmp/qwen3-official-smoke-19edfebd-20261115/benchmark/official_baselines/long_context_official.py",
+      "input_ids_sha256": "c5a7b9a2accc5fa2772fb7fc1c400040d00bbb2820969f6f5ca9abc7d8b91713",
+      "input_file_sha256": "52b587a924defa07d36091824e3128310f657bca34a4f011c062879e757c5063",
+      "actual_prompt_tokens": 65437,
+      "repeat_tpot_ms": [
+        22.98422041349113,
+        23.139685858041048,
+        22.94978778809309
+      ],
+      "median_tpot_ms": 22.98422041349113,
+      "path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/quest/quest_b1_64k.json",
+      "sha256": "8a6d47eb8e4d90e3bdec0973ca49ff4d183d433368e180d2778c7161b06f7da0",
+      "kernel_extension_sha256": "de7d6e32052fd63206c7ba20b54d9040c40f8dc6617eb2a392c80e0bcc1b6b1f",
+      "quest_diff_sha256": "edb9e2d579687781a9b293ed87dc2445664db25118811bc5a8227b5ea6792b8f"
+    },
+    {
+      "method": "quest",
+      "context_length": 131072,
+      "batch_size": 1,
+      "status": "complete",
+      "measurement_origin": "reused-closed-result",
+      "new_gpu_measurement": false,
+      "source_head": "19edfebd404cfffadeadc30de7378f9fbe3e0069",
+      "harness_sha256": "9154276939ebff8355136c921dd8d9e771ddd7a4dbf41285e4286c7185fd34ce",
+      "harness_path": "/tmp/qwen3-official-smoke-19edfebd-20261115/benchmark/official_baselines/long_context_official.py",
+      "input_ids_sha256": "54bfdf10e081c48640113b8f1d270f8c5376fdeac19a56c4070815a4d4d6aa42",
+      "input_file_sha256": "8eb137ac247e120f77810068866c37d70e6b098aff45ce730108e8268e9e0f02",
+      "actual_prompt_tokens": 130990,
+      "repeat_tpot_ms": [
+        24.811849929392338,
+        24.684969102963805,
+        24.564749794080853
+      ],
+      "median_tpot_ms": 24.684969102963805,
+      "path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/quest/quest_b1_128k.json",
+      "sha256": "19cc23b01563a3a16cda44f83e77a1b135d65c68eb58a4fa9a79e890abf92bed",
+      "kernel_extension_sha256": "de7d6e32052fd63206c7ba20b54d9040c40f8dc6617eb2a392c80e0bcc1b6b1f",
+      "quest_diff_sha256": "edb9e2d579687781a9b293ed87dc2445664db25118811bc5a8227b5ea6792b8f"
+    },
+    {
+      "method": "quest",
+      "context_length": 262144,
+      "batch_size": 1,
+      "status": "complete",
+      "measurement_origin": "reused-closed-result",
+      "new_gpu_measurement": false,
+      "source_head": "41006cf8298167eed4b9bac386dfaa2a6c24bc85",
+      "harness_sha256": "0102961858e0a9455fcb0ad78d269fba5bc90c957bfe16f9ed9bad462ead63a9",
+      "harness_path": "/home/wangyuanshuo02/two-level-attention/benchmark/official_baselines/long_context_official.py",
+      "input_ids_sha256": "05325d14fa6868ab22b6964d160adaa1968323ca80e396261b97ac75b55c093d",
+      "input_file_sha256": "0f8b39583d1df5e267c1750da44300322a2b5359cf6b2fe89b45b56efe028b30",
+      "actual_prompt_tokens": 261935,
+      "repeat_tpot_ms": [
+        29.122937936335802,
+        30.046682339161634,
+        28.950894717127085
+      ],
+      "median_tpot_ms": 29.122937936335802,
+      "path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/quest/quest_b1_256k.json",
+      "sha256": "7d9e6edc29bcd7fcc411bdfa618be83e5db30ea289a32954d84e0866535cda38",
+      "kernel_extension_sha256": "de7d6e32052fd63206c7ba20b54d9040c40f8dc6617eb2a392c80e0bcc1b6b1f",
+      "quest_diff_sha256": "edb9e2d579687781a9b293ed87dc2445664db25118811bc5a8227b5ea6792b8f"
+    },
+    {
+      "method": "quest",
+      "context_length": 524288,
+      "batch_size": 1,
+      "status": "complete",
+      "measurement_origin": "reused-closed-result",
+      "new_gpu_measurement": false,
+      "source_head": "41006cf8298167eed4b9bac386dfaa2a6c24bc85",
+      "harness_sha256": "0102961858e0a9455fcb0ad78d269fba5bc90c957bfe16f9ed9bad462ead63a9",
+      "harness_path": "/home/wangyuanshuo02/two-level-attention/benchmark/official_baselines/long_context_official.py",
+      "input_ids_sha256": "50d3339d268c4a2d6dcfc058e5c1640e663c633adf1515455f913c9e63ef8426",
+      "input_file_sha256": "6ca6ca3137fe30ca2925a20641ae7f2e08d964f0bb7628bbc315ea1c29627dc8",
+      "actual_prompt_tokens": 523827,
+      "repeat_tpot_ms": [
+        54.550930857658386,
+        83.82336678914726,
+        88.74027710407972
+      ],
+      "median_tpot_ms": 83.82336678914726,
+      "path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/quest/quest_b1_512k.json",
+      "sha256": "3d653abde14b8a7cb4f152cc12f4f206f3778fa43cf1b69e12d3df429f7d869a",
+      "kernel_extension_sha256": "de7d6e32052fd63206c7ba20b54d9040c40f8dc6617eb2a392c80e0bcc1b6b1f",
+      "quest_diff_sha256": "edb9e2d579687781a9b293ed87dc2445664db25118811bc5a8227b5ea6792b8f"
+    },
+    {
+      "method": "nfa",
+      "context_length": 32768,
+      "batch_size": 1,
+      "status": "complete",
+      "measurement_origin": "reused-closed-result",
+      "new_gpu_measurement": false,
+      "source_head": "19edfebd404cfffadeadc30de7378f9fbe3e0069",
+      "harness_sha256": "30ecca792c9cb1d7e8913a4f895d8235ec889e32ebd46d3d3cb71ba09fd394ae",
+      "harness_path": "/tmp/qwen3-official-smoke-19edfebd-20261115/benchmark/efficiency/benchmark_long_context_two_point.py",
+      "input_ids_sha256": "2bf914fe345a47dc1b73ef1451b2e155e9cb73bcff1a33bf3f0091f6ae331e8c",
+      "input_file_sha256": "073bae295bd94baa1880f33c4b0ccaec3a4d510dac2b31935b3ce488ad698fe8",
+      "actual_prompt_tokens": 32082,
+      "repeat_tpot_ms": [
+        11.280354810878634,
+        12.587632983922958,
+        12.742478167638183
+      ],
+      "median_tpot_ms": 12.587632983922958,
+      "path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/nfa/nfa_graph_b1_32k.json",
+      "sha256": "1735746d6091ae837e93120041e0b244d6054c4c9112106258464f69f64be2f9"
+    },
+    {
+      "method": "nfa",
+      "context_length": 65536,
+      "batch_size": 1,
+      "status": "complete",
+      "measurement_origin": "reused-closed-result",
+      "new_gpu_measurement": false,
+      "source_head": "19edfebd404cfffadeadc30de7378f9fbe3e0069",
+      "harness_sha256": "30ecca792c9cb1d7e8913a4f895d8235ec889e32ebd46d3d3cb71ba09fd394ae",
+      "harness_path": "/tmp/qwen3-official-smoke-19edfebd-20261115/benchmark/efficiency/benchmark_long_context_two_point.py",
+      "input_ids_sha256": "c5a7b9a2accc5fa2772fb7fc1c400040d00bbb2820969f6f5ca9abc7d8b91713",
+      "input_file_sha256": "52b587a924defa07d36091824e3128310f657bca34a4f011c062879e757c5063",
+      "actual_prompt_tokens": 65437,
+      "repeat_tpot_ms": [
+        13.860590988770127,
+        15.34763746894896,
+        14.933991245925426
+      ],
+      "median_tpot_ms": 14.933991245925426,
+      "path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/nfa/nfa_graph_b1_64k.json",
+      "sha256": "3ff5e2844574246f84fe0a674b0ef62586929e3f96509276e8ee06c87154dc1b"
+    },
+    {
+      "method": "nfa",
+      "context_length": 131072,
+      "batch_size": 1,
+      "status": "complete",
+      "measurement_origin": "reused-closed-result",
+      "new_gpu_measurement": false,
+      "source_head": "19edfebd404cfffadeadc30de7378f9fbe3e0069",
+      "harness_sha256": "30ecca792c9cb1d7e8913a4f895d8235ec889e32ebd46d3d3cb71ba09fd394ae",
+      "harness_path": "/tmp/qwen3-official-smoke-19edfebd-20261115/benchmark/efficiency/benchmark_long_context_two_point.py",
+      "input_ids_sha256": "54bfdf10e081c48640113b8f1d270f8c5376fdeac19a56c4070815a4d4d6aa42",
+      "input_file_sha256": "8eb137ac247e120f77810068866c37d70e6b098aff45ce730108e8268e9e0f02",
+      "actual_prompt_tokens": 130990,
+      "repeat_tpot_ms": [
+        18.77328986302018,
+        18.85277288965881,
+        18.913865089416504
+      ],
+      "median_tpot_ms": 18.85277288965881,
+      "path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/nfa/nfa_graph_b1_128k.json",
+      "sha256": "d2a2bbdce57ed1f998fb2e1bb3a929cb376d8cee83aa69b83a28d4a313e4691a"
+    },
+    {
+      "method": "nfa",
+      "context_length": 262144,
+      "batch_size": 1,
+      "status": "complete",
+      "measurement_origin": "reused-closed-result",
+      "new_gpu_measurement": false,
+      "source_head": "41006cf8298167eed4b9bac386dfaa2a6c24bc85",
+      "harness_sha256": "62308ee0d29e63c36ab61e985ede1e719b7e3d7c136a956829d4120453a21f4a",
+      "harness_path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/benchmark_long_context_two_point.py",
+      "input_ids_sha256": "05325d14fa6868ab22b6964d160adaa1968323ca80e396261b97ac75b55c093d",
+      "input_file_sha256": "0f8b39583d1df5e267c1750da44300322a2b5359cf6b2fe89b45b56efe028b30",
+      "actual_prompt_tokens": 261935,
+      "repeat_tpot_ms": [
+        25.721563026309013,
+        26.340891607105732,
+        26.20357763953507
+      ],
+      "median_tpot_ms": 26.20357763953507,
+      "path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/nfa/nfa_graph_b1_256k.json",
+      "sha256": "1a0887d4b6a9219cb7f9731cc48b59c0b44874adf7c680e31b6d69f63a9c9059"
+    },
+    {
+      "method": "nfa",
+      "context_length": 524288,
+      "batch_size": 1,
+      "status": "complete",
+      "measurement_origin": "reused-closed-result",
+      "new_gpu_measurement": false,
+      "source_head": "41006cf8298167eed4b9bac386dfaa2a6c24bc85",
+      "harness_sha256": "62308ee0d29e63c36ab61e985ede1e719b7e3d7c136a956829d4120453a21f4a",
+      "harness_path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/benchmark_long_context_two_point.py",
+      "input_ids_sha256": "50d3339d268c4a2d6dcfc058e5c1640e663c633adf1515455f913c9e63ef8426",
+      "input_file_sha256": "6ca6ca3137fe30ca2925a20641ae7f2e08d964f0bb7628bbc315ea1c29627dc8",
+      "actual_prompt_tokens": 523827,
+      "repeat_tpot_ms": [
+        185.48804777674377,
+        61.052299570292234,
+        58.51614009588957
+      ],
+      "median_tpot_ms": 61.052299570292234,
+      "path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/nfa/nfa_graph_b1_512k.json",
+      "sha256": "3bbf1df8e878657a516d0ddb0406aa80aab8556e5f99014ef1009e6c01253d59"
+    },
+    {
+      "method": "asynctls",
+      "context_length": 32768,
+      "batch_size": 1,
+      "status": "complete",
+      "measurement_origin": "reused-closed-result",
+      "new_gpu_measurement": false,
+      "source_head": "19edfebd404cfffadeadc30de7378f9fbe3e0069",
+      "harness_sha256": "0fee70569ad72e4a76c5ff55ad71fd83bfb21b3a0c7371a2d08c6b7f3e26d3eb",
+      "harness_path": "/tmp/qwen3-official-smoke-19edfebd-20261115/benchmark/efficiency/benchmark_asynctls_two_point.py",
+      "input_ids_sha256": "2bf914fe345a47dc1b73ef1451b2e155e9cb73bcff1a33bf3f0091f6ae331e8c",
+      "input_file_sha256": "073bae295bd94baa1880f33c4b0ccaec3a4d510dac2b31935b3ce488ad698fe8",
+      "actual_prompt_tokens": 32082,
+      "repeat_tpot_ms": [
+        24.113302817568183,
+        23.91812391579151,
+        23.957791039720178
+      ],
+      "median_tpot_ms": 23.957791039720178,
+      "path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/asynctls/asynctls_graph_b1_32k.json",
+      "sha256": "37c51b76585721c8a6232300b17925df52efe8bd0049ad6e9d37a8d5e4644aaa",
+      "channel_file_sha256": "613a971cbc36d8e312a76af5ff2ee85bcd1bb0959c333ebd8e0605afd1524da4"
+    },
+    {
+      "method": "asynctls",
+      "context_length": 65536,
+      "batch_size": 1,
+      "status": "complete",
+      "measurement_origin": "reused-closed-result",
+      "new_gpu_measurement": false,
+      "source_head": "19edfebd404cfffadeadc30de7378f9fbe3e0069",
+      "harness_sha256": "0fee70569ad72e4a76c5ff55ad71fd83bfb21b3a0c7371a2d08c6b7f3e26d3eb",
+      "harness_path": "/tmp/qwen3-official-smoke-19edfebd-20261115/benchmark/efficiency/benchmark_asynctls_two_point.py",
+      "input_ids_sha256": "c5a7b9a2accc5fa2772fb7fc1c400040d00bbb2820969f6f5ca9abc7d8b91713",
+      "input_file_sha256": "52b587a924defa07d36091824e3128310f657bca34a4f011c062879e757c5063",
+      "actual_prompt_tokens": 65437,
+      "repeat_tpot_ms": [
+        21.441604010760784,
+        24.202101165428758,
+        24.28581123240292
+      ],
+      "median_tpot_ms": 24.202101165428758,
+      "path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/asynctls/asynctls_graph_b1_64k.json",
+      "sha256": "15c8494b435b3be81eebdde7bb032cfc182477207513a71b93e098b2ef9e2161",
+      "channel_file_sha256": "613a971cbc36d8e312a76af5ff2ee85bcd1bb0959c333ebd8e0605afd1524da4"
+    },
+    {
+      "method": "asynctls",
+      "context_length": 131072,
+      "batch_size": 1,
+      "status": "complete",
+      "measurement_origin": "reused-closed-result",
+      "new_gpu_measurement": false,
+      "source_head": "19edfebd404cfffadeadc30de7378f9fbe3e0069",
+      "harness_sha256": "0fee70569ad72e4a76c5ff55ad71fd83bfb21b3a0c7371a2d08c6b7f3e26d3eb",
+      "harness_path": "/tmp/qwen3-official-smoke-19edfebd-20261115/benchmark/efficiency/benchmark_asynctls_two_point.py",
+      "input_ids_sha256": "54bfdf10e081c48640113b8f1d270f8c5376fdeac19a56c4070815a4d4d6aa42",
+      "input_file_sha256": "8eb137ac247e120f77810068866c37d70e6b098aff45ce730108e8268e9e0f02",
+      "actual_prompt_tokens": 130990,
+      "repeat_tpot_ms": [
+        24.38901225104928,
+        24.222697131335735,
+        24.291045498102903
+      ],
+      "median_tpot_ms": 24.291045498102903,
+      "path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/asynctls/asynctls_graph_b1_128k.json",
+      "sha256": "a959dc3f6685547e29d000899f4a1d2aa012c6fc7d619674ca882dae565d2b68",
+      "channel_file_sha256": "613a971cbc36d8e312a76af5ff2ee85bcd1bb0959c333ebd8e0605afd1524da4"
+    },
+    {
+      "method": "asynctls",
+      "context_length": 262144,
+      "batch_size": 1,
+      "status": "complete",
+      "measurement_origin": "reused-closed-result",
+      "new_gpu_measurement": false,
+      "source_head": "19edfebd404cfffadeadc30de7378f9fbe3e0069",
+      "harness_sha256": "0fee70569ad72e4a76c5ff55ad71fd83bfb21b3a0c7371a2d08c6b7f3e26d3eb",
+      "harness_path": "/tmp/qwen3-official-smoke-19edfebd-20261115/benchmark/efficiency/benchmark_asynctls_two_point.py",
+      "input_ids_sha256": "05325d14fa6868ab22b6964d160adaa1968323ca80e396261b97ac75b55c093d",
+      "input_file_sha256": "0f8b39583d1df5e267c1750da44300322a2b5359cf6b2fe89b45b56efe028b30",
+      "actual_prompt_tokens": 261935,
+      "repeat_tpot_ms": [
+        25.075856829062104,
+        24.90670490078628,
+        24.989341152831912
+      ],
+      "median_tpot_ms": 24.989341152831912,
+      "path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/asynctls/asynctls_graph_b1_256k.json",
+      "sha256": "7bc22d867e9c4a4acc8e809f63e76dcce5ece84c14a423267926ccf679a39002",
+      "channel_file_sha256": "613a971cbc36d8e312a76af5ff2ee85bcd1bb0959c333ebd8e0605afd1524da4"
+    },
+    {
+      "method": "asynctls",
+      "context_length": 524288,
+      "batch_size": 1,
+      "status": "complete",
+      "measurement_origin": "current-measurement",
+      "new_gpu_measurement": true,
+      "source_head": "b3ee770f8865549ef7271bc83f73968a328950d1",
+      "harness_sha256": "0fee70569ad72e4a76c5ff55ad71fd83bfb21b3a0c7371a2d08c6b7f3e26d3eb",
+      "harness_path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/benchmark_asynctls_two_point.py",
+      "input_ids_sha256": "50d3339d268c4a2d6dcfc058e5c1640e663c633adf1515455f913c9e63ef8426",
+      "input_file_sha256": "6ca6ca3137fe30ca2925a20641ae7f2e08d964f0bb7628bbc315ea1c29627dc8",
+      "actual_prompt_tokens": 523827,
+      "repeat_tpot_ms": [
+        27.62363012880087,
+        26.295981602743268,
+        25.970247574150562
+      ],
+      "median_tpot_ms": 26.295981602743268,
+      "path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/asynctls/asynctls_graph_b1_512k.json",
+      "sha256": "4ef3ddaa1cfec90a18f30348fbce207377e1658c171b19bd5c88e8d65385b740",
+      "channel_file_sha256": "613a971cbc36d8e312a76af5ff2ee85bcd1bb0959c333ebd8e0605afd1524da4"
+    }
+  ],
+  "operator_rows": [
+    {
+      "method": "nfa",
+      "context_length": 32768,
+      "batch_size": 1,
+      "measurement_origin": "current-measurement",
+      "profiled_decode_steps": 29,
+      "source_head": "b3ee770f8865549ef7271bc83f73968a328950d1",
+      "harness_sha256": "2961f3e16e85741d3a0519c12b47da5e5f552ecb78cfd032905cc1a81657ae82",
+      "harness_path": null,
+      "pure_l1_score_ms_per_step": 0.14580886206896562,
+      "pure_l2_score_ms_per_step": 0.9326132758620658,
+      "wide_l1_ms_per_step": 0.837117137931034,
+      "wide_l2_ms_per_step": 2.0881971034482723,
+      "selected_attention_ms_per_step": 1.0246134137931024,
+      "skip_near_layers": 0,
+      "skip_far_layers": 0,
+      "path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/profiles/nfa_operator_b1_32k_current.json",
+      "sha256": "7a80ffad59d1e7992e67e37065e120e8714368e41c3183b8a3bd172674fea2a0",
+      "nsys_path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/profiles/nfa_operator_b1_32k_current.nsys-rep",
+      "nsys_sha256": "338cb5e32adc3b34f4643b74fbebc4057369fa013c743befaa500744e79d9915",
+      "sqlite_path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/profiles/nfa_operator_b1_32k_current.sqlite",
+      "sqlite_sha256": "e7811d6b5bcaf160e1a7886fd008c578a15fe34baf2ab4233a71634b25d16240"
+    },
+    {
+      "method": "nfa",
+      "context_length": 65536,
+      "batch_size": 1,
+      "measurement_origin": "current-measurement",
+      "profiled_decode_steps": 29,
+      "source_head": "b3ee770f8865549ef7271bc83f73968a328950d1",
+      "harness_sha256": "2961f3e16e85741d3a0519c12b47da5e5f552ecb78cfd032905cc1a81657ae82",
+      "harness_path": null,
+      "pure_l1_score_ms_per_step": 0.1515168965517238,
+      "pure_l2_score_ms_per_step": 0.9317374482758624,
+      "wide_l1_ms_per_step": 0.8525515517241402,
+      "wide_l2_ms_per_step": 2.5696877586206925,
+      "selected_attention_ms_per_step": 1.0262887586206895,
+      "skip_near_layers": 0,
+      "skip_far_layers": 0,
+      "path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/profiles/nfa_operator_b1_64k_current.json",
+      "sha256": "2e337ff9bee8b9f591ad5a252d0249a844a65e6fa045544877f47002d752d7bb",
+      "nsys_path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/profiles/nfa_operator_b1_64k_current.nsys-rep",
+      "nsys_sha256": "8a6831b46688f5bcb70c08a86eafd4d66cb2a3e84092a48cc3f8b414a3b21076",
+      "sqlite_path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/profiles/nfa_operator_b1_64k_current.sqlite",
+      "sqlite_sha256": "5b461d2116f871a9b46b161ad37e3d3fafa22395f9c6c642cab2dd7f2b2a4fe4"
+    },
+    {
+      "method": "nfa",
+      "context_length": 131072,
+      "batch_size": 1,
+      "measurement_origin": "current-measurement",
+      "profiled_decode_steps": 29,
+      "source_head": "b3ee770f8865549ef7271bc83f73968a328950d1",
+      "harness_sha256": "2961f3e16e85741d3a0519c12b47da5e5f552ecb78cfd032905cc1a81657ae82",
+      "harness_path": null,
+      "pure_l1_score_ms_per_step": 0.16915489655172528,
+      "pure_l2_score_ms_per_step": 0.9397636896551733,
+      "wide_l1_ms_per_step": 0.88235524137931,
+      "wide_l2_ms_per_step": 2.5777273448275846,
+      "selected_attention_ms_per_step": 1.0216847241379314,
+      "skip_near_layers": 0,
+      "skip_far_layers": 0,
+      "path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/profiles/nfa_operator_b1_128k_current.json",
+      "sha256": "9624731af8261fc9b69c6a78a2048ebd6ad8b25f7592beaadc33885f0a044200",
+      "nsys_path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/profiles/nfa_operator_b1_128k_current.nsys-rep",
+      "nsys_sha256": "b23c7465dc9378575e5e5b41cc43e1afed4826ce144b5a7ae4b596091b04e7ff",
+      "sqlite_path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/profiles/nfa_operator_b1_128k_current.sqlite",
+      "sqlite_sha256": "58e7dd3ce4a549bce7d7935bb411d957505833aee2b30cfec44d6f19621cdb1a"
+    },
+    {
+      "method": "nfa",
+      "context_length": 262144,
+      "batch_size": 1,
+      "measurement_origin": "reused-original-5-step-profile-refinalized-copy",
+      "profiled_decode_steps": 5,
+      "source_head": "84bd19ee947c2498db7c988a9fa2ca766caf1267",
+      "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef",
+      "harness_path": null,
+      "pure_l1_score_ms_per_step": 0.26809620000000006,
+      "pure_l2_score_ms_per_step": 0.9342293999999993,
+      "wide_l1_ms_per_step": 1.0635993999999998,
+      "wide_l2_ms_per_step": 2.569387999999999,
+      "selected_attention_ms_per_step": 1.0150547999999997,
+      "skip_near_layers": 0,
+      "skip_far_layers": 0,
+      "path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/profiles/nfa_operator_b1_256k_reused.json",
+      "sha256": "00da9a7a4e305376a5d4546988b869bd9f38187e91dcc4afeb8bd304cbe00465",
+      "nsys_path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_full_20261111/tail_noskip_graph/nfa-operator-profile/nfa-operator-profile_l262144_b1_graph.nsys-rep",
+      "nsys_sha256": "7e63fe421dad23a64eb473931c345ea312a2b007356dd4a00ebb8b810565beeb",
+      "sqlite_path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_full_20261111/tail_noskip_graph/nfa-operator-profile/nfa-operator-profile_l262144_b1_graph.sqlite",
+      "sqlite_sha256": "7411b7c652252dbcc43e45c4d14adef2992d8ffd50a8247f6e76372d00852a95"
+    },
+    {
+      "method": "nfa",
+      "context_length": 524288,
+      "batch_size": 1,
+      "measurement_origin": "reused-original-5-step-profile-refinalized-copy",
+      "profiled_decode_steps": 5,
+      "source_head": "84bd19ee947c2498db7c988a9fa2ca766caf1267",
+      "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef",
+      "harness_path": null,
+      "pure_l1_score_ms_per_step": 0.39307620000000004,
+      "pure_l2_score_ms_per_step": 0.9290065999999989,
+      "wide_l1_ms_per_step": 1.3676254,
+      "wide_l2_ms_per_step": 2.5644215999999984,
+      "selected_attention_ms_per_step": 1.0202197999999998,
+      "skip_near_layers": 0,
+      "skip_far_layers": 0,
+      "path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/profiles/nfa_operator_b1_512k_reused.json",
+      "sha256": "2125935e34c18da605994eb2fe3f73d4bb54c09c0b06c46d25762cff97e5324f",
+      "nsys_path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_full_20261111/tail_noskip_graph/nfa-operator-profile/nfa-operator-profile_l524288_b1_graph.nsys-rep",
+      "nsys_sha256": "83755e51b8d6b7262ac83a130651d537ffc0ae31690a867bed240a602b7ef747",
+      "sqlite_path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_full_20261111/tail_noskip_graph/nfa-operator-profile/nfa-operator-profile_l524288_b1_graph.sqlite",
+      "sqlite_sha256": "f35aaa4756ad23d7c30abe12dc17459c91a08d5fd33574e8f6ac2889740d7dca"
+    },
+    {
+      "method": "quest",
+      "context_length": 32768,
+      "batch_size": 1,
+      "measurement_origin": "reused-closed-profile",
+      "profiled_decode_steps": 32,
+      "source_head": "b3ee770f8865549ef7271bc83f73968a328950d1",
+      "harness_sha256": "9154276939ebff8355136c921dd8d9e771ddd7a4dbf41285e4286c7185fd34ce",
+      "harness_path": "/home/wangyuanshuo02/two-level-attention/benchmark/official_baselines/long_context_official.py",
+      "estimate_ms_per_step": 1.355148562499998,
+      "topk_ms_per_step": 1.5004830937499996,
+      "topk_raft_ms_per_step": 0.2102518437500008,
+      "topk_canonicalize_ms_per_step": 1.2902312499999986,
+      "sparse_attention_ms_per_step": 0.5887146875000099,
+      "kernel_extension_sha256": "47c9fcb557bcb98670a2ee9a4075edfea8c06e3ff427f000239986f5856c7288",
+      "path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/profiles/quest_official_b1_32k.json",
+      "sha256": "429292f7f5eb2a971518887196657b6c085b4df04da9192402d04966d9447580",
+      "nsys_path": "/home/wangyuanshuo02/ak_verify_results/qwen3_quest_batch_smoke_20261117/canonical_20261117/performance/operator_records/quest_official_b1_32k.nsys-rep",
+      "nsys_sha256": "067699da1a42e092f653ca57d21b5b0732191d8774ee0c1673d0f0354a090a26",
+      "sqlite_path": "/home/wangyuanshuo02/ak_verify_results/qwen3_quest_batch_smoke_20261117/canonical_20261117/performance/operator_records/quest_official_b1_32k.sqlite",
+      "sqlite_sha256": "178bb8038c39efecf6b492824b5c254aa394cf5ab3e0c1c4ea446d25eab4c989"
+    },
+    {
+      "method": "quest",
+      "context_length": 65536,
+      "batch_size": 1,
+      "measurement_origin": "reused-closed-profile",
+      "profiled_decode_steps": 32,
+      "source_head": "b3ee770f8865549ef7271bc83f73968a328950d1",
+      "harness_sha256": "9154276939ebff8355136c921dd8d9e771ddd7a4dbf41285e4286c7185fd34ce",
+      "harness_path": "/home/wangyuanshuo02/two-level-attention/benchmark/official_baselines/long_context_official.py",
+      "estimate_ms_per_step": 2.6729242499999954,
+      "topk_ms_per_step": 2.5207194062500005,
+      "topk_raft_ms_per_step": 0.2627387187499994,
+      "topk_canonicalize_ms_per_step": 2.2579806875000004,
+      "sparse_attention_ms_per_step": 0.7786156250000061,
+      "kernel_extension_sha256": "47c9fcb557bcb98670a2ee9a4075edfea8c06e3ff427f000239986f5856c7288",
+      "path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/profiles/quest_official_b1_64k.json",
+      "sha256": "c7e270a149350e24a01644963f7c5ac724af4f84cc0afdf8911853777a1d35e4",
+      "nsys_path": "/home/wangyuanshuo02/ak_verify_results/qwen3_quest_batch_smoke_20261117/canonical_20261117/performance/operator_records/quest_official_b1_64k.nsys-rep",
+      "nsys_sha256": "45af19796bd2d5a997450e5bfc1247dde89b499e6590622d723034d36642a4ce",
+      "sqlite_path": "/home/wangyuanshuo02/ak_verify_results/qwen3_quest_batch_smoke_20261117/canonical_20261117/performance/operator_records/quest_official_b1_64k.sqlite",
+      "sqlite_sha256": "aa48743d1821c4e9de9a46920c10e50d10591edf606f199e8b7af787e35786b8"
+    },
+    {
+      "method": "quest",
+      "context_length": 131072,
+      "batch_size": 1,
+      "measurement_origin": "reused-closed-profile",
+      "profiled_decode_steps": 32,
+      "source_head": "b3ee770f8865549ef7271bc83f73968a328950d1",
+      "harness_sha256": "9154276939ebff8355136c921dd8d9e771ddd7a4dbf41285e4286c7185fd34ce",
+      "harness_path": "/home/wangyuanshuo02/two-level-attention/benchmark/official_baselines/long_context_official.py",
+      "estimate_ms_per_step": 5.306084781250003,
+      "topk_ms_per_step": 4.425611250000002,
+      "topk_raft_ms_per_step": 0.35100178125000003,
+      "topk_canonicalize_ms_per_step": 4.074609468749997,
+      "sparse_attention_ms_per_step": 1.2586370937500362,
+      "kernel_extension_sha256": "47c9fcb557bcb98670a2ee9a4075edfea8c06e3ff427f000239986f5856c7288",
+      "path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/profiles/quest_official_b1_128k.json",
+      "sha256": "5a8fa14d72b61be83b2c328c31f38af75b675cd818ab93871e5052dc7a52cfec",
+      "nsys_path": "/home/wangyuanshuo02/ak_verify_results/qwen3_quest_batch_smoke_20261117/canonical_20261117/performance/operator_records/quest_official_b1_128k.nsys-rep",
+      "nsys_sha256": "805c4751c2da94fd7541512cbb838e784727ae287ed6e82a91a6e11875d3d8cc",
+      "sqlite_path": "/home/wangyuanshuo02/ak_verify_results/qwen3_quest_batch_smoke_20261117/canonical_20261117/performance/operator_records/quest_official_b1_128k.sqlite",
+      "sqlite_sha256": "32819479785a4ce772afdf6ed5b82ec2b4a7e16ca5417abdfa92355694ace786"
+    },
+    {
+      "method": "quest",
+      "context_length": 262144,
+      "batch_size": 1,
+      "measurement_origin": "current-measurement",
+      "profiled_decode_steps": 32,
+      "source_head": "b3ee770f8865549ef7271bc83f73968a328950d1",
+      "harness_sha256": "7ff8ecd5bb35cdcc0e84513a6129c915e57e5f4f6ecc4935eb748bc6dd84cb4e",
+      "harness_path": "/home/wangyuanshuo02/two-level-attention/benchmark/official_baselines/long_context_official.py",
+      "estimate_ms_per_step": 10.585415468750003,
+      "topk_ms_per_step": 8.18387453125001,
+      "topk_raft_ms_per_step": 0.48784212499999985,
+      "topk_canonicalize_ms_per_step": 7.696032406250004,
+      "sparse_attention_ms_per_step": 2.2708017499999755,
+      "kernel_extension_sha256": "52abaae86e945d0aff1620f6890eba85fe17164a16b6939a414b1a69ec241de4",
+      "path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/profiles/quest_official_b1_256k_operator.json",
+      "sha256": "d1243caad6f639141761585b02cd35ed8b6d7a4a393f3bef7fed3865438f1e37",
+      "nsys_path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/profiles/quest_official_b1_256k_operator.nsys-rep",
+      "nsys_sha256": "fac4012a8393c5ba8e3306358b130829d21ffababefa3d93f883c60e518550f8",
+      "sqlite_path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/profiles/quest_official_b1_256k_operator.sqlite",
+      "sqlite_sha256": "75380d8a12e835847e5832bd38c4d1dacccc23b02b2cf448abd8bf81dfb2302a"
+    },
+    {
+      "method": "quest",
+      "context_length": 524288,
+      "batch_size": 1,
+      "measurement_origin": "current-measurement",
+      "profiled_decode_steps": 32,
+      "source_head": "cc48075695a827840c25d35df917df3a1079838d",
+      "harness_sha256": "7ff8ecd5bb35cdcc0e84513a6129c915e57e5f4f6ecc4935eb748bc6dd84cb4e",
+      "harness_path": "/home/wangyuanshuo02/two-level-attention/benchmark/official_baselines/long_context_official.py",
+      "estimate_ms_per_step": 21.054775218749995,
+      "topk_ms_per_step": 15.545383625000003,
+      "topk_raft_ms_per_step": 0.7590977499999985,
+      "topk_canonicalize_ms_per_step": 14.786285875000003,
+      "sparse_attention_ms_per_step": 4.333895937499975,
+      "kernel_extension_sha256": "52abaae86e945d0aff1620f6890eba85fe17164a16b6939a414b1a69ec241de4",
+      "path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/profiles/quest_official_b1_512k_operator_alloc.json",
+      "sha256": "72f25d7cda12c24ffa5d70f4dd4a7ceb375dd2a47c839a8242a4b7ac70c281fc",
+      "nsys_path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/profiles/quest_official_b1_512k_operator_alloc.nsys-rep",
+      "nsys_sha256": "63620dd8eab83db0908faec9a923fa9c2f7c238d6819c4813388b95401d1d22f",
+      "sqlite_path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/profiles/quest_official_b1_512k_operator_alloc.sqlite",
+      "sqlite_sha256": "07ca38f9a74604d89d5e13f48df55b66ff69adcf1134927dbbdcb1b7353e949a"
+    },
+    {
+      "method": "asynctls",
+      "context_length": 32768,
+      "batch_size": 1,
+      "measurement_origin": "current-measurement",
+      "profiled_decode_steps": 31,
+      "source_head": "aaf89756b8d7c2422c38f3e4eb0e121ef5335097",
+      "harness_sha256": "bb3cac4ca0c7a55fbd42636da2d09a00ebf148676f143986d850fae628c00706",
+      "harness_path": null,
+      "topk_sort_family_ms_per_step": 1.8295692580645302,
+      "gather_family_ms_per_step": 5.1617028709676935,
+      "index_family_ms_per_step": 6.991272129032248,
+      "attribution_scope": "Only kernel names uniquely attributable to PyTorch Top-K/sort and gather are included in index_family_ms. Block scoring, INT4 quantize-dequantize, projected QK, softmax and exact selected attention use kernels that cannot be separated reliably from other model kernels by name; they remain in kernel_summary and are not assigned fabricated stage totals.",
+      "path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/profiles/asynctls_operator_b1_32k_current.json",
+      "sha256": "ebd15afbe01c759815143b53b73f0cb8cf4b50a4d88ad3c523cd932792f951e7",
+      "nsys_path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/profiles/asynctls_operator_b1_32k_current.nsys-rep",
+      "nsys_sha256": "b3c1fe7f2e79382843d15f5e50b70ba822c2d0955096090dc9faa4addcbd2539",
+      "sqlite_path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/profiles/asynctls_operator_b1_32k_current.sqlite",
+      "sqlite_sha256": "f0a72f6623a1484b3a940c6ee6212c11a8b8f82f190caea414df7a7fa5f02ff4"
+    },
+    {
+      "method": "asynctls",
+      "context_length": 65536,
+      "batch_size": 1,
+      "measurement_origin": "current-measurement",
+      "profiled_decode_steps": 31,
+      "source_head": "aaf89756b8d7c2422c38f3e4eb0e121ef5335097",
+      "harness_sha256": "bb3cac4ca0c7a55fbd42636da2d09a00ebf148676f143986d850fae628c00706",
+      "harness_path": null,
+      "topk_sort_family_ms_per_step": 1.8332104193548548,
+      "gather_family_ms_per_step": 5.279843483870927,
+      "index_family_ms_per_step": 7.113053903225803,
+      "attribution_scope": "Only kernel names uniquely attributable to PyTorch Top-K/sort and gather are included in index_family_ms. Block scoring, INT4 quantize-dequantize, projected QK, softmax and exact selected attention use kernels that cannot be separated reliably from other model kernels by name; they remain in kernel_summary and are not assigned fabricated stage totals.",
+      "path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/profiles/asynctls_operator_b1_64k_current.json",
+      "sha256": "7dfe0bef2bab60260e3e8439616914fb0bc864a5bd7e31c4d69d922a587158d9",
+      "nsys_path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/profiles/asynctls_operator_b1_64k_current.nsys-rep",
+      "nsys_sha256": "f00ae0de6acb5a214fa56230c21a8ee2a253b755e3bf6c7e15c824f6a1dc5e88",
+      "sqlite_path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/profiles/asynctls_operator_b1_64k_current.sqlite",
+      "sqlite_sha256": "2041d5971e1b07c0d91fe5d4f6fa914f7ffbe6bbcaa0287561250c4871c5d069"
+    },
+    {
+      "method": "asynctls",
+      "context_length": 131072,
+      "batch_size": 1,
+      "measurement_origin": "current-measurement",
+      "profiled_decode_steps": 31,
+      "source_head": "aaf89756b8d7c2422c38f3e4eb0e121ef5335097",
+      "harness_sha256": "bb3cac4ca0c7a55fbd42636da2d09a00ebf148676f143986d850fae628c00706",
+      "harness_path": null,
+      "topk_sort_family_ms_per_step": 1.8332428064516126,
+      "gather_family_ms_per_step": 5.414407741935421,
+      "index_family_ms_per_step": 7.247650548386997,
+      "attribution_scope": "Only kernel names uniquely attributable to PyTorch Top-K/sort and gather are included in index_family_ms. Block scoring, INT4 quantize-dequantize, projected QK, softmax and exact selected attention use kernels that cannot be separated reliably from other model kernels by name; they remain in kernel_summary and are not assigned fabricated stage totals.",
+      "path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/profiles/asynctls_operator_b1_128k_current.json",
+      "sha256": "f9625ada48eef21b8f007357371b149f080f436805ec9e3d198785c77b2c18e0",
+      "nsys_path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/profiles/asynctls_operator_b1_128k_current.nsys-rep",
+      "nsys_sha256": "07f58eed758a2169b8fa46ed28a2ad81fb946e4d29e0fc4a1a5afebe3ddf73c3",
+      "sqlite_path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/profiles/asynctls_operator_b1_128k_current.sqlite",
+      "sqlite_sha256": "3deb769c992f2527b64f2523f040782be3135ef635cef44ce912fd6fec804b1c"
+    },
+    {
+      "method": "asynctls",
+      "context_length": 262144,
+      "batch_size": 1,
+      "measurement_origin": "current-measurement",
+      "profiled_decode_steps": 31,
+      "source_head": "aaf89756b8d7c2422c38f3e4eb0e121ef5335097",
+      "harness_sha256": "bb3cac4ca0c7a55fbd42636da2d09a00ebf148676f143986d850fae628c00706",
+      "harness_path": null,
+      "topk_sort_family_ms_per_step": 1.8356711290322552,
+      "gather_family_ms_per_step": 5.74887729032253,
+      "index_family_ms_per_step": 7.584548419354826,
+      "attribution_scope": "Only kernel names uniquely attributable to PyTorch Top-K/sort and gather are included in index_family_ms. Block scoring, INT4 quantize-dequantize, projected QK, softmax and exact selected attention use kernels that cannot be separated reliably from other model kernels by name; they remain in kernel_summary and are not assigned fabricated stage totals.",
+      "path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/profiles/asynctls_operator_b1_256k_current.json",
+      "sha256": "7682c9671cc915bef35300ab0f02d8d642a2d6474c5acd7bd5afc0875cdf3580",
+      "nsys_path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/profiles/asynctls_operator_b1_256k_current.nsys-rep",
+      "nsys_sha256": "c994273a2b15cbca80ec7aab7bab3ef5117b9084e4f580226c25804d61c17aea",
+      "sqlite_path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/profiles/asynctls_operator_b1_256k_current.sqlite",
+      "sqlite_sha256": "32d45720343f7a68a2c0289e29a10c47fb6ae4d6f244ce777eca52fb8ee15565"
+    },
+    {
+      "method": "asynctls",
+      "context_length": 524288,
+      "batch_size": 1,
+      "measurement_origin": "current-measurement",
+      "profiled_decode_steps": 31,
+      "source_head": "0ef33c7b0b859e8d7f6363b3b548a1e0483f7c36",
+      "harness_sha256": "bb3cac4ca0c7a55fbd42636da2d09a00ebf148676f143986d850fae628c00706",
+      "harness_path": null,
+      "topk_sort_family_ms_per_step": 1.8287538387096818,
+      "gather_family_ms_per_step": 6.130748806451533,
+      "index_family_ms_per_step": 7.959502645161249,
+      "attribution_scope": "Only kernel names uniquely attributable to PyTorch Top-K/sort and gather are included in index_family_ms. Block scoring, INT4 quantize-dequantize, projected QK, softmax and exact selected attention use kernels that cannot be separated reliably from other model kernels by name; they remain in kernel_summary and are not assigned fabricated stage totals.",
+      "path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/profiles/asynctls_operator_b1_512k_current.json",
+      "sha256": "946b19eb56929dc640012ba44a0ebac8471365d606713c3fd8a9e5a86c81669f",
+      "nsys_path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/profiles/asynctls_operator_b1_512k_current.nsys-rep",
+      "nsys_sha256": "a1cc722a98485f63be5f64e2d6ef5feb2270f8220863d76ac840359f2b548e62",
+      "sqlite_path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/profiles/asynctls_operator_b1_512k_current.sqlite",
+      "sqlite_sha256": "4162a903572721b00fa7d1868582c2d87dcf8a09a5ec0a20c884e39942d82782"
+    }
+  ]
+}

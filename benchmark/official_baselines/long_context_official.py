@@ -50,6 +50,10 @@ def parse_args():
     parser.add_argument("--warmup-requests", type=int, default=1)
     parser.add_argument("--repeats", type=int, default=3)
     parser.add_argument("--max-new-tokens", type=int, default=33)
+    parser.add_argument(
+        "--measurement-mode", choices=("clean-e2e", "operator-profile"),
+        default="clean-e2e",
+    )
     return parser.parse_args()
 
 
@@ -127,6 +131,10 @@ def main():
         raise ValueError("要求 max-new-tokens>=2、repeats>0、warmup-requests>=0")
     if args.budget <= 0 or args.budget % args.quest_page_size:
         raise ValueError("Quest budget 必须为正且整除 page-size")
+    if args.measurement_mode == "operator-profile" and (
+        args.warmup_requests != 0 or args.repeats != 1
+    ):
+        raise ValueError("operator-profile 固定为 0 warmup + 1 repeat")
 
     from transformers import AutoConfig, AutoTokenizer
 
@@ -167,7 +175,10 @@ def main():
         "warmup_requests": args.warmup_requests,
         "repeats": args.repeats,
         "max_new_tokens": args.max_new_tokens,
-        "measurement_mode": "clean-e2e-no-profiler",
+        "measurement_mode": (
+            "clean-e2e-no-profiler" if args.measurement_mode == "clean-e2e"
+            else "nsys-cuda-full-process-operator-profile-pending-finalize"
+        ),
         "timing_protocol": "T(33)-T(1) two-point complete request host wall; EOS ignored",
         "rope_policy": rope_policy,
         "rope_preflight": rope_preflight,
@@ -178,7 +189,10 @@ def main():
     for _ in range(args.warmup_requests):
         timed_pair(engine, ids, args.max_new_tokens, require_positive=False)
     for repeat in range(args.repeats):
-        generated, timing = timed_pair(engine, ids, args.max_new_tokens)
+        generated, timing = timed_pair(
+            engine, ids, args.max_new_tokens,
+            require_positive=args.measurement_mode == "clean-e2e",
+        )
         payload["cells"].append({
             "task": args.task,
             "sample_index": args.sample_index,

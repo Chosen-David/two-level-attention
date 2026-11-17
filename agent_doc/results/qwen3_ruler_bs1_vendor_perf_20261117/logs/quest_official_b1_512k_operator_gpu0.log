@@ -1,0 +1,94 @@
+[START] utc=2026-11-17T02:18:39Z L=524288 B=1 GPU=0 output=/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/profiles/quest_official_b1_512k_operator.json
+Token indices sequence length is longer than the specified maximum sequence length for this model (523827 > 131072). Running this sequence through the model will result in indexing errors
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/5 [00:00<?, ?it/s]Loading checkpoint shards:  20%|██        | 1/5 [00:01<00:04,  1.08s/it]Loading checkpoint shards:  40%|████      | 2/5 [00:02<00:03,  1.21s/it]Loading checkpoint shards:  60%|██████    | 3/5 [00:03<00:02,  1.25s/it]Loading checkpoint shards:  80%|████████  | 4/5 [00:04<00:01,  1.18s/it]Loading checkpoint shards: 100%|██████████| 5/5 [00:04<00:00,  1.23it/s]Loading checkpoint shards: 100%|██████████| 5/5 [00:04<00:00,  1.02it/s]
+The following generation flags are not valid and may be ignored: ['top_p', 'top_k']. Set `TRANSFORMERS_VERBOSITY=info` for more details.
+Traceback (most recent call last):
+  File "/home/wangyuanshuo02/two-level-attention/benchmark/official_baselines/long_context_official.py", line 218, in <module>
+    main()
+  File "/home/wangyuanshuo02/two-level-attention/benchmark/official_baselines/long_context_official.py", line 192, in main
+    generated, timing = timed_pair(
+                        ^^^^^^^^^^^
+  File "/home/wangyuanshuo02/two-level-attention/benchmark/official_baselines/longbench_official.py", line 542, in timed_pair
+    first_ids, ttft = engine.generate(ids, 1, ignore_eos=True)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/wangyuanshuo02/two-level-attention/benchmark/official_baselines/longbench_official.py", line 436, in generate
+    return self._generate_quest(
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/wangyuanshuo02/two-level-attention/benchmark/official_baselines/longbench_official.py", line 469, in _generate_quest
+    output = self.model.generate(
+             ^^^^^^^^^^^^^^^^^^^^
+  File "/home/fluentllmenv/lib/python3.11/site-packages/torch/utils/_contextlib.py", line 120, in decorate_context
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fluentllmenv/lib/python3.11/site-packages/transformers/generation/utils.py", line 2539, in generate
+    result = self._sample(
+             ^^^^^^^^^^^^^
+  File "/home/fluentllmenv/lib/python3.11/site-packages/transformers/generation/utils.py", line 2867, in _sample
+    outputs = self(**model_inputs, return_dict=True)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fluentllmenv/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fluentllmenv/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fluentllmenv/lib/python3.11/site-packages/transformers/utils/generic.py", line 940, in wrapper
+    output = func(self, *args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fluentllmenv/lib/python3.11/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 480, in forward
+    outputs: BaseModelOutputWithPast = self.model(
+                                       ^^^^^^^^^^^
+  File "/home/fluentllmenv/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fluentllmenv/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fluentllmenv/lib/python3.11/site-packages/transformers/utils/generic.py", line 1064, in wrapper
+    outputs = func(self, *args, **kwargs)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fluentllmenv/lib/python3.11/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 410, in forward
+    hidden_states = decoder_layer(
+                    ^^^^^^^^^^^^^^
+  File "/home/fluentllmenv/lib/python3.11/site-packages/transformers/modeling_layers.py", line 94, in __call__
+    return super().__call__(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fluentllmenv/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fluentllmenv/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fluentllmenv/lib/python3.11/site-packages/transformers/utils/deprecation.py", line 172, in wrapped_func
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fluentllmenv/lib/python3.11/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 260, in forward
+    hidden_states, _ = self.self_attn(
+                       ^^^^^^^^^^^^^^^
+  File "/home/fluentllmenv/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fluentllmenv/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/wangyuanshuo02/two-level-attention/benchmark/official_baselines/qwen3_quest_kernel.py", line 239, in _qwen3_quest_forward
+    attn_output = self.o_proj(attn_output)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fluentllmenv/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fluentllmenv/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fluentllmenv/lib/python3.11/site-packages/torch/nn/modules/linear.py", line 125, in forward
+    return F.linear(input, self.weight, self.bias)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 4.00 GiB. GPU 0 has a total capacity of 139.72 GiB of which 1.64 GiB is free. Process 1205307 has 138.07 GiB memory in use. Of the allocated memory 133.47 GiB is allocated by PyTorch, and 4.13 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+Collecting data...
+Generating '/tmp/nsys-report-3e5b.qdstrm'
+[1/2] [0%                          ] quest_official_b1_512k_operator.nsys-rep[1/2] [0%                          ] quest_official_b1_512k_operator.nsys-rep[1/2] [============56%             ] quest_official_b1_512k_operator.nsys-rep[1/2] [===============65%          ] quest_official_b1_512k_operator.nsys-rep[1/2] [=================73%        ] quest_official_b1_512k_operator.nsys-rep[1/2] [=================74%        ] quest_official_b1_512k_operator.nsys-rep[1/2] [==================75%       ] quest_official_b1_512k_operator.nsys-rep[1/2] [==================76%       ] quest_official_b1_512k_operator.nsys-rep[1/2] [==================77%       ] quest_official_b1_512k_operator.nsys-rep[1/2] [==================78%       ] quest_official_b1_512k_operator.nsys-rep[1/2] [===================79%      ] quest_official_b1_512k_operator.nsys-rep[1/2] [===================80%      ] quest_official_b1_512k_operator.nsys-rep[1/2] [===================81%      ] quest_official_b1_512k_operator.nsys-rep[1/2] [===================82%      ] quest_official_b1_512k_operator.nsys-rep[1/2] [====================83%     ] quest_official_b1_512k_operator.nsys-rep[1/2] [====================84%     ] quest_official_b1_512k_operator.nsys-rep[1/2] [====================85%     ] quest_official_b1_512k_operator.nsys-rep[1/2] [=====================86%    ] quest_official_b1_512k_operator.nsys-rep[1/2] [=====================87%    ] quest_official_b1_512k_operator.nsys-rep[1/2] [========================100%] quest_official_b1_512k_operator.nsys-rep[1/2] [========================100%] quest_official_b1_512k_operator.nsys-rep
+[2/2] [0%                          ] quest_official_b1_512k_operator.sqlite[2/2] [1%                          ] quest_official_b1_512k_operator.sqlite[2/2] [2%                          ] quest_official_b1_512k_operator.sqlite[2/2] [3%                          ] quest_official_b1_512k_operator.sqlite[2/2] [4%                          ] quest_official_b1_512k_operator.sqlite[2/2] [5%                          ] quest_official_b1_512k_operator.sqlite[2/2] [6%                          ] quest_official_b1_512k_operator.sqlite[2/2] [7%                          ] quest_official_b1_512k_operator.sqlite[2/2] [8%                          ] quest_official_b1_512k_operator.sqlite[2/2] [9%                          ] quest_official_b1_512k_operator.sqlite[2/2] [10%                         ] quest_official_b1_512k_operator.sqlite[2/2] [11%                         ] quest_official_b1_512k_operator.sqlite[2/2] [12%                         ] quest_official_b1_512k_operator.sqlite[2/2] [13%                         ] quest_official_b1_512k_operator.sqlite[2/2] [14%                         ] quest_official_b1_512k_operator.sqlite[2/2] [=15%                        ] quest_official_b1_512k_operator.sqlite[2/2] [=16%                        ] quest_official_b1_512k_operator.sqlite[2/2] [=17%                        ] quest_official_b1_512k_operator.sqlite[2/2] [==18%                       ] quest_official_b1_512k_operator.sqlite[2/2] [==19%                       ] quest_official_b1_512k_operator.sqlite[2/2] [==20%                       ] quest_official_b1_512k_operator.sqlite[2/2] [==21%                       ] quest_official_b1_512k_operator.sqlite[2/2] [===22%                      ] quest_official_b1_512k_operator.sqlite[2/2] [===23%                      ] quest_official_b1_512k_operator.sqlite[2/2] [===24%                      ] quest_official_b1_512k_operator.sqlite[2/2] [====25%                     ] quest_official_b1_512k_operator.sqlite[2/2] [====26%                     ] quest_official_b1_512k_operator.sqlite[2/2] [====27%                     ] quest_official_b1_512k_operator.sqlite[2/2] [====28%                     ] quest_official_b1_512k_operator.sqlite[2/2] [=====29%                    ] quest_official_b1_512k_operator.sqlite[2/2] [=====30%                    ] quest_official_b1_512k_operator.sqlite[2/2] [=====31%                    ] quest_official_b1_512k_operator.sqlite[2/2] [=====32%                    ] quest_official_b1_512k_operator.sqlite[2/2] [======33%                   ] quest_official_b1_512k_operator.sqlite[2/2] [======34%                   ] quest_official_b1_512k_operator.sqlite[2/2] [======35%                   ] quest_official_b1_512k_operator.sqlite[2/2] [=======36%                  ] quest_official_b1_512k_operator.sqlite[2/2] [=======37%                  ] quest_official_b1_512k_operator.sqlite[2/2] [=======38%                  ] quest_official_b1_512k_operator.sqlite[2/2] [=======39%                  ] quest_official_b1_512k_operator.sqlite[2/2] [========40%                 ] quest_official_b1_512k_operator.sqlite[2/2] [========41%                 ] quest_official_b1_512k_operator.sqlite[2/2] [========42%                 ] quest_official_b1_512k_operator.sqlite[2/2] [=========43%                ] quest_official_b1_512k_operator.sqlite[2/2] [=========44%                ] quest_official_b1_512k_operator.sqlite[2/2] [=========45%                ] quest_official_b1_512k_operator.sqlite[2/2] [=========46%                ] quest_official_b1_512k_operator.sqlite[2/2] [==========47%               ] quest_official_b1_512k_operator.sqlite[2/2] [==========48%               ] quest_official_b1_512k_operator.sqlite[2/2] [==========49%               ] quest_official_b1_512k_operator.sqlite[2/2] [===========50%              ] quest_official_b1_512k_operator.sqlite[2/2] [===========51%              ] quest_official_b1_512k_operator.sqlite[2/2] [===========52%              ] quest_official_b1_512k_operator.sqlite[2/2] [===========53%              ] quest_official_b1_512k_operator.sqlite[2/2] [============54%             ] quest_official_b1_512k_operator.sqlite[2/2] [============55%             ] quest_official_b1_512k_operator.sqlite[2/2] [============56%             ] quest_official_b1_512k_operator.sqlite[2/2] [============57%             ] quest_official_b1_512k_operator.sqlite[2/2] [=============58%            ] quest_official_b1_512k_operator.sqlite[2/2] [=============59%            ] quest_official_b1_512k_operator.sqlite[2/2] [=============60%            ] quest_official_b1_512k_operator.sqlite[2/2] [==============61%           ] quest_official_b1_512k_operator.sqlite[2/2] [==============62%           ] quest_official_b1_512k_operator.sqlite[2/2] [==============63%           ] quest_official_b1_512k_operator.sqlite[2/2] [==============64%           ] quest_official_b1_512k_operator.sqlite[2/2] [===============65%          ] quest_official_b1_512k_operator.sqlite[2/2] [===============66%          ] quest_official_b1_512k_operator.sqlite[2/2] [===============67%          ] quest_official_b1_512k_operator.sqlite[2/2] [================68%         ] quest_official_b1_512k_operator.sqlite[2/2] [================69%         ] quest_official_b1_512k_operator.sqlite[2/2] [================70%         ] quest_official_b1_512k_operator.sqlite[2/2] [================71%         ] quest_official_b1_512k_operator.sqlite[2/2] [=================72%        ] quest_official_b1_512k_operator.sqlite[2/2] [=================73%        ] quest_official_b1_512k_operator.sqlite[2/2] [=================74%        ] quest_official_b1_512k_operator.sqlite[2/2] [==================75%       ] quest_official_b1_512k_operator.sqlite[2/2] [==================76%       ] quest_official_b1_512k_operator.sqlite[2/2] [==================77%       ] quest_official_b1_512k_operator.sqlite[2/2] [==================78%       ] quest_official_b1_512k_operator.sqlite[2/2] [===================79%      ] quest_official_b1_512k_operator.sqlite[2/2] [===================80%      ] quest_official_b1_512k_operator.sqlite[2/2] [===================81%      ] quest_official_b1_512k_operator.sqlite[2/2] [===================82%      ] quest_official_b1_512k_operator.sqlite[2/2] [====================83%     ] quest_official_b1_512k_operator.sqlite[2/2] [====================84%     ] quest_official_b1_512k_operator.sqlite[2/2] [====================85%     ] quest_official_b1_512k_operator.sqlite[2/2] [=====================86%    ] quest_official_b1_512k_operator.sqlite[2/2] [=====================87%    ] quest_official_b1_512k_operator.sqlite[2/2] [=====================88%    ] quest_official_b1_512k_operator.sqlite[2/2] [=====================89%    ] quest_official_b1_512k_operator.sqlite[2/2] [======================90%   ] quest_official_b1_512k_operator.sqlite[2/2] [======================91%   ] quest_official_b1_512k_operator.sqlite[2/2] [======================92%   ] quest_official_b1_512k_operator.sqlite[2/2] [=======================93%  ] quest_official_b1_512k_operator.sqlite[2/2] [=======================94%  ] quest_official_b1_512k_operator.sqlite[2/2] [=======================95%  ] quest_official_b1_512k_operator.sqlite[2/2] [=======================96%  ] quest_official_b1_512k_operator.sqlite[2/2] [========================97% ] quest_official_b1_512k_operator.sqlite[2/2] [========================98% ] quest_official_b1_512k_operator.sqlite[2/2] [========================99% ] quest_official_b1_512k_operator.sqlite[2/2] [========================100%] quest_official_b1_512k_operator.sqlite[2/2] [========================100%] quest_official_b1_512k_operator.sqlite
+Generated:
+	/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/profiles/quest_official_b1_512k_operator.nsys-rep
+	/home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_ruler_bs1_vendor_perf_20261117/profiles/quest_official_b1_512k_operator.sqlite
