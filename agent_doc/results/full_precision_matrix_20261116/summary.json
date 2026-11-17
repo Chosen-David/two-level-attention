@@ -95,13 +95,16 @@
       },
       "ruler_32768": {
         "reuse": ["FullKV", "NFA", "AsyncTLS", "MInference", "FASA", "SparQ", "HISA", "ClusterKV"],
-        "recover": ["Quest", "JSSA"],
-        "missing_or_unrecovered": ["MoBA"]
+        "generating": ["Quest"],
+        "recover": ["JSSA"],
+        "missing_or_unrecovered": ["MoBA"],
+        "note": "2026-11-17官方Quest单样本smoke通过后，11任务×100正式臂正在pc02 GPU2生成；历史Quest generation仍保持recover，不与当前official-active身份混池。"
       },
       "ruler_65536": {
         "reuse": ["FullKV", "NFA", "AsyncTLS", "MInference", "FASA"],
         "cancelled-by-user": ["SparQ", "HISA", "ClusterKV"],
-        "recover": ["Quest", "JSSA"],
+        "generating": ["Quest"],
+        "recover": ["JSSA"],
         "missing_or_unrecovered": ["MoBA"],
         "note": "SparQ两个producer script generation不能合并。2026-11-17三方法单样本smoke已归档，但用户随后明确取消这些baseline，正式partial不再生成、不评分、不并入矩阵。"
       },
@@ -119,11 +122,11 @@
           "near=minmax,far=minmax@32768",
           "near=minmax,far=minmax@65536",
           "near=avg,far=avg@32768",
-          "near=avg,far=avg@65536"
+          "near=avg,far=avg@65536",
+          "near=avg,far=avg@131072"
         ],
         "generating": [
-          "near=minmax,far=minmax@131072",
-          "near=avg,far=avg@131072"
+          "near=minmax,far=minmax@131072"
         ],
         "reference_only": "near=avg,far=minmax既有数据仅作同输入配对参考，不重复生成、不混池"
       }
@@ -177,11 +180,16 @@
     "producers": {
       "ruler_regional": "9f3e8057acd528a904aa8883b830d541b389e39f",
       "qwen3_8b_nfa_lbv2": "b3ee770f8865549ef7271bc83f73968a328950d1",
-      "ruler_vendor_gap": "cc48075695a827840c25d35df917df3a1079838d"
+      "ruler_vendor_gap": "cc48075695a827840c25d35df917df3a1079838d",
+      "quest_official_active": "2ccb64a66ce9d894ce388bfa0e43dbf0fe757471",
+      "quest_submodule": "01c1623bf9395009520874e989e29f683203b357",
+      "quest_kernel_sha256": "52abaae86e945d0aff1620f6890eba85fe17164a16b6939a414b1a69ec241de4",
+      "quest_runtime_sha256": "7ee987d9fa5e168ea81feed6c298c7937f4c9f427e03a32a0e044cf8d5abf67a"
     },
     "active_formal_workers": [
-      {"host": "pc32", "gpu": 1, "arm": "Qwen3-8B RULER C3 near/far=avg/avg", "cell": "131072 shard1/2", "expected_rows": 50},
-      {"host": "pc33", "gpu": 0, "arm": "Qwen3-8B RULER C2 near/far=minmax/minmax", "cell": "131072 shard0/2", "expected_rows": 50}
+      {"host": "pc33", "gpu": 0, "arm": "Qwen3-8B RULER C2 near/far=minmax/minmax", "cell": "131072 shard1/2", "expected_rows": 50},
+      {"host": "pc02", "gpu": 2, "arm": "Qwen3-8B official Quest RULER", "cell": "32768 all11", "expected_rows": 1100, "shell_pid": 3825748},
+      {"host": "pc33", "gpu": 1, "arm": "Qwen3-8B official Quest RULER", "cell": "65536 all11", "expected_rows": 1100, "shell_pid": 1005454, "scope": "accuracy-only, not performance"}
     ],
     "completed_formal_workers": [
       {"host": "pc32", "gpu": 0, "arm": "Qwen3-8B NFA LongBench v2", "shard": "0/8", "rows": 63, "official_strict_score": 34.92, "scope": "single_shard_not_population_avg"},
@@ -192,8 +200,8 @@
       {"host": "pc40", "gpu": 0, "arm": "Qwen3-8B NFA LongBench v2", "shard": "5/8", "rows": 63, "official_strict_score": 19.05, "scope": "single_shard_not_population_avg"},
       {"host": "pc40", "gpu": 1, "arm": "Qwen3-8B NFA LongBench v2", "shard": "6/8", "rows": 63, "official_strict_score": 31.75, "scope": "single_shard_not_population_avg"},
       {"host": "pc02", "gpu": 3, "arm": "Qwen3-8B NFA LongBench v2", "shard": "7/8", "rows": 62, "official_strict_score": 37.1, "scope": "single_shard_not_population_avg"},
-      {"host": "pc32", "gpu": 1, "arm": "Qwen3-8B RULER C3 near/far=avg/avg", "cells": ["32768 shard0/2", "32768 shard1/2", "65536 shard0/2", "65536 shard1/2", "131072 shard0/2"], "rows": 250},
-      {"host": "pc33", "gpu": 0, "arm": "Qwen3-8B RULER C2 near/far=minmax/minmax", "cells": ["32768 shard0/2", "32768 shard1/2", "65536 shard0/2", "65536 shard1/2"], "rows": 200}
+      {"host": "pc32", "gpu": 1, "arm": "Qwen3-8B RULER C3 near/far=avg/avg", "cells": ["32768 shard0/2", "32768 shard1/2", "65536 shard0/2", "65536 shard1/2", "131072 shard0/2", "131072 shard1/2"], "rows": 300},
+      {"host": "pc33", "gpu": 0, "arm": "Qwen3-8B RULER C2 near/far=minmax/minmax", "cells": ["32768 shard0/2", "32768 shard1/2", "65536 shard0/2", "65536 shard1/2", "131072 shard0/2"], "rows": 250}
     ],
     "qwen3_8b_nfa_lbv2_result": {
       "path": "agent_doc/results/full_precision_matrix_20261116/qwen3_8b_nfa_lbv2.json",
@@ -216,13 +224,30 @@
     },
     "regional_c3_completed": {
       "verification": "pending-independent-verification",
-      "production_audit": "ak_verify_results/nfa_dac_ruler_regional_9f3e8057_20261116/_audits/c3_32k_64k_production_audit.json",
-      "production_audit_sha256": "0ef40778577e5e1b07e390be01190e819b1b89d205d57a4b5aca090bd19b4905",
+      "production_audit": "ak_verify_results/nfa_dac_ruler_regional_9f3e8057_20261116/_audits/c3_32k_64k_128k_production_audit.json",
+      "production_audit_sha256": "87b9f293e4229483f2535b7722e8f2648cd021fa97bfc779950383add059f88a",
       "results": [
         {"context_length": 32768, "rows": 100, "official_score": 80.0},
-        {"context_length": 65536, "rows": 100, "official_score": 78.0}
+        {"context_length": 65536, "rows": 100, "official_score": 78.0},
+        {"context_length": 131072, "rows": 100, "official_score": 65.0}
       ],
-      "scope": "Qwen3-8B RULER niah_multikey_2单任务；near/far=avg/avg；每长度双分片合并审计，32K/64K各100条、36层全部keep，尚未完成128K"
+      "scope": "Qwen3-8B RULER niah_multikey_2单任务；near/far=avg/avg；三长度各双分片合并审计100条、逐样本官方分/输入身份/runcap/SHA及36层全部keep均PASS；共300请求，仅为单任务而非完整RULER"
+    },
+    "quest_official_active": {
+      "verification": "pending-independent-verification",
+      "evidence_root": "ak_verify_results/full_precision_active_2ccb64a6_20261117",
+      "entry": "benchmark/official_baselines/ruler_official.py --method quest --budget 1024 --quest-page-size 16",
+      "dispatch_script": "agent_doc/results/full_precision_matrix_20261116/_dispatch/run_ruler_quest_official_gap.sh",
+      "deployment_fix": "首次32K smoke因子模块Git元数据缺失而在生成前fail-closed，失败日志单独保留；随后固定Quest真实HEAD=01c1623b并保留修改版运行资产，未修改git_identity门禁。嵌套第三方.git绝对/相对指针已可逆移出producer。",
+      "smoke": [
+        {"host": "pc02", "gpu": 2, "context_length": 32768, "task": "niah_single_1", "rows": 1, "official_score": 100.0, "prediction_sha256": "b619701398766f9e4d66f35707d37e0eb27133cd257e07cf87fcba6841857c07", "formal_score_sha256": "83525938a72825f891bd14c2e1127111636bcad10b55f1d86bb355062fc1f443", "yarn": false},
+        {"host": "pc33", "gpu": 1, "context_length": 65536, "task": "niah_single_1", "rows": 1, "official_score": 100.0, "prediction_sha256": "2f975bd141a701f78ece55037dfb49fd235ea9feb8bd08ab5af0da6ab47beff3", "formal_score_sha256": "5432fa3ec18f340783b088ad66a3eee4052aaff357cfd3e793f9718a37c3a590", "yarn": true, "yarn_factor": 2.0}
+      ],
+      "formal_generating": [
+        {"host": "pc02", "gpu": 2, "context_length": 32768, "tasks": 11, "rows_per_task": 100, "expected_rows": 1100},
+        {"host": "pc33", "gpu": 1, "context_length": 65536, "tasks": 11, "rows_per_task": 100, "expected_rows": 1100}
+      ],
+      "scope": "单样本100分只证明真实入口可运行，不外推人口精度；32K/64K正式臂尚未闭集，128K尚未smoke；不与旧quest_vendor或历史generation混池"
     },
     "vendor_smoke": {
       "status": "historical-evidence-before-cancellation",
@@ -252,11 +277,11 @@
         {"host": "pc31", "gpu": 1, "method": "HISA", "context_length": 131072, "partial_rows": 11, "done": false}
       ]
     },
-    "queued_regional_requests": {"c2_after_current_worker": 50, "c3_after_current_worker": 0},
+    "queued_regional_requests": {"c2_after_current_worker": 0, "c3_after_current_worker": 0},
     "qwen3_8b_nfa_lbv2_smoke": "1/1 generation and official-strict scoring PASS; input=31512, output=23, strict_runcap=1, v2_identity=1; smoke score is not a full-population accuracy claim",
-    "last_ignition_attempt": "C2 32K/64K已各100条通过生产侧正式审计，official_score=88.0/78.0，128K shard0最后观测在pc33 GPU0生成；C3 128K shard1最后观测在pc32 GPU1生成。用户随后明确取消SparQ/HISA/ClusterKV等baseline，六个正式partial已全部精确停止并收割，不再生成或评分；取消前六份单样本smoke仅保留为历史入口证据。",
-    "resource_policy": "只使用点火前重新实测空闲的卡；pc02四卡和pc31双卡上的已取消vendor任务已全部停止，六卡显存均释放至1 MiB且无本任务残留Python。pc33 GPU0和pc32 GPU1的C2/C3状态需按实时进程与闭集证据更新。未触碰其他会话进程；pc14直接sshpass密码登录仍连接超时，不作为可用资源。",
-    "vendor_assets": "取消前部署的cc480756 clean producer及SparQ/HISA/ClusterKV资产、失败日志和smoke证据均保留作历史审计，不再用于后续生成；SparQ orchestration临时执行闸修改已恢复，不随本次取消状态提交。",
-    "next": "LBv2已闭集，不再重复生成；继续未取消的C2/C3 128K，闭集后分别做三长度正式审计。后续baseline只处理Quest/JSSA/AsyncTLS的真实恢复或缺口，MInference/SparQ/MoBA/ClusterKV/HISA/FASA不再补跑、评分或恢复；所有结果在不同owner独立验收前保持pending。"
+    "last_ignition_attempt": "C3 avg/avg三长度已各100条闭集并通过生产侧正式审计，official_score=80.0/78.0/65.0；C2 minmax/minmax的128K shard0已完成50条，shard1在pc33 GPU0继续。Quest官方32K/64K单样本smoke均真实通过，32K正式臂在pc02 GPU2、64K正式臂在pc33 GPU1生成；128K尚未smoke。",
+    "resource_policy": "只使用点火前重新实测空闲的卡；pc02 GPU2用于Quest 32K精度，pc33 GPU0继续C2、GPU1仅用于Quest 64K精度而非性能测试。pc40/pc31/pc32其余卡有点火时实测的其他compute app，未触碰；pc14直接sshpass密码登录仍连接超时，不作为可用资源。",
+    "vendor_assets": "取消前部署的cc480756 clean producer及SparQ/HISA/ClusterKV资产、失败日志和smoke证据均保留作历史审计，不再用于后续生成；当前Quest使用独立2ccb64a6 producer、固定Quest子模块HEAD和扩展/运行包SHA。",
+    "next": "LBv2和C3已闭集，不再重复生成；继续C2 128K shard1及Quest 32K/64K正式臂，闭集后分别正式审计。仅在实测空卡上先做Quest 128K smoke，通过后才派正式臂。后续baseline只处理Quest/JSSA/AsyncTLS的真实恢复或缺口，MInference/SparQ/MoBA/ClusterKV/HISA/FASA不再补跑、评分或恢复；所有结果在不同owner独立验收前保持pending。"
   }
 }

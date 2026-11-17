@@ -34,6 +34,7 @@
 - `agent_doc/results/full_precision_matrix_20261116/_dispatch/run_regional_chain.sh`：落盘的C2/C3三长度×双分片链，避免远程内联shell变量提前展开。
 - `agent_doc/results/full_precision_matrix_20261116/_dispatch/run_ruler_vendor_gap.sh`：取消前用于SparQ/HISA/ClusterKV 64K/128K独立输出、固定HEAD、干净worktree、GPU占用检查、全量日志、11任务生成及formal scorer硬门禁；现仅归档，不再执行这些已取消方法。
 - `agent_doc/results/full_precision_matrix_20261116/_dispatch/run_lbv2_nfa.sh`：Qwen3-8B NFA LBv2的隔离一样本smoke与503请求确定性分片；固定HEAD、干净worktree、实测GPU、完整日志、逐分片runcap/source manifest评分，评分目录按分片隔离以避免跨分片ID误合并。
+- `agent_doc/results/full_precision_matrix_20261116/_dispatch/run_ruler_quest_official_gap.sh`：Qwen3-8B官方Quest RULER三长度的独立smoke/formal入口；固定主仓HEAD、Quest子模块HEAD、扩展与运行包SHA，检查干净producer、11份输入和GPU compute app，以`pred_active`隔离现行generation，完成后调用正式scorer。smoke仅`niah_single_1`一条，formal为11任务×100，smoke分数不外推人口精度。
 - C2/C3固定producer为`9f3e8057acd528a904aa8883b830d541b389e39f`，输出与历史目录隔离。vendor资产位于被忽略的`exp/vendor_baselines`，clean worktree不会自动携带，必须在点火前同步并记录哈希；ClusterKV还需要`ckv_env.sh`。
 
 ## Progress
@@ -103,10 +104,19 @@
 - 停车后pc02四卡和pc31双卡显存均释放至1 MiB，无本任务残留Python，六格均无done标记。SparQ 64K/128K、HISA 64K/128K、ClusterKV 64K/128K的partial行数依次27/10、24/11、5/4；这些partial及日志已收割到本机`ak_verify_results/full_precision_matrix_cc480756_20261116`，状态统一为`cancelled-by-user`，不评分、不闭集、不并入正式精度矩阵。
 - 六份取消前单样本smoke继续保留为历史入口证据，不能外推人口精度，也不再扩展。被中断的旧提交没有创建，相关暂存已撤销；SparQ脚本的临时`--baseline-execute`修改已恢复，不随取消状态提交。
 
+### 2026-11-17 C3三长度闭集与Quest官方32K/64K点火
+
+- C3 near/far=avg/avg的128K两片已各50/50闭集并收割，shard1 done时间为`2026-11-17T14:13:02+08:00`。三长度合并正式审计逐样本复算官方分、source index、输入身份、runcap、prediction/receipts/scores/source manifest SHA及36层全部keep均PASS；official_score=80.0/78.0/65.0，共300请求。审计=`ak_verify_results/nfa_dac_ruler_regional_9f3e8057_20261116/_audits/c3_32k_64k_128k_production_audit.json`，SHA256=`87b9f293e4229483f2535b7722e8f2648cd021fa97bfc779950383add059f88a`。仍仅为MultiKey2单任务并保持pending-independent-verification，不能冒充完整RULER。
+- C2 minmax/minmax的128K shard0已50/50闭集并收割，shard1已在本机GPU0接力；三长度合并审计必须等shard1完成，当前不提前给128K分数。
+- 新增`run_ruler_quest_official_gap.sh`并部署固定producer `2ccb64a66ce9d894ce388bfa0e43dbf0fe757471`。首次Quest 32K smoke在模型加载后因Quest目录缺少子模块Git元数据、HEAD向上解析成主仓而fail-closed，未生成prediction或done；失败日志已单独保留为`quest_L32768_smoke.failed-git-identity.log`。随后通过完整bundle恢复Quest真实HEAD=`01c1623bf9395009520874e989e29f683203b357`，保留修改版运行源码和扩展SHA=`52abaae86e945d0aff1620f6890eba85fe17164a16b6939a414b1a69ec241de4`，未修改`git_identity()`。运行包带入的7个嵌套第三方`.git`指针指向本机原仓或不存在模块，已可逆移至`/tmp/quest_nested_git_pointers*_2ccb64a6`；producer仅在`.git/config`登记`submodule.third-party/Quest.ignore=dirty`以容纳已知精简/补丁运行树，主仓HEAD和其他tracked文件仍由原有洁净门禁检查。
+- Quest 32K单样本smoke已在pc02 GPU2真实完成，1/1、official_score=100.0、yarn=false，prediction SHA256=`b619701398766f9e4d66f35707d37e0eb27133cd257e07cf87fcba6841857c07`，formal score SHA256=`83525938a72825f891bd14c2e1127111636bcad10b55f1d86bb355062fc1f443`；smoke及首次失败日志已收割。随后32K正式11任务×100在pc02 GPU2启动，父shell PID=3825748，启动时GPU、模型加载和逐请求日志三重验证通过，尚未闭集。
+- 本机GPU1实测空闲后仅用于Quest 64K精度任务，不用于性能测试；GPU0继续C2。64K单样本smoke已1/1、official_score=100.0、yarn=true/factor=2.0，prediction SHA256=`2f975bd141a701f78ece55037dfb49fd235ea9feb8bd08ab5af0da6ab47beff3`，formal score SHA256=`5432fa3ec18f340783b088ad66a3eee4052aaff357cfd3e793f9718a37c3a590`。随后64K正式11任务×100在本机GPU1启动，父shell PID=1005454，尚未闭集。128K尚未smoke，需等待实测空卡；所有Quest结果继续pending-independent-verification，不与旧vendor或历史generation混池。
+
 ## 下一步
 
-1. LBv2 503已完成canonical merge、官方strict评分和44项SHA复核，不再重复生成；保留pending-independent-verification并交不同owner验收。
-2. 继续未取消的pc32 C3与pc33 C2 128K链；两臂闭集后分别合并三长度各100条并正式审计，不与avg/minmax混池。
-3. 后续baseline只处理Quest、JSSA、AsyncTLS的真实恢复与必要补格；已取消的六个vendor partial只保留证据，不继续运行、评分或闭集。
-4. 继续恢复GLM/Qwen3-32B Quest/JSSA原始generation；Qwen3-32B NFA若需统一协议16任务正式臂则重跑legacy13，不直接拼接13+3。FASA 35.15原始prediction不再恢复。
-5. 仅在Quest/JSSA/AsyncTLS及未取消的FullKV/NFA范围核验其余模型与数据集支持；完成官方评分、输入身份、runcap、SHA256和生产侧审计后更新矩阵及`CURRENT_NARRATIVE.md`，独立验收前不作最终质量结论。
+1. LBv2 503和C3三长度300请求已完成闭集与生产侧审计，不再重复生成；保留pending-independent-verification并交不同owner验收。
+2. 继续本机C2 128K shard1，闭集后合并三长度各100条并正式审计，不与avg/minmax混池。
+3. 继续Quest 32K/64K正式11任务×100；128K必须先在实测空卡完成真实smoke，通过后再派正式臂。每长度闭集后核验官方评分、generation pointer、输入/YaRN身份与全部SHA。
+4. 后续baseline只处理Quest、JSSA、AsyncTLS的真实恢复与必要补格；已取消的六个vendor partial只保留证据，不继续运行、评分或闭集。
+5. 继续恢复GLM/Qwen3-32B Quest/JSSA原始generation；Qwen3-32B NFA若需统一协议16任务正式臂则重跑legacy13，不直接拼接13+3。FASA 35.15原始prediction不再恢复。
+6. 仅在Quest/JSSA/AsyncTLS及未取消的FullKV/NFA范围核验其余模型与数据集支持；完成官方评分、输入身份、runcap、SHA256和生产侧审计后更新矩阵及`CURRENT_NARRATIVE.md`，独立验收前不作最终质量结论。
