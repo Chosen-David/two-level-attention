@@ -82,10 +82,9 @@
         "note": "FASA pred_fasa_1024恢复目录3750/3750、16/16 strict runcap及SHA通过，生产侧AVG16=33.31与fasa_lb_16.json逐任务一致；输入身份仅为legacy_strict。另一份AVG16=35.15的汇总source file已定位到sglang/exp/trace/results/qwen3_8b_longbench_fasa_vendor.json（SHA256=cf8659bb4b19bd000357475e32a324ce3152f4d8686ce44d7ef260fa1baeb098），但原始generation仍未定位，保留为独立report-only恢复候选，不覆盖33.31证据。MoBA原始13任务3150行已恢复，缺samsum/trec/passage_count且无run-cap sidecar；canonical difflib AVG13=49.04，显式Levenshtein复算逐任务吻合旧AVG13=49.19。另发现的moba_vendor缺失任务文件与e89首条prediction及record schema均不同，且e89同身份三文件全局检索为0，禁止跨generation补缺。"
       },
       "longbench_v2": {
-        "reuse": ["FullKV", "Quest", "JSSA", "AsyncTLS"],
-        "generating": ["NFA"],
+        "reuse": ["FullKV", "NFA", "Quest", "JSSA", "AsyncTLS"],
         "missing_or_unrecovered": ["MInference", "SparQ", "MoBA", "ClusterKV", "HISA", "FASA"],
-        "note": "official Quest与旧vendor Quest为不同implementation identity；现行NFA质量入口复用共享run_quality，普通/-O各29项主机契约测试通过。2026-11-17 pc32真实单样本smoke已生成31512-token输入、23-token输出，补齐同版jieba/rouge后仅重跑评分并通过official-strict、strict runcap和v2输入身份；正式world=8的shard0已启动63请求，其余7片待空闲卡，尚未形成503闭集或新AVG。"
+        "note": "official Quest与旧vendor Quest为不同implementation identity。2026-11-17现行NFA正式world=8全部8片已完成真实生成、逐片官方评分、本机收割和canonical merge；503个官方ID恰好闭集，official-strict=162/503=32.21，strict_runcap=1、v2_identity=1、cap=31500，44项证据SHA复核PASS。结果=qwen3_8b_nfa_lbv2.json（SHA256=62a9828d50c7a5c7a3f1f3531f766eee9203512110deef4bca50f25a873f4c6a），保持pending-independent-verification，不与历史full/mavg/aavg混池。"
       },
       "ruler_32768": {
         "reuse": ["FullKV", "NFA", "AsyncTLS", "MInference", "FASA", "SparQ", "HISA", "ClusterKV"],
@@ -168,17 +167,47 @@
   "dispatch_state": {
     "producers": {
       "ruler_regional": "9f3e8057acd528a904aa8883b830d541b389e39f",
-      "qwen3_8b_nfa_lbv2": "b3ee770f8865549ef7271bc83f73968a328950d1"
+      "qwen3_8b_nfa_lbv2": "b3ee770f8865549ef7271bc83f73968a328950d1",
+      "ruler_vendor_gap": "cc48075695a827840c25d35df917df3a1079838d"
     },
     "active_formal_workers": [
-      {"host": "pc32", "gpu": 0, "arm": "Qwen3-8B NFA LongBench v2", "shard": "0/8", "expected_rows": 63},
-      {"host": "pc32", "gpu": 1, "arm": "Qwen3-8B RULER C3 near/far=avg/avg", "cell": "32768 shard0/2", "expected_rows": 50}
+      {"host": "pc32", "gpu": 1, "arm": "Qwen3-8B RULER C3 near/far=avg/avg", "cell": "131072 shard0/2", "expected_rows": 50}
     ],
-    "queued_regional_requests": {"c2": 300, "c3_after_current_worker": 250},
+    "completed_formal_workers": [
+      {"host": "pc32", "gpu": 0, "arm": "Qwen3-8B NFA LongBench v2", "shard": "0/8", "rows": 63, "official_strict_score": 34.92, "scope": "single_shard_not_population_avg"},
+      {"host": "pc02", "gpu": 0, "arm": "Qwen3-8B NFA LongBench v2", "shard": "1/8", "rows": 63, "official_strict_score": 30.16, "scope": "single_shard_not_population_avg"},
+      {"host": "pc02", "gpu": 1, "arm": "Qwen3-8B NFA LongBench v2", "shard": "2/8", "rows": 63, "official_strict_score": 31.75, "scope": "single_shard_not_population_avg"},
+      {"host": "pc02", "gpu": 2, "arm": "Qwen3-8B NFA LongBench v2", "shard": "3/8", "rows": 63, "official_strict_score": 34.92, "scope": "single_shard_not_population_avg"},
+      {"host": "pc31", "gpu": 0, "arm": "Qwen3-8B NFA LongBench v2", "shard": "4/8", "rows": 63, "official_strict_score": 38.1, "scope": "single_shard_not_population_avg"},
+      {"host": "pc40", "gpu": 0, "arm": "Qwen3-8B NFA LongBench v2", "shard": "5/8", "rows": 63, "official_strict_score": 19.05, "scope": "single_shard_not_population_avg"},
+      {"host": "pc40", "gpu": 1, "arm": "Qwen3-8B NFA LongBench v2", "shard": "6/8", "rows": 63, "official_strict_score": 31.75, "scope": "single_shard_not_population_avg"},
+      {"host": "pc02", "gpu": 3, "arm": "Qwen3-8B NFA LongBench v2", "shard": "7/8", "rows": 62, "official_strict_score": 37.1, "scope": "single_shard_not_population_avg"},
+      {"host": "pc32", "gpu": 1, "arm": "Qwen3-8B RULER C3 near/far=avg/avg", "cells": ["32768 shard0/2", "32768 shard1/2", "65536 shard0/2", "65536 shard1/2"], "rows": 200}
+    ],
+    "qwen3_8b_nfa_lbv2_result": {
+      "path": "agent_doc/results/full_precision_matrix_20261116/qwen3_8b_nfa_lbv2.json",
+      "sha256": "62a9828d50c7a5c7a3f1f3531f766eee9203512110deef4bca50f25a873f4c6a",
+      "rows": 503,
+      "correct": 162,
+      "official_strict_score": 32.21,
+      "evidence_sha256_checked": 44,
+      "verification": "pending-independent-verification"
+    },
+    "regional_c3_completed": {
+      "verification": "pending-independent-verification",
+      "production_audit": "ak_verify_results/nfa_dac_ruler_regional_9f3e8057_20261116/_audits/c3_32k_64k_production_audit.json",
+      "production_audit_sha256": "0ef40778577e5e1b07e390be01190e819b1b89d205d57a4b5aca090bd19b4905",
+      "results": [
+        {"context_length": 32768, "rows": 100, "official_score": 80.0},
+        {"context_length": 65536, "rows": 100, "official_score": 78.0}
+      ],
+      "scope": "Qwen3-8B RULER niah_multikey_2单任务；near/far=avg/avg；每长度双分片合并审计，32K/64K各100条、36层全部keep，尚未完成128K"
+    },
+    "queued_regional_requests": {"c2": 300, "c3_after_current_worker": 50},
     "qwen3_8b_nfa_lbv2_smoke": "1/1 generation and official-strict scoring PASS; input=31512, output=23, strict_runcap=1, v2_identity=1; smoke score is not a full-population accuracy claim",
-    "last_ignition_attempt": "pc33 GPU1在LBv2脚本GPU门禁前被另一会话性能worker占用，未生成请求；pc32旧regional worktree缺少后新增链脚本，C2/C3首次启动立即退出且无prediction。链脚本随后投送到producer外部路径，C3和LBv2 smoke/formal均完成三重验证后真实运行。",
-    "resource_policy": "只使用点火前重新实测空闲的卡；当前pc33/pc02/pc40/pc31均有其他compute app，pc32双卡由本任务两个worker使用；pc14两次直接sshpass密码登录均连接超时，不作为可用资源。",
-    "vendor_assets": "SparQ关键patch在本机/pc02/pc40 SHA一致；HISA已从pc02恢复，ClusterKV vendor及third_party/ClusterKV已从pc40恢复。vendor runner新增隔离单任务单样本smoke模式，尚未真实GPU smoke。",
-    "next": "在新增空闲卡启动LBv2剩余1/8至7/8分片；C3链完成后继续C2；同步锁定vendor资产到独立新producer worktree并做三方法64K/128K smoke，通过后执行全量补格。"
+    "last_ignition_attempt": "LBv2全部8片已完成生成、逐片评分、收割和503 canonical merge，官方strict=162/503=32.21，44项证据SHA复核PASS。C3的32K/64K已各100条通过生产侧正式审计，128K shard0已完成新进程、显存和加载日志三重验证。pc32 GPU0随后由另一会话gate-sensitivity worker使用，未触碰。",
+    "resource_policy": "只使用点火前重新实测空闲的卡；2026-11-17最新复核pc33双卡、pc02/pc31/pc40/pc32全部目标卡均有compute app，不能新增vendor或C2点火；pc14两次直接sshpass密码登录均连接超时，不作为可用资源。",
+    "vendor_assets": "pc02/pc31/pc40/pc32均已部署独立cc480756 clean producer及同SHA SparQ/HISA/ClusterKV资产。pc02 ClusterKV 4.5GB环境已恢复，libcublas.so.12存在且torch 2.8.0+cu128、pylibraft.cluster、rmm真实导入PASS；三方法仍尚未真实GPU smoke。",
+    "next": "LBv2已闭集，不再重复生成；保持C3 128K链并在真实空卡启动C2，完成后做三长度正式审计；vendor先在空卡做64K/128K单样本smoke，通过后再跑11任务×100正式补格，继续处理其余模型和数据集缺口。"
   }
 }

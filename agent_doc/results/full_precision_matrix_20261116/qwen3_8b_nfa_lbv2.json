@@ -1,0 +1,75 @@
+{
+  "schema": "full-precision-matrix-longbench-v2-result-v1",
+  "status": "pass-production-side",
+  "verification": "pending-independent-verification",
+  "model": "Qwen3-8B",
+  "dataset": "LongBench v2",
+  "method": "NFA",
+  "producer": "b3ee770f8865549ef7271bc83f73968a328950d1",
+  "execution": "eager",
+  "nfa": {
+    "subspace": "tail",
+    "gate": "off",
+    "gate_epsilon": 0.0,
+    "level1_topk": 128,
+    "level2_topk": 1024,
+    "page_size": 64,
+    "near_pages": 32,
+    "near_tokens": "off",
+    "near_len": 4096,
+    "near_method": "avg",
+    "far_method": "minmax",
+    "sink_tokens": 4,
+    "sliding_window_size": 128,
+    "subspace_dim": 32,
+    "subspace_cmp_ratio": 4
+  },
+  "population": {
+    "requests": 503,
+    "unique_official_ids": 503,
+    "world_size": 8,
+    "sharding": "source_order[rank::world_size]",
+    "rows_per_shard": [63, 63, 63, 63, 63, 63, 63, 62]
+  },
+  "official_strict": {
+    "choice_parser": "official-strict-v1",
+    "scorer_backend": "difflib:stdlib",
+    "correct": 162,
+    "score": 32.21,
+    "unrounded_accuracy_percent": 32.20675944333996,
+    "strict_validated": 1,
+    "v2_validated": 1,
+    "legacy_no_sidecar": 0,
+    "cap_effective": 31500,
+    "cap_comparability_key": "6688f41924",
+    "cap_identity_hash": "3bd01edd48",
+    "source_fingerprint": "v2-76fedda7999eb4e6b58d977271b1817a16e5c260ee437d106fa5eecace14e751",
+    "prompt_template_sha256": "e6ea2750f5810f8767be6d764df16c94b58f6f337fee6618fc8ccfdb99c38576",
+    "actual_input_ids_ordered_sha256": "6bbca7273809d6498340963745b61b3f81659bdc2fa4dd862ade6e8d52c3038e"
+  },
+  "evidence_root": "ak_verify_results/full_precision_matrix_b3ee770f_20261116/qwen3_8b_nfa_lbv2",
+  "canonical": {
+    "prediction": "pred/lbv2-nfa_tail_gate_off_eager.jsonl",
+    "prediction_sha256": "e4ebad7b4a3c4b2a7fc68f3f22cf6a020c7c8417c4f3c3aa5f15993722d800a1",
+    "runcap_sha256": "9d02dca3cf7820e3a341fe3994923696a72670765cc03ff8615e2b738afcd7a7",
+    "source_manifest_sha256": "0531e425ffa48b637b5b6bd8816f7487490e5b3b0e06c33434d608eb1b091c7c",
+    "official_result": "_score_canonical/result.json",
+    "official_result_sha256": "7f4d135fc5e786b949f3782bc55d34fd8a72122b8ec729262b1e93ed136662ac"
+  },
+  "shards": [
+    {"rank": 0, "host": "pc32", "gpu": 0, "rows": 63, "score": 34.92, "prediction_sha256": "acb57172c8a155c044394fc364ab039680bb14becdcacf5db9fd9eb05659893e", "runcap_sha256": "42fd7d2f11cbf121a61ccfc8a15c50e6bfa37d6e26d25bfcb09158d1d6390a47", "source_manifest_sha256": "2f4de69755f00df04af1cb9f7e56b413c136fe7f2324014a3d34a8979a1db3ec", "quality_manifest_sha256": "a8c67d87e9ea5d0d8f012512ccd4d5732908d4f0fa2d19404765e23d254484e2", "result_sha256": "c15db6ce677a89788762cb187426e2b85022e04d51308c91873684f46a7523a6"},
+    {"rank": 1, "host": "pc02", "gpu": 0, "rows": 63, "score": 30.16, "prediction_sha256": "d073a784e70064599267ca01c0ed43406bc1dfec00a1fa3559cede2fc107919f", "runcap_sha256": "506407976ecf2aabcaaa1b2446cb06166e373a1df863d045eb0c327d42722119", "source_manifest_sha256": "e4f31310ecb3c376456796d99feeb055a7250770c14cc56a3932a037825a9409", "quality_manifest_sha256": "f2ad60c9f23a84053b00474685ba49cf7a1b9b42ac6e271077a7a3b7fad1a9e2", "result_sha256": "1c56309bba2062760955d218d43cd75b63dabdfabb2df64274345388b800a460"},
+    {"rank": 2, "host": "pc02", "gpu": 1, "rows": 63, "score": 31.75, "prediction_sha256": "72f2963752d7b9a789b0e8159ad33f122ce7a02f3d46603fddc4c73a976c6930", "runcap_sha256": "82e3495392ec48be070d9e04bf8f1211f6af9fc06161c3e0d00435a2c0470a30", "source_manifest_sha256": "fa7aaac8c264d7438c900299666c1036bcc79534f2aed0667afde8cd1ff8c2da", "quality_manifest_sha256": "5272d667e01f3f1d68b9850c6312841e97ce40da9cb01307486ee2d8a785f4cf", "result_sha256": "427d339f2e565bb11000c38f1befcf3d1acecf6d8d7ae34c56c9ee38817f8b02"},
+    {"rank": 3, "host": "pc02", "gpu": 2, "rows": 63, "score": 34.92, "prediction_sha256": "06e1d42098b464c98a1262cf35de56bfc16d53163b6b15c5c9fed3551e7eaca0", "runcap_sha256": "fd02c9a6f81f2b4427d06bccb188c9f11a9c1f03856446512c33c15017ed5b22", "source_manifest_sha256": "fed527364417f0f2cde7b31bde430e7561faf14438b84cbf8a99e3a22df9a022", "quality_manifest_sha256": "33ce5a0e86785cb49c27b1e715ad0da735e7e54b701dd068e9c3412dc166b805", "result_sha256": "e4f117c7a23549831cee0206265e7ac99c983f02bc9d7ad271aee226deed5944"},
+    {"rank": 4, "host": "pc31", "gpu": 0, "rows": 63, "score": 38.1, "prediction_sha256": "5521f2f2afd9c9eb8d747b7b997a695d14af9c096b6b50327f5b91652430778f", "runcap_sha256": "866d916b9a6a724a112908ab474e75cd069e1c78b19aedbbe83aca2384eb761f", "source_manifest_sha256": "096eb640a03a5750471cdb29f1d38e564b4dc6fa851d13b61daee2b6656aaea1", "quality_manifest_sha256": "a08798aac89fb49a5bb1ea499e11fc1a03028b39fc24e0cdbc29e7f518bb0378", "result_sha256": "52c64688628f283b61df6757a271c4d8409ca95e1a367315ed42d0902fbe35a0"},
+    {"rank": 5, "host": "pc40", "gpu": 0, "rows": 63, "score": 19.05, "prediction_sha256": "eb841ef4feabfbf52729613979d46542dd3c2316883209a134829ddcf36d864b", "runcap_sha256": "7fa155f1d336e0f7aed2900c375a0a6549fe31ed0a316b24954628a14bbf6fbf", "source_manifest_sha256": "8909dfa1f57395a02f7b798c5b619824837ee1ce197cd025f8ef71fe1448e2c5", "quality_manifest_sha256": "041f5086cc2264bc91d04ca87b2f53c1ff57058a65df71df8627de6616f1de98", "result_sha256": "8e581e9b4d32a26b7dcfa65bee42dda2592fa7db74ae4cfaabbd412dab0c8b12"},
+    {"rank": 6, "host": "pc40", "gpu": 1, "rows": 63, "score": 31.75, "prediction_sha256": "552daeed6ce2cb429913b5f07dd031da0652fd4c8471a8f52f80f53e31a4b57a", "runcap_sha256": "46a025b261cb89a191294d594315c72d7b42d5862847bfe5190668d1960c9695", "source_manifest_sha256": "fa792d7d175f100a05ba859a9c50858e589ad1930ac2ee6ce1f7f3f1d8bd6044", "quality_manifest_sha256": "007050054c59cd6061a10a62a5d653174f9d24be017215f8d1ebcb8ac2e871d0", "result_sha256": "cf6ceeaca773c720fc11f08e0c192d552bba9c295f7619628343ba8de68761d6"},
+    {"rank": 7, "host": "pc02", "gpu": 3, "rows": 62, "score": 37.1, "prediction_sha256": "73b968024c53065ccd968975d896038f170300a6b2f66524af16323ec0a395db", "runcap_sha256": "eda275adef45c94d4e1011c23c75c38214957f077f7d220d0e6c0017307462f8", "source_manifest_sha256": "1182640c1daa49822b69193a7bf645cd29878096b834e9e63455c8852ed05ac5", "quality_manifest_sha256": "2a8c1f5a10ee5241a9326587ddb211d8fdd4c8023033b2309ce80d1adfcc8c32", "result_sha256": "526559fed16340043024ca118d144548ee0afb5104d68a531ec393ec0601181a"}
+  ],
+  "notes": [
+    "八个分片均完成真实GPU生成、逐分片官方strict评分和本机收割；canonical merge校验rank、源顺序、官方ID、choice、输入身份、producer及runcap后恢复503顺序。",
+    "生产侧独立重算pred_choice命中162/503=32.20675944333996%，与官方32.21一致。",
+    "分片分数只用于对账，不作为人口AVG；本结果不与历史full/mavg/aavg或其他implementation identity混池。",
+    "当前仅为Qwen3-8B单模型单方法LBv2闭集，不表示四模型全baseline已经补齐；不同owner独立验收前不作最终质量结论。"
+  ]
+}

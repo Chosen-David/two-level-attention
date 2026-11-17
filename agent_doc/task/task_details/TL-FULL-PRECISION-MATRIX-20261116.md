@@ -76,10 +76,19 @@
 - smoke通过后已启动正式`world=8`的shard0（63请求），进程PID=2161646、显存与日志三重验证通过；其余7片只保留明确待派状态，未写成已生成。正式输出与smoke隔离，每片评分目录也隔离。
 - SparQ关键patch在本机/pc02/pc40的SHA256一致（`qwen3_sparq_patch.py=97040f44...`、`sparq_attention_official.py=b0f8929b...`）；HISA已从pc02恢复（`qwen3_hisa_patch.py=96186a77...`），ClusterKV vendor和`third_party/ClusterKV`已从pc40恢复（`ckv_env.sh=c120d745...`、patch=`bb5f58ca...`）。`run_ruler_vendor_gap.sh`新增可选`smoke|formal`模式，smoke只跑`niah_single_1`一条并使用独立输出/锁/评分门禁；已通过`bash -n`、ShellCheck和diff检查，尚未真实GPU smoke。
 
+### 2026-11-17 LBv2八片并行、C3推进与ClusterKV环境恢复
+
+- LBv2正式`world=8`现已全部互斥点火：pc32 GPU0=`0/8`，pc02 GPU0/1/2/3=`1/2/3/7`，pc31 GPU0=`4/8`，pc40 GPU0/1=`5/6/8`。除shard7为62条外其余各63条，总计503。每片均有独立Python、compute app/显存和启动日志；启动后行数持续增长，没有把pid存在单独当作健康证据。
+- LBv2全部8片已完成63/63（shard7为62/62）、逐片官方strict评分及本机收割，分片score依次34.92/30.16/31.75/34.92/38.10/19.05/31.75/37.10；所有分片strict_runcap=1、v2_identity=1。现有`merge_longbench_quality.py`已校验8个rank、源顺序、官方ID、strict choice、输入身份、producer和runcap，canonical prediction恰为503个唯一官方ID。隔离目录官方评分为32.21，生产侧重算`pred_choice`命中162/503=32.20675944333996%；cap=31500，44项证据SHA复核PASS。结果与逐片哈希归档为`agent_doc/results/full_precision_matrix_20261116/qwen3_8b_nfa_lbv2.json`（SHA256=`62a9828d50c7a5c7a3f1f3531f766eee9203512110deef4bca50f25a873f4c6a`），继续pending-independent-verification，禁止重复生成已闭集503请求。
+- C3在pc32 GPU1已完成32K和64K各两片，共200条；128K shard0已于10:52:45启动，新Python PID=2213090，GPU1显存约47GB，模型加载日志正常，链内剩余128K shard1。C2尚未点火。pc32 GPU0在shard0完成后被另一会话gate-sensitivity worker接棒，pc31/pc40/pc33其他计算进程也均保持不动。
+- C3的32K/64K完整证据已收割并通过`audit_ruler_results.py`生产侧正式审计：每长度100个source index恰好闭合，逐样本官方分、输入身份、runcap、prediction/receipts/scores/source manifest SHA及36层全部keep均PASS；official_score分别80.0/78.0。审计=`ak_verify_results/nfa_dac_ruler_regional_9f3e8057_20261116/_audits/c3_32k_64k_production_audit.json`，SHA256=`0ef40778577e5e1b07e390be01190e819b1b89d205d57a4b5aca090bd19b4905`；仅为MultiKey2单任务且继续pending-independent-verification，128K尚未闭集。审计器仅新增允许实际producer `9f3e8057`，未放宽任何数据门禁。
+- 四台远端已用bundle部署独立clean producer `/tmp/full-precision-matrix-cc480756`，HEAD=`cc48075695a827840c25d35df917df3a1079838d`，并同步被忽略的SparQ/HISA/ClusterKV源码资产，关键文件SHA一致。pc02的4.5GB ClusterKV环境已恢复，`libcublas.so.12`就位，`torch 2.8.0+cu128 + pylibraft.cluster + rmm`真实导入PASS；这只解除环境阻塞，三方法仍未完成真实GPU smoke。
+- 最新GPU复核没有发现可安全新增任务的空卡；vendor smoke和C2保持待派，不能以环境就绪代替生成结果。LBv2八片齐后复用现有`merge_longbench_quality.py`按source index恢复503顺序，重建canonical runcap/source manifest，再在隔离目录用官方strict scorer评分；所有结果继续`pending-independent-verification`。
+
 ## 下一步
 
-1. 新增空卡优先启动LBv2 `1/8`至`7/8`互斥分片；每片点火后完成PID、compute app/显存和日志三重验证，最终按官方`_id`闭集503。
-2. 保持pc32 C3链运行，资源允许时启动C2；两臂完成后分别合并三长度各100条并正式评分，不与avg/minmax混池。
+1. LBv2 503已完成canonical merge、官方strict评分和44项SHA复核，不再重复生成；保留pending-independent-verification并交不同owner验收。
+2. 保持pc32 C3 128K链运行，资源允许时启动C2；两臂完成后分别合并三长度各100条并正式评分，不与avg/minmax混池。
 3. 将SparQ/HISA/ClusterKV锁定资产同步到独立新producer worktree，逐方法执行64K/128K单样本smoke，通过后执行各11任务×100正式补格。
 4. 继续恢复GLM/Qwen3-32B Quest/JSSA原始generation及FASA 35.15原始prediction；Qwen3-32B NFA若需统一协议16任务正式臂则重跑legacy13，不直接拼接13+3。
 5. 逐方法核验其余模型与数据集支持；完成官方评分、输入身份、runcap、SHA256和生产侧审计后更新矩阵及`CURRENT_NARRATIVE.md`，独立验收前不作最终质量结论。

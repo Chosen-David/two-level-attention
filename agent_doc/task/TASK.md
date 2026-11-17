@@ -2,7 +2,7 @@
 
 ## 2026-11-16
 
-- [ ] [TL-FULL-PRECISION-MATRIX-20261116] 四模型×FullKV/NFA×全部现行baseline×LongBench v1/v2/RULER三长度覆盖矩阵与历史恢复审计已落盘；FASA双来源、MoBA13任务双后端、Qwen3-32B NFA跨代13+3 merge-audit及Quest/JSSA pc14恢复缺口均保持分列。2026-11-17 Qwen3-8B NFA LBv2真实单样本smoke已完成生成并在补齐同版评分依赖后通过official-strict/runcap/v2身份，正式world=8 shard0（63请求）与C3 32K shard0已在pc32双卡点火，剩余分片待实测空卡；C2尚未点火。SparQ/HISA/ClusterKV资产已定位恢复，vendor隔离smoke模式已实现但尚未GPU验证，所有结果保持pending。([详情](task_details/TL-FULL-PRECISION-MATRIX-20261116.md)；[矩阵](../results/full_precision_matrix_20261116/summary.json))
+- [ ] [TL-FULL-PRECISION-MATRIX-20261116] 四模型×FullKV/NFA×全部现行baseline×LongBench v1/v2/RULER三长度覆盖矩阵与历史恢复审计已落盘；FASA双来源、MoBA13任务双后端、Qwen3-32B NFA跨代13+3 merge-audit及Quest/JSSA pc14恢复缺口均保持分列。2026-11-17 Qwen3-8B NFA LBv2正式8片已完成503 canonical闭集、official-strict=162/503=32.21及44项SHA复核；RULER C3 avg/avg的32K/64K已各100条通过正式审计（80.0/78.0），128K在跑，C2尚未点火。SparQ/HISA/ClusterKV独立producer及资产已部署，pc02 ClusterKV环境真实导入PASS，三方法仍待空卡GPU smoke；所有结果保持pending-independent-verification。([详情](task_details/TL-FULL-PRECISION-MATRIX-20261116.md)；[矩阵](../results/full_precision_matrix_20261116/summary.json))
 
 ## 2026-11-15
 
