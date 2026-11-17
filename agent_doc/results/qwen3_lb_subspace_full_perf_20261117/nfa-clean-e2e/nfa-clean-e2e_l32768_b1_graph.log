@@ -1,0 +1,36 @@
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/5 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 5/5 [00:00<00:00, 178.58it/s]
+register qwen3 attn: [model.layers.0.self_attn]
+register iter91 rmsnorm: [model.layers.0.self_attn.q_norm]
+register iter91 rmsnorm: [model.layers.0.self_attn.k_norm]
+register iter91 rmsnorm: [model.layers.0.input_layernorm]
+register iter91 rmsnorm: [model.layers.0.post_attention_layernorm]
+register iter97 MLP SiLU+mul: [model.layers.0.mlp]
+{
+  "context_length": 32768,
+  "batch_size": 1,
+  "execution": "graph",
+  "measurement_mode": "clean-e2e",
+  "subspace": "full",
+  "l2_subspace": "full",
+  "score_dimensions": {
+    "head_dim": 128,
+    "l1_score_dims": 128,
+    "l2_score_dims": 128
+  },
+  "gate_epsilon": 0.05,
+  "force_skip_mode": "natural",
+  "operator_mode": "off",
+  "operator_summary": null,
+  "steady_tpot_ms_median": 12.584496021270752,
+  "prefill_seconds": 7.809306621551514,
+  "skip": {
+    "0": {
+      "n_layers": 36,
+      "near_layers": [],
+      "far_layers": [],
+      "both_layers": []
+    }
+  },
+  "saved": "/home/wangyuanshuo02/qwen3_lb_subspace_20261116/perf_full_v1/nfa-clean-e2e/nfa-clean-e2e_l32768_b1_graph.json"
+}

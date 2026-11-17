@@ -1,0 +1,69 @@
+{
+  "arguments": {
+    "repo": "/home/wangyuanshuo02/qwen3_lb_subspace_20261116/two-level-attention",
+    "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+    "data_root": "/tmp/nfa_kernel_inputs",
+    "task": "niah_multikey_2",
+    "sample_index": 2,
+    "input_provenance": "repeated-needle-body-extension",
+    "longbench_data": "/home/wangyuanshuo02/datasets/LongBench/data",
+    "output_dir": "/home/wangyuanshuo02/qwen3_lb_subspace_20261116/perf_full_v1",
+    "gpu": 1,
+    "shard_index": 0,
+    "num_shards": 1,
+    "arms": [
+      "flashinfer-e2e"
+    ],
+    "lengths": [
+      32768
+    ],
+    "batches": [
+      1
+    ],
+    "execution": "graph",
+    "warmup_steps": 3,
+    "profile_repeat": 5,
+    "decode_steps": 32,
+    "visible_len": 8192,
+    "subspace": "full",
+    "l2_subspace": "full",
+    "gate_epsilon": 0.05,
+    "force_skip_mode": "natural",
+    "max_attempts": 2,
+    "prepare_only": false,
+    "summarize_only": false
+  },
+  "source_by_arm": {
+    "nfa-operator-profile": {
+      "head": "9f3e8057acd528a904aa8883b830d541b389e39f",
+      "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+    },
+    "nfa-clean-e2e": {
+      "head": "9f3e8057acd528a904aa8883b830d541b389e39f",
+      "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+    },
+    "flashinfer-operator-profile": {
+      "head": "9f3e8057acd528a904aa8883b830d541b389e39f",
+      "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "harness_sha256": "003485049371ab321c26c18f0bf32f3e905dd819530924a11ed3fbf4f84d71ae"
+    },
+    "flashinfer-e2e": {
+      "head": "9f3e8057acd528a904aa8883b830d541b389e39f",
+      "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "harness_sha256": "bb3cac4ca0c7a55fbd42636da2d09a00ebf148676f143986d850fae628c00706"
+    }
+  },
+  "matrix_driver_sha256": "f13a1d8ce5b76c0c23765b0797913b00f729c4910ab0c77d2abc9da117c8be76",
+  "events": [
+    {
+      "length": 32768,
+      "batch": 1,
+      "arm": "flashinfer-e2e",
+      "status": "ran",
+      "output": "/home/wangyuanshuo02/qwen3_lb_subspace_20261116/perf_full_v1/flashinfer-e2e/flashinfer-e2e_l32768_b1_graph.json"
+    }
+  ],
+  "infeasible": []
+}
