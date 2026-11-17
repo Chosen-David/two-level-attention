@@ -1,7 +1,42 @@
 """区域 kernel 审计按 batch 层发射计数，而非按请求重复计数。"""
+import sys
+from types import SimpleNamespace
+
 import pytest
 
-from benchmark.efficiency.measure_nfa_selector_e2e import _region_kernel_call_audit
+from benchmark.efficiency import run_nfa_perf_matrix as perf_matrix
+from benchmark.efficiency.measure_nfa_selector_e2e import (
+    _region_kernel_call_audit,
+    _resolve_nfa_patch_args,
+)
+from sparse_attn.indexer.nfa_indexer import NFAIndexer
+
+
+@pytest.mark.parametrize('level2_topk', [256, 512, 1024, 2048])
+def test_operator_level2_topk_reaches_real_indexer_config(level2_topk):
+    patch_args = _resolve_nfa_patch_args(SimpleNamespace(
+        subspace='tail', l2_subspace='same', operator_mode='off',
+        level2_topk=level2_topk))
+    indexer = NFAIndexer(patch_args)
+    assert indexer.args.tia_level2_topk == level2_topk
+    assert indexer.args.tia_level1_topk == 128
+
+
+@pytest.mark.parametrize('level2_topk', [256, 512, 1024, 2048])
+def test_perf_matrix_forwards_level2_topk_and_guards_reuse(
+        monkeypatch, tmp_path, level2_topk):
+    monkeypatch.setattr(sys, 'argv', [
+        'run_nfa_perf_matrix.py', '--output-dir', str(tmp_path), '--gpu', '0',
+        '--arms', 'nfa-operator-profile', '--level2-topk', str(level2_topk),
+    ])
+    args = perf_matrix.parse_args()
+    fields = perf_matrix.expected_fields(
+        args, 32768, 1, 'nfa-operator-profile')
+    assert fields['level2_topk'] == level2_topk
+    command = perf_matrix.measure_command(
+        args, 32768, 1, 'nfa-operator-profile', tmp_path / 'result.json')
+    option = command.index('--level2-topk')
+    assert command[option + 1] == str(level2_topk)
 
 
 def _request(near=(), far=(), n_layers=4):

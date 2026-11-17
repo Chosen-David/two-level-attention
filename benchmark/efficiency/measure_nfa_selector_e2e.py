@@ -96,6 +96,9 @@ def parse_args():
                         choices=('operator-profile', 'clean-e2e'))
     parser.add_argument('--subspace', required=True, choices=('full', 'tail'))
     parser.add_argument('--l2-subspace', required=True, choices=('same', 'full'))
+    parser.add_argument('--level2-topk', type=int, default=1024,
+                        choices=(256, 512, 1024, 2048),
+                        help='NFA L2 token 预算；默认保持 1024')
     parser.add_argument('--gate-epsilon', type=float, required=True)
     parser.add_argument(
         '--force-skip-mode', default='natural',
@@ -162,6 +165,14 @@ def _load_input(args, tokenizer):
     return torch.tensor(material_ids, dtype=torch.long, device='cuda'), receipt
 
 
+def _resolve_nfa_patch_args(args):
+    patch_args = nfa_args(args.subspace)
+    patch_args.nfa_l2_subspace = args.l2_subspace
+    patch_args.nfa_operator_mode = args.operator_mode
+    patch_args.tia_level2_topk = args.level2_topk
+    return patch_args
+
+
 def load_model(args, max_new_tokens):
     config = AutoConfig.from_pretrained(args.model_path)
     if config.model_type != 'qwen3':
@@ -175,14 +186,15 @@ def load_model(args, max_new_tokens):
     model = AutoModelForCausalLM.from_pretrained(
         args.model_path, config=config, torch_dtype=torch.bfloat16).cuda().eval()
     verify_runtime_rope(model)
-    patch_args = nfa_args(args.subspace)
-    patch_args.nfa_l2_subspace = args.l2_subspace
-    patch_args.nfa_operator_mode = args.operator_mode
+    patch_args = _resolve_nfa_patch_args(args)
     patched = register_patch(
         model, patch_args, resolve_treatment_snapshot(patch_args),
         rmsnorm_decode=True, mlp_silu_decode=True)
     if patched != config.num_hidden_layers:
         raise RuntimeError(f'NFA patched {patched}/{config.num_hidden_layers} layers')
+    indexer = model.model.layers[0].self_attn.indexer
+    if indexer.args.tia_level2_topk != args.level2_topk:
+        raise RuntimeError('NFA L2 token 预算未到达真实 indexer')
     if args.context_length > LONG_PREFILL_MLP_CHUNK:
         _enable_long_prefill_mlp_chunk(model)
     return model, patch_args
@@ -555,6 +567,7 @@ def run(args):
         'execution': args.execution,
         'subspace': args.subspace,
         'l2_subspace': args.l2_subspace,
+        'level2_topk': model.model.layers[0].self_attn.indexer.args.tia_level2_topk,
         'score_dimensions': score_dimensions(model),
         'gate_epsilon': args.gate_epsilon,
         'force_skip_mode': args.force_skip_mode,
@@ -628,6 +641,7 @@ def main():
         'measurement_mode': args.measurement_mode,
         'subspace': args.subspace,
         'l2_subspace': args.l2_subspace,
+        'level2_topk': result['level2_topk'],
         'score_dimensions': result['score_dimensions'],
         'gate_epsilon': args.gate_epsilon,
         'force_skip_mode': args.force_skip_mode,

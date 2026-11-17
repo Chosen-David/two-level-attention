@@ -50,6 +50,9 @@ def parse_args():
     parser.add_argument('--visible-len', type=int, default=8192)
     parser.add_argument('--subspace', choices=('full', 'tail'), default='tail')
     parser.add_argument('--l2-subspace', choices=('same', 'full'), default='same')
+    parser.add_argument('--level2-topk', type=int, default=1024,
+                        choices=(256, 512, 1024, 2048),
+                        help='NFA L2 token 预算；默认保持 1024')
     parser.add_argument('--gate-epsilon', type=float, default=0.05)
     parser.add_argument(
         '--force-skip-mode', default='natural',
@@ -297,6 +300,7 @@ def expected_fields(args, length, batch, arm):
             'operator-profile' if arm == 'nfa-operator-profile' else 'clean-e2e'),
         'subspace': args.subspace,
         'l2_subspace': args.l2_subspace,
+        'level2_topk': args.level2_topk,
         'gate_epsilon': args.gate_epsilon,
         'force_skip_mode': args.force_skip_mode,
         'operator_mode': 'off',
@@ -383,6 +387,7 @@ def measure_command(args, length, batch, arm, output):
             '--measurement-mode', mode,
             '--subspace', args.subspace,
             '--l2-subspace', args.l2_subspace,
+            '--level2-topk', str(args.level2_topk),
             '--gate-epsilon', str(args.gate_epsilon), '--operator-mode', 'off',
             '--force-skip-mode', args.force_skip_mode,
             '--profile-repeat', str(args.profile_repeat),

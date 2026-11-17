@@ -1,11 +1,13 @@
 """NFA/FlashInfer LongBench 真实质量入口的主机侧契约测试。"""
 from copy import deepcopy
+from types import SimpleNamespace
 
 import pytest
 import torch
 from transformers import AutoTokenizer
 
 from benchmark.efficiency.benchmark_longbench_quality import (
+    _validate_fullkv_nfa_args,
     _validate_quality_receipt,
     nfa_quality_arm,
     resolve_nfa_quality_config,
@@ -66,6 +68,37 @@ def test_nfa_gate_off_forces_zero_epsilon_everywhere():
     assert gate_config.epsilon == 0.0
     assert nfa_quality_arm(
         "tail", "off", gate_epsilon=gate_config.epsilon) == "tail_gate_off"
+
+
+@pytest.mark.parametrize("level2_topk", [256, 512, 1024, 2048])
+def test_nfa_level2_topk_reaches_patch_indexer_runtime_and_arm(level2_topk):
+    patch_args, _ = resolve_nfa_quality_config(
+        "tail", "on", level2_topk=level2_topk)
+    assert patch_args.tia_level2_topk == level2_topk
+    indexer = NFAIndexer(patch_args)
+    assert indexer.args.tia_level2_topk == level2_topk
+    expected_arm = ("tail_gate_on" if level2_topk == 1024
+                    else f"tail_gate_on_k2{level2_topk}")
+    assert nfa_quality_arm(
+        "tail", "on", gate_epsilon=0.1,
+        level2_topk=indexer.args.tia_level2_topk) == expected_arm
+
+
+@pytest.mark.parametrize("level2_topk", [None, True, 256.5, 0, 131, -256])
+def test_nfa_level2_topk_rejects_invalid_values(level2_topk):
+    with pytest.raises(ValueError, match="level2 topk"):
+        resolve_nfa_quality_config(
+            "tail", "on", level2_topk=level2_topk)
+
+
+def test_fullkv_rejects_nfa_level2_topk_instead_of_ignoring_it():
+    args = SimpleNamespace(
+        nfa_far_method="minmax", nfa_gate_epsilon=None,
+        nfa_level2_topk=None)
+    _validate_fullkv_nfa_args(args)
+    args.nfa_level2_topk = 256
+    with pytest.raises(ValueError, match="level2 topk"):
+        _validate_fullkv_nfa_args(args)
 
 
 def test_nfa_quality_numeric_near_quota_reaches_real_indexer():
