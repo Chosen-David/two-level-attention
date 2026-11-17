@@ -171,8 +171,8 @@
       "ruler_vendor_gap": "cc48075695a827840c25d35df917df3a1079838d"
     },
     "active_formal_workers": [
-      {"host": "pc32", "gpu": 1, "arm": "Qwen3-8B RULER C3 near/far=avg/avg", "cell": "131072 shard0/2", "expected_rows": 50},
-      {"host": "pc33", "gpu": 0, "arm": "Qwen3-8B RULER C2 near/far=minmax/minmax", "cell": "32768 shard0/2", "expected_rows": 50}
+      {"host": "pc32", "gpu": 1, "arm": "Qwen3-8B RULER C3 near/far=avg/avg", "cell": "131072 shard1/2", "expected_rows": 50},
+      {"host": "pc33", "gpu": 0, "arm": "Qwen3-8B RULER C2 near/far=minmax/minmax", "cell": "65536 shard0/2", "expected_rows": 50}
     ],
     "completed_formal_workers": [
       {"host": "pc32", "gpu": 0, "arm": "Qwen3-8B NFA LongBench v2", "shard": "0/8", "rows": 63, "official_strict_score": 34.92, "scope": "single_shard_not_population_avg"},
@@ -183,7 +183,8 @@
       {"host": "pc40", "gpu": 0, "arm": "Qwen3-8B NFA LongBench v2", "shard": "5/8", "rows": 63, "official_strict_score": 19.05, "scope": "single_shard_not_population_avg"},
       {"host": "pc40", "gpu": 1, "arm": "Qwen3-8B NFA LongBench v2", "shard": "6/8", "rows": 63, "official_strict_score": 31.75, "scope": "single_shard_not_population_avg"},
       {"host": "pc02", "gpu": 3, "arm": "Qwen3-8B NFA LongBench v2", "shard": "7/8", "rows": 62, "official_strict_score": 37.1, "scope": "single_shard_not_population_avg"},
-      {"host": "pc32", "gpu": 1, "arm": "Qwen3-8B RULER C3 near/far=avg/avg", "cells": ["32768 shard0/2", "32768 shard1/2", "65536 shard0/2", "65536 shard1/2"], "rows": 200}
+      {"host": "pc32", "gpu": 1, "arm": "Qwen3-8B RULER C3 near/far=avg/avg", "cells": ["32768 shard0/2", "32768 shard1/2", "65536 shard0/2", "65536 shard1/2", "131072 shard0/2"], "rows": 250},
+      {"host": "pc33", "gpu": 0, "arm": "Qwen3-8B RULER C2 near/far=minmax/minmax", "cells": ["32768 shard0/2", "32768 shard1/2"], "rows": 100}
     ],
     "qwen3_8b_nfa_lbv2_result": {
       "path": "agent_doc/results/full_precision_matrix_20261116/qwen3_8b_nfa_lbv2.json",
@@ -193,6 +194,15 @@
       "official_strict_score": 32.21,
       "evidence_sha256_checked": 44,
       "verification": "pending-independent-verification"
+    },
+    "regional_c2_completed": {
+      "verification": "pending-independent-verification",
+      "production_audit": "ak_verify_results/nfa_dac_ruler_regional_9f3e8057_20261116/_audits/c2_32k_production_audit.json",
+      "production_audit_sha256": "9f2b232881afcec51641b3fd50cc29b2edf5d2e34e50d99aea00f6efa653c0ea",
+      "results": [
+        {"context_length": 32768, "rows": 100, "official_score": 88.0}
+      ],
+      "scope": "Qwen3-8B RULER niah_multikey_2单任务；near/far=minmax/minmax；32K双分片合并审计100条、36层全部keep，64K/128K尚未闭集"
     },
     "regional_c3_completed": {
       "verification": "pending-independent-verification",
@@ -204,9 +214,9 @@
       ],
       "scope": "Qwen3-8B RULER niah_multikey_2单任务；near/far=avg/avg；每长度双分片合并审计，32K/64K各100条、36层全部keep，尚未完成128K"
     },
-    "queued_regional_requests": {"c2_after_current_worker": 250, "c3_after_current_worker": 50},
+    "queued_regional_requests": {"c2_after_current_worker": 150, "c3_after_current_worker": 0},
     "qwen3_8b_nfa_lbv2_smoke": "1/1 generation and official-strict scoring PASS; input=31512, output=23, strict_runcap=1, v2_identity=1; smoke score is not a full-population accuracy claim",
-    "last_ignition_attempt": "LBv2全部8片已完成生成、逐片评分、收割和503 canonical merge，官方strict=162/503=32.21，44项证据SHA复核PASS。C3的32K/64K已各100条通过生产侧正式审计，128K shard0在pc32 GPU1继续运行。2026-11-17 11:30复测pc33 GPU0空闲后已启动C2 32K shard0，Python PID=606301，进程、约25GB显存/compute app和模型加载日志三重验证通过；链内剩余C2 250请求。",
+    "last_ignition_attempt": "C2 32K双分片已各50条闭集并通过生产侧正式审计，official_score=88.0、36层全部keep，审计SHA256=9f2b232881afcec51641b3fd50cc29b2edf5d2e34e50d99aea00f6efa653c0ea；C2 64K shard0已接力。C3 128K shard0已完成50条并只收割该完整分片，shard1已在pc32 GPU1接力；两臂均保持pending-independent-verification。",
     "resource_policy": "只使用点火前重新实测空闲的卡；2026-11-17最新复核发现pc33 GPU0空闲并已用于C2。pc33 GPU1随后短暂释放，但SparQ 64K smoke点火时被脚本GPU门禁发现新compute PID=1896650并退出，未创建正式smoke日志、prediction或done标记；未触碰其他会话进程，当前不能新增vendor点火。pc14两次直接sshpass密码登录均连接超时，不作为可用资源。",
     "vendor_assets": "pc33/pc02/pc31/pc40/pc32均已部署独立cc480756 clean producer及同SHA SparQ/HISA/ClusterKV资产。pc02 ClusterKV 4.5GB环境已恢复，libcublas.so.12存在且torch 2.8.0+cu128、pylibraft.cluster、rmm真实导入PASS；三方法仍尚未真实GPU smoke。",
     "next": "LBv2已闭集，不再重复生成；保持pc32 C3 128K链和pc33 C2三长度链，完成后分别做三长度正式审计；vendor先在后续真实空卡做64K/128K单样本smoke，通过后再跑11任务×100正式补格，继续处理其余模型和数据集缺口。"
