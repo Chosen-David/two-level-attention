@@ -112,11 +112,18 @@
 - Quest 32K单样本smoke已在pc02 GPU2真实完成，1/1、official_score=100.0、yarn=false，prediction SHA256=`b619701398766f9e4d66f35707d37e0eb27133cd257e07cf87fcba6841857c07`，formal score SHA256=`83525938a72825f891bd14c2e1127111636bcad10b55f1d86bb355062fc1f443`；smoke及首次失败日志已收割。随后32K正式11任务×100在pc02 GPU2启动，父shell PID=3825748，启动时GPU、模型加载和逐请求日志三重验证通过，尚未闭集。
 - 本机GPU1实测空闲后仅用于Quest 64K精度任务，不用于性能测试；GPU0继续C2。64K单样本smoke已1/1、official_score=100.0、yarn=true/factor=2.0，prediction SHA256=`2f975bd141a701f78ece55037dfb49fd235ea9feb8bd08ab5af0da6ab47beff3`，formal score SHA256=`5432fa3ec18f340783b088ad66a3eee4052aaff357cfd3e793f9718a37c3a590`。随后64K正式11任务×100在本机GPU1启动，父shell PID=1005454，尚未闭集。128K尚未smoke，需等待实测空卡；所有Quest结果继续pending-independent-verification，不与旧vendor或历史generation混池。
 
+### 2026-11-17 C2三长度闭集、Quest 128K smoke/正式点火与JSSA静态预检
+
+- C2 near/far=minmax/minmax的128K两片已各50/50闭集，shard1 done时间为`2026-11-17T15:06:58+08:00`。三长度合并正式审计逐样本复算官方分、source index、输入身份、runcap、prediction/receipts/scores/source manifest SHA及36层全部keep均PASS；official_score=88.0/78.0/62.0，共300请求。审计=`ak_verify_results/nfa_dac_ruler_regional_9f3e8057_20261116/_audits/c2_32k_64k_128k_production_audit.json`，SHA256=`6da50e79e54e1b20856cf1c63cdaff81deea57012d6be0dc8dc5951b90458e01`。仍仅为MultiKey2单任务并保持pending-independent-verification，不能冒充完整RULER。本机GPU0已实测释放至1 MiB，无C2残留compute app。
+- pc02 GPU3实测无compute app后，使用独立脚本副本`/tmp/run_ruler_quest_official_gap_2ccb64a6_v2.sh`完成Quest 128K单样本smoke；1/1、official_score=100.0、YaRN factor=4.0，prediction SHA256=`37d749453e29b70960da1169476451eaab843a3ab245797a492127fec30a0e88`，formal score SHA256=`fbb707e8ce7d8ae912f5f41e5192437dac7ec74e6fd83e55d5fb39b00a07188f`。证据已收割到本机同一证据根，与正式输出隔离。随后同卡启动11任务×100正式臂，父shell PID=3836920，进程、约50GB显存/compute app、模型加载及逐请求日志均通过；该任务仅为精度而非性能测试，尚未闭集。
+- JSSA静态身份已闭合：JSSA HEAD=`34ce5abd82453b16ca6d5f16a1a8ae50fac5b920`，patched-vLLM HEAD=`39910f2b25aacc09f5e7f166cdf0030b19f8b9e8`；官方backend/indexed-attend/score-topk SHA256分别为`6bf8d3a248bc4dc3690f38e351721fa04af0606a9d4202ad9cecb3e719ab90af`/`ac7ce5af8a5982947de738fb90d742c11121f925dd45f0bb2be87189ae2c1b98`/`e8fb015a34ae3a2afd239a08bc7b0962ece8c2672e80fd630e4f6d03b96b1190`，basis SHA256=`c0642d54a676d94f9e0f2227f364eda24c3655382f7e0c2c3b9199f19e315a22`。本地预编译wheel的`_C.abi3.so`含`top_k_per_row_decode`符号，SO SHA256=`82377ecfef7233be6e3edb14ff0744f6dd856f8bd04b6dd37a3c816eb28bbdee`。
+- 既有`vllm-jssa/.venv`只是指向`/home/wangyuanshuo02/miniconda-jssa`的链接，该Python实际没有vLLM/Torch；这不是可运行证据。正在`/tmp/jssa-python-39910f2b`和独立源码副本重建官方环境，首次`uv venv --seed`卡在依赖引导后已停止并改用`uv pip`，未修改当前生产源码、未启动GPU任务、未允许Torch/vendor fallback。JSSA在真实导入、radix binding和单样本smoke通过前不登记为可运行或生成结果。
+
 ## 下一步
 
 1. LBv2 503和C3三长度300请求已完成闭集与生产侧审计，不再重复生成；保留pending-independent-verification并交不同owner验收。
-2. 继续本机C2 128K shard1，闭集后合并三长度各100条并正式审计，不与avg/minmax混池。
-3. 继续Quest 32K/64K正式11任务×100；128K必须先在实测空卡完成真实smoke，通过后再派正式臂。每长度闭集后核验官方评分、generation pointer、输入/YaRN身份与全部SHA。
-4. 后续baseline只处理Quest、JSSA、AsyncTLS的真实恢复与必要补格；已取消的六个vendor partial只保留证据，不继续运行、评分或闭集。
+2. C2三长度300请求已完成闭集与生产侧审计，不再重复生成；保留pending-independent-verification并交不同owner验收。
+3. 继续Quest 32K/64K/128K正式11任务×100；三长度smoke均已通过，正式臂分别位于pc02 GPU2、本机GPU1和pc02 GPU3。每长度闭集后核验官方评分、generation pointer、输入/YaRN身份与全部SHA。
+4. 完成JSSA隔离环境真实导入与radix binding预检，在实测空卡先做32K单样本smoke，通过后再派正式臂；后续baseline只处理Quest、JSSA、AsyncTLS的真实恢复与必要补格，已取消的六个vendor partial只保留证据，不继续运行、评分或闭集。
 5. 继续恢复GLM/Qwen3-32B Quest/JSSA原始generation；Qwen3-32B NFA若需统一协议16任务正式臂则重跑legacy13，不直接拼接13+3。FASA 35.15原始prediction不再恢复。
 6. 仅在Quest/JSSA/AsyncTLS及未取消的FullKV/NFA范围核验其余模型与数据集支持；完成官方评分、输入身份、runcap、SHA256和生产侧审计后更新矩阵及`CURRENT_NARRATIVE.md`，独立验收前不作最终质量结论。
