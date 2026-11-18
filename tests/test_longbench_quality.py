@@ -11,9 +11,21 @@ from benchmark.efficiency.benchmark_longbench_quality import (
     _validate_quality_receipt,
     nfa_quality_arm,
     resolve_nfa_quality_config,
+    validate_longbench_quality_tasks,
 )
 from sparse_attn.indexer.nfa_indexer import NFAIndexer
 from sparse_attn.scheduler.scheduler import StopStringMatcher
+
+
+def test_longbench_quality_accepts_lbv2_only_as_an_exclusive_task():
+    validate_longbench_quality_tasks(["lbv2"])
+    validate_longbench_quality_tasks(["trec", "samsum"])
+    with pytest.raises(ValueError, match="不能与 LongBench v1 混合"):
+        validate_longbench_quality_tasks(["lbv2", "trec"])
+    with pytest.raises(ValueError, match="唯一的 LongBench"):
+        validate_longbench_quality_tasks(["lbv2", "lbv2"])
+    with pytest.raises(ValueError, match="唯一的 LongBench"):
+        validate_longbench_quality_tasks(["unknown"])
 
 
 @pytest.mark.parametrize(
@@ -99,6 +111,16 @@ def test_fullkv_rejects_nfa_level2_topk_instead_of_ignoring_it():
     args.nfa_level2_topk = 256
     with pytest.raises(ValueError, match="level2 topk"):
         _validate_fullkv_nfa_args(args)
+
+
+@pytest.mark.parametrize("level2_topk", [256, 512, 1024, 2048])
+def test_nfa_quality_level2_topk_reaches_real_indexer(level2_topk):
+    patch_args, _ = resolve_nfa_quality_config(
+        "full", "off", 128, level2_topk=level2_topk)
+    indexer = NFAIndexer(patch_args)
+    assert indexer.args.tia_level2_topk == level2_topk
+    with pytest.raises(ValueError, match="L2 token budget"):
+        resolve_nfa_quality_config("full", "off", 128, level2_topk=768)
 
 
 def test_nfa_quality_numeric_near_quota_reaches_real_indexer():

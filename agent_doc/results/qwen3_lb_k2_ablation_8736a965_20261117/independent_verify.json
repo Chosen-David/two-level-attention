@@ -1,0 +1,143 @@
+{
+  "schema": "qwen3-lb-k2-ablation-independent-verify-v1",
+  "verification": "pending-independent-verification",
+  "source_head": "8736a965e903fd461ef5591347933205e18adee0",
+  "protocol": "benchmark.efficiency.benchmark_longbench_quality --method nfa --execution eager --nfa-subspace full --nfa-subspace-dim 128 --nfa-gate off --nfa-level2-topk 256|512|1024|2048 --visible-len 8192",
+  "baseline": {
+    "source": "agent_doc/results/qwen3_nfa_fi_longbench16_20261115",
+    "flashinfer_source_head": "7fac274fda9df13e82caadd95f3cca5c8374a1a3"
+  },
+  "cells": [
+    {
+      "task": "hotpotqa",
+      "k2": 256,
+      "rows": 200,
+      "official_score": 58.94,
+      "recomputed_mean_score": 58.94012761277778,
+      "fullkv_baseline_score": 59.41621501258598,
+      "delta_points": -0.47608739980820075,
+      "paired_bootstrap_ci95": [
+        -1.8468262686053287,
+        0.5973214586673986
+      ],
+      "prediction_sha256": "6b6930fd43951b9f5f054fbd003b865a1ad6be8aeede61dcb858a85aaaf943eb",
+      "receipts_sha256": "f4097c80cd5666d5b6648a31f3f6641e94dbcd68961a6e7f47f1f296ea79c042",
+      "source_head": "8736a965e903fd461ef5591347933205e18adee0"
+    },
+    {
+      "task": "hotpotqa",
+      "k2": 512,
+      "rows": 200,
+      "official_score": 59.38,
+      "recomputed_mean_score": 59.38326046713143,
+      "fullkv_baseline_score": 59.41621501258598,
+      "delta_points": -0.032954545454545466,
+      "paired_bootstrap_ci95": [
+        -0.8829545454545454,
+        0.75
+      ],
+      "prediction_sha256": "54bf4da032451502a7dcc4a4777e3668f47c7050222692529323e296650e73bb",
+      "receipts_sha256": "077af078a4be2cd3b20db05d463821bae0872ea61ae80c24bc7c517cc6d03e7b",
+      "source_head": "8736a965e903fd461ef5591347933205e18adee0"
+    },
+    {
+      "task": "hotpotqa",
+      "k2": 1024,
+      "rows": 200,
+      "official_score": 59.12,
+      "recomputed_mean_score": 59.12396559533656,
+      "fullkv_baseline_score": 59.41621501258598,
+      "delta_points": -0.2922494172494173,
+      "paired_bootstrap_ci95": [
+        -0.9,
+        0.016841491841491835
+      ],
+      "prediction_sha256": "94d2a14445b698925602ed27b5839eaef15173c1063f864b8e528f1f1f1f04a5",
+      "receipts_sha256": "2f1c74770120955d2c13006b6359cd0b377e46e248a048f6386f3bece4e533ac",
+      "source_head": "8736a965e903fd461ef5591347933205e18adee0"
+    },
+    {
+      "task": "hotpotqa",
+      "k2": 2048,
+      "rows": 200,
+      "official_score": 59.12,
+      "recomputed_mean_score": 59.121584642955604,
+      "fullkv_baseline_score": 59.41621501258598,
+      "delta_points": -0.29463036963036965,
+      "paired_bootstrap_ci95": [
+        -0.9,
+        0.011779886779886804
+      ],
+      "prediction_sha256": "d5ef729821120a871076613edaf6e6e2f01b530736029dead160bc7da8bebbce",
+      "receipts_sha256": "39f54a09c45ba94990c8d440e7d8dd597bee14c5529cfc1ca05d9049e72e0f88",
+      "source_head": "8736a965e903fd461ef5591347933205e18adee0"
+    },
+    {
+      "task": "gov_report",
+      "k2": 256,
+      "rows": 200,
+      "official_score": 33.45,
+      "recomputed_mean_score": 33.454851598186536,
+      "fullkv_baseline_score": 33.48196528364569,
+      "delta_points": -0.027113685459154838,
+      "paired_bootstrap_ci95": [
+        -0.48475674082817516,
+        0.42745176308640415
+      ],
+      "prediction_sha256": "13ed21d43bd52362f489452ac9d6e54f81503ed9ac66bbced4e4b38c4b0628de",
+      "receipts_sha256": "eeab9a112e3d5fc35411a3d61095c9b2b1f8e8d07efba67c77e3ed186a0920b6",
+      "source_head": "8736a965e903fd461ef5591347933205e18adee0"
+    },
+    {
+      "task": "gov_report",
+      "k2": 512,
+      "rows": 200,
+      "official_score": 33.64,
+      "recomputed_mean_score": 33.63676565711242,
+      "fullkv_baseline_score": 33.48196528364569,
+      "delta_points": 0.15480037346672426,
+      "paired_bootstrap_ci95": [
+        -0.3071357396789308,
+        0.6303970960473918
+      ],
+      "prediction_sha256": "6ff759272c530b38e9ec20ad00f9c8d0fa502d56a47c255a64b502114cc5293e",
+      "receipts_sha256": "8381574b30ba077c7ab7445af26a4a9b11233fc8ab5825a6bf0f31c0afb708bd",
+      "source_head": "8736a965e903fd461ef5591347933205e18adee0"
+    },
+    {
+      "task": "gov_report",
+      "k2": 1024,
+      "rows": 200,
+      "official_score": 33.63,
+      "recomputed_mean_score": 33.626888493158546,
+      "fullkv_baseline_score": 33.48196528364569,
+      "delta_points": 0.14492320951285648,
+      "paired_bootstrap_ci95": [
+        -0.2715430900631574,
+        0.5654539055546431
+      ],
+      "prediction_sha256": "e710d8391974f7f5e510d1e04b2aac1b05367f020cf972e7894bce3ca90bd716",
+      "receipts_sha256": "419fa68c45beb6172e442a4c789c782a90cdc8849e06d1dc01026ec0aa35d520",
+      "source_head": "8736a965e903fd461ef5591347933205e18adee0"
+    },
+    {
+      "task": "gov_report",
+      "k2": 2048,
+      "rows": 200,
+      "official_score": 33.47,
+      "recomputed_mean_score": 33.46697610238553,
+      "fullkv_baseline_score": 33.48196528364569,
+      "delta_points": -0.014989181260167204,
+      "paired_bootstrap_ci95": [
+        -0.40781946480960957,
+        0.36517706836455566
+      ],
+      "prediction_sha256": "1e95b5cdaede0d88900dfb4e10b59507b5f39779e72ff1dd1c2da18a438ac745",
+      "receipts_sha256": "87338560ec5f89245f900f9348956eb0e91c8abf3946bdc20935f6645deb3317",
+      "source_head": "8736a965e903fd461ef5591347933205e18adee0"
+    }
+  ],
+  "paired_bootstrap_repeats": 10000,
+  "paired_bootstrap_seed": 20261117,
+  "scorer": "benchmark.LongBench.eval.sample_score + official eval"
+}

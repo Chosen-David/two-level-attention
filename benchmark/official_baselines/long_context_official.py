@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import statistics
 import subprocess
 from pathlib import Path
 
@@ -48,8 +49,13 @@ def parse_args():
     parser.add_argument("--jssa-gpu-memory-utilization", type=float, default=0.85)
     parser.add_argument("--enforce-eager", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--warmup-requests", type=int, default=1)
+    parser.add_argument("--decode-warmup-steps", type=int, default=3)
     parser.add_argument("--repeats", type=int, default=3)
     parser.add_argument("--max-new-tokens", type=int, default=33)
+    parser.add_argument(
+        "--measurement-mode", choices=("clean-e2e", "operator-profile"),
+        default="clean-e2e",
+    )
     return parser.parse_args()
 
 
@@ -120,6 +126,53 @@ def source_receipt():
     }
 
 
+def timed_pair_cuda_event(engine, ids, max_new_tokens, decode_warmup_steps):
+    """Quest decode 步级 CUDA Event 计时，排除 prefill 与 warmup 步。
+
+    使用模型 forward 前后 hook（collect_decode_events）在同一个 CUDA stream
+    上对每个 decode 步的完整前向打 start/end event，与 NFA/JSSA/AsyncTLS 的
+    逐步 CUDA-event 口径一致。prefill 与首 token 不进稳态；warmup 步从
+    decode 步序列头部剔除。
+    """
+    _, ttft = engine.generate(ids, 1, ignore_eos=True)
+    generated, request_wall, step_ms = engine.generate(
+        ids, max_new_tokens, ignore_eos=True, collect_decode_events=True)
+    expected_steps = max_new_tokens - 1
+    if len(step_ms) != expected_steps:
+        raise RuntimeError(
+            f"Quest CUDA event decode steps {len(step_ms)} != {expected_steps}"
+        )
+    if decode_warmup_steps < 0 or decode_warmup_steps >= expected_steps:
+        raise ValueError("decode_warmup_steps 必须位于 [0, max_new_tokens-1)")
+    steady = step_ms[decode_warmup_steps:]
+    generated_rows = [generated] if engine.batch_size == 1 else generated
+    return generated, {
+        "schema": "longbench-official-quest-cuda-event-decode-v1",
+        "ttft_ms": ttft * 1000.0,
+        "request_wall_ms": request_wall * 1000.0,
+        "decode_host_wall_ms": request_wall * 1000.0,
+        "decode_host_tpot_ms": request_wall * 1000.0 / expected_steps,
+        "tpot_ms": statistics.median(steady),
+        "event_tpot_ms_median": statistics.median(steady),
+        "event_tpot_ms_all": step_ms,
+        "measured_decode_steps": len(steady),
+        "warmup_steps_excluded_from_steady": decode_warmup_steps,
+        "decode_steps": expected_steps,
+        "batch_size": engine.batch_size,
+        "output_layout": "batch-major" if engine.batch_size > 1 else "flat-b1",
+        "actual_generated_tokens": sum(map(len, generated_rows)),
+        "actual_generated_tokens_per_request": list(map(len, generated_rows)),
+        "generated_token_ids": generated_rows,
+        "eos_early_stop": False,
+        "decode_protocol": "fixed length; EOS ignored",
+        "timing_metric": (
+            "CUDA-event elapsed time around each complete Quest decode step "
+            "(model forward pre/post hooks), excluding prefill and the first "
+            "decode_warmup_steps decode steps"
+        ),
+    }
+
+
 def main():
     args = parse_args()
     validate_official_batch_size(args)
@@ -127,6 +180,10 @@ def main():
         raise ValueError("要求 max-new-tokens>=2、repeats>0、warmup-requests>=0")
     if args.budget <= 0 or args.budget % args.quest_page_size:
         raise ValueError("Quest budget 必须为正且整除 page-size")
+    if args.measurement_mode == "operator-profile" and (
+        args.warmup_requests != 0 or args.repeats != 1
+    ):
+        raise ValueError("operator-profile 固定为 0 warmup + 1 repeat")
 
     from transformers import AutoConfig, AutoTokenizer
 
@@ -167,8 +224,15 @@ def main():
         "warmup_requests": args.warmup_requests,
         "repeats": args.repeats,
         "max_new_tokens": args.max_new_tokens,
-        "measurement_mode": "clean-e2e-no-profiler",
-        "timing_protocol": "T(33)-T(1) two-point complete request host wall; EOS ignored",
+        "measurement_mode": (
+            "clean-e2e-no-profiler" if args.measurement_mode == "clean-e2e"
+            else "nsys-cuda-full-process-operator-profile-pending-finalize"
+        ),
+        "timing_protocol": (
+            "CUDA-event per-decode-step median; EOS ignored"
+            if args.method == "quest" and args.measurement_mode == "clean-e2e"
+            else "T(33)-T(1) two-point complete request host wall; EOS ignored"
+        ),
         "rope_policy": rope_policy,
         "rope_preflight": rope_preflight,
         "runtime_rope_verification": runtime_rope,
@@ -178,7 +242,14 @@ def main():
     for _ in range(args.warmup_requests):
         timed_pair(engine, ids, args.max_new_tokens, require_positive=False)
     for repeat in range(args.repeats):
-        generated, timing = timed_pair(engine, ids, args.max_new_tokens)
+        if args.method == "quest" and args.measurement_mode == "clean-e2e":
+            generated, timing = timed_pair_cuda_event(
+                engine, ids, args.max_new_tokens, args.decode_warmup_steps)
+        else:
+            generated, timing = timed_pair(
+                engine, ids, args.max_new_tokens,
+                require_positive=args.measurement_mode == "clean-e2e",
+            )
         payload["cells"].append({
             "task": args.task,
             "sample_index": args.sample_index,

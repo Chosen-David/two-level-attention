@@ -1,0 +1,197 @@
+{
+  "schema": "qwen3-bs1-decode-e2e-cuda-event-comparison-v2",
+  "verification": "pending-independent-verification",
+  "timing_metric": "CUDA-event elapsed-time median per decode step; 3 warmup decode steps excluded, 29 measured steps",
+  "input": "repeated-needle-body-extension file_row_index=0 (identical across all arms); BS1; niah_multikey_2 sample2",
+  "nfa_gate01_note": "gate epsilon=0.1, natural region-skip; skip layers grow 5/13/23/30/36 with length (see skip_summary)",
+  "lengths": [
+    32768,
+    65536,
+    131072,
+    262144,
+    524288
+  ],
+  "rows": [
+    {
+      "method": "asynctls-semantic-pytorch",
+      "context_length": 32768,
+      "event_tpot_ms_median": 23.903743743896484,
+      "output": "agent_doc/results/nfa_bs1_decode_only_20261117/clean/asynctls_L32768_forward.json"
+    },
+    {
+      "method": "asynctls-semantic-pytorch",
+      "context_length": 65536,
+      "event_tpot_ms_median": 24.259008407592773,
+      "output": "agent_doc/results/nfa_bs1_decode_only_20261117/clean/asynctls_L65536_forward.json"
+    },
+    {
+      "method": "asynctls-semantic-pytorch",
+      "context_length": 131072,
+      "event_tpot_ms_median": 24.239295959472656,
+      "output": "agent_doc/results/nfa_bs1_decode_only_20261117/clean/asynctls_L131072_forward.json"
+    },
+    {
+      "method": "asynctls-semantic-pytorch",
+      "context_length": 262144,
+      "event_tpot_ms_median": 24.980255126953125,
+      "output": "agent_doc/results/nfa_bs1_decode_only_20261117/clean/asynctls_L262144_forward.json"
+    },
+    {
+      "method": "asynctls-semantic-pytorch",
+      "context_length": 524288,
+      "event_tpot_ms_median": 25.91644859313965,
+      "output": "agent_doc/results/nfa_bs1_decode_only_20261117/clean/asynctls_L524288_forward.json"
+    },
+    {
+      "method": "jssa-nfa-semantic",
+      "context_length": 32768,
+      "event_tpot_ms_median": 12.66220760345459,
+      "output": "agent_doc/results/jssa_nfa_semantic_bs1_decode_event_20261118/jssa-clean-e2e/jssa-clean-e2e_l32768_b1_graph.json"
+    },
+    {
+      "method": "jssa-nfa-semantic",
+      "context_length": 65536,
+      "event_tpot_ms_median": 15.975040435791016,
+      "output": "agent_doc/results/jssa_nfa_semantic_bs1_decode_event_20261118/jssa-clean-e2e/jssa-clean-e2e_l65536_b1_graph.json"
+    },
+    {
+      "method": "jssa-nfa-semantic",
+      "context_length": 131072,
+      "event_tpot_ms_median": 25.49020767211914,
+      "output": "agent_doc/results/jssa_nfa_semantic_bs1_decode_event_20261118/jssa-clean-e2e/jssa-clean-e2e_l131072_b1_graph.json"
+    },
+    {
+      "method": "jssa-nfa-semantic",
+      "context_length": 262144,
+      "event_tpot_ms_median": 41.757118225097656,
+      "output": "agent_doc/results/jssa_nfa_semantic_bs1_decode_event_20261118/jssa-clean-e2e/jssa-clean-e2e_l262144_b1_graph.json"
+    },
+    {
+      "method": "jssa-nfa-semantic",
+      "context_length": 524288,
+      "event_tpot_ms_median": 73.83356475830078,
+      "output": "agent_doc/results/jssa_nfa_semantic_bs1_decode_event_20261118/jssa-clean-e2e/jssa-clean-e2e_l524288_b1_graph.json"
+    },
+    {
+      "method": "jssa-official",
+      "context_length": 32768,
+      "event_tpot_ms_median": 11.335136413574219,
+      "output": "agent_doc/results/nfa_bs1_decode_only_20261117/clean/jssa_L32768_forward.json"
+    },
+    {
+      "method": "jssa-official",
+      "context_length": 65536,
+      "event_tpot_ms_median": 11.928223609924316,
+      "output": "agent_doc/results/nfa_bs1_decode_only_20261117/clean/jssa_L65536_forward.json"
+    },
+    {
+      "method": "jssa-official",
+      "context_length": 131072,
+      "event_tpot_ms_median": 12.612704277038574,
+      "output": "agent_doc/results/nfa_bs1_decode_only_20261117/clean/jssa_L131072_forward.json"
+    },
+    {
+      "method": "jssa-official",
+      "context_length": 262144,
+      "event_tpot_ms_median": 13.901215553283691,
+      "output": "agent_doc/results/nfa_bs1_decode_only_20261117/clean/jssa_L262144_forward.json"
+    },
+    {
+      "method": "jssa-official",
+      "context_length": 524288,
+      "event_tpot_ms_median": 16.549823760986328,
+      "output": "agent_doc/results/nfa_bs1_decode_only_20261117/clean/jssa_L524288_forward.json"
+    },
+    {
+      "method": "nfa-gate01",
+      "context_length": 32768,
+      "event_tpot_ms_median": 10.219743728637695,
+      "output": "agent_doc/results/nfa_bs1_decode_only_gate01_20261117/gpu0/clean/nfa_L32768_forward.json"
+    },
+    {
+      "method": "nfa-gate01",
+      "context_length": 65536,
+      "event_tpot_ms_median": 10.678144454956055,
+      "output": "agent_doc/results/nfa_bs1_decode_only_gate01_20261117/gpu1/clean/nfa_L65536_forward.json"
+    },
+    {
+      "method": "nfa-gate01",
+      "context_length": 131072,
+      "event_tpot_ms_median": 10.5513277053833,
+      "output": "agent_doc/results/nfa_bs1_decode_only_gate01_20261117/gpu0/clean/nfa_L131072_forward.json"
+    },
+    {
+      "method": "nfa-gate01",
+      "context_length": 262144,
+      "event_tpot_ms_median": 10.529279708862305,
+      "output": "agent_doc/results/nfa_bs1_decode_only_gate01_20261117/gpu0/clean/nfa_L262144_forward.json"
+    },
+    {
+      "method": "nfa-gate01",
+      "context_length": 524288,
+      "event_tpot_ms_median": 10.713760375976562,
+      "output": "agent_doc/results/nfa_bs1_decode_only_gate01_20261117/gpu1/clean/nfa_L524288_forward.json"
+    },
+    {
+      "method": "quest-official",
+      "context_length": 32768,
+      "event_tpot_ms_median": 19.020544052124023,
+      "output": "agent_doc/results/qwen3_bs1_decode_event_comparison_20261117/quest_official/quest_official_L32768.json"
+    },
+    {
+      "method": "quest-official",
+      "context_length": 65536,
+      "event_tpot_ms_median": 22.868032455444336,
+      "output": "agent_doc/results/qwen3_bs1_decode_event_comparison_20261117/quest_official/quest_official_L65536.json"
+    },
+    {
+      "method": "quest-official",
+      "context_length": 131072,
+      "event_tpot_ms_median": 24.888927459716797,
+      "output": "agent_doc/results/qwen3_bs1_decode_event_comparison_20261117/quest_official/quest_official_L131072.json"
+    },
+    {
+      "method": "quest-official",
+      "context_length": 262144,
+      "event_tpot_ms_median": 36.61939239501953,
+      "output": "agent_doc/results/qwen3_bs1_decode_event_comparison_20261117/quest_official/quest_official_L262144.json"
+    },
+    {
+      "method": "quest-official",
+      "context_length": 524288,
+      "event_tpot_ms_median": 60.61811065673828,
+      "output": "agent_doc/results/qwen3_bs1_decode_event_comparison_20261117/quest_official/quest_official_L524288.json"
+    },
+    {
+      "method": "quest-semantic-b1024",
+      "context_length": 32768,
+      "event_tpot_ms_median": 18.262527465820312,
+      "output": "agent_doc/results/qwen3_bs1_decode_event_comparison_20261117/quest_semantic_b1024/quest-clean-e2e_l32768_b1_graph.json"
+    },
+    {
+      "method": "quest-semantic-b1024",
+      "context_length": 65536,
+      "event_tpot_ms_median": 22.753759384155273,
+      "output": "agent_doc/results/qwen3_bs1_decode_event_comparison_20261117/quest_semantic_b1024/quest-clean-e2e_l65536_b1_graph.json"
+    },
+    {
+      "method": "quest-semantic-b1024",
+      "context_length": 131072,
+      "event_tpot_ms_median": 33.10044860839844,
+      "output": "agent_doc/results/qwen3_bs1_decode_event_comparison_20261117/quest_semantic_b1024/quest-clean-e2e_l131072_b1_graph.json"
+    },
+    {
+      "method": "quest-semantic-b1024",
+      "context_length": 262144,
+      "event_tpot_ms_median": 54.05081558227539,
+      "output": "agent_doc/results/qwen3_bs1_decode_event_comparison_20261117/quest_semantic_b1024/quest-clean-e2e_l262144_b1_graph.json"
+    },
+    {
+      "method": "quest-semantic-b1024",
+      "context_length": 524288,
+      "event_tpot_ms_median": 147.33033752441406,
+      "output": "agent_doc/results/qwen3_bs1_decode_event_comparison_20261117/quest_semantic_b1024/quest-clean-e2e_l524288_b1_graph.json"
+    }
+  ],
+  "jssa_nfa_semantic_note": "JSSA paper performance semantics: official project/store+indexed-attend, NFA full-candidate 32-D score + exact filtered Top-K2; no L1/region/skip."
+}

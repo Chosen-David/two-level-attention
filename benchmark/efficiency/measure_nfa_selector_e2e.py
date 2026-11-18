@@ -76,6 +76,14 @@ STAGE_TOKENS = {
         '_gather_attend_regions_combine_kernel',
     ),
 }
+# 与上方宽阶段桶分开：这里只汇总实际打分 kernel，不含页统计或 Q 准备。
+PURE_SCORE_TOKENS = {
+    'pure_l1_score_ms': (
+        '_nfa_l1_scores_kernel', '_nfa_l1_near_scores_kernel',
+        '_nfa_l1_far_scores_kernel',
+    ),
+    'pure_l2_score_ms': ('_nfa_fine_scores_paged_kernel',),
+}
 AUDIT_TOKENS = (
     'nfa', 'topk', 'candidate', 'union', 'gather_attend', 'prepare_q',
     'fine_scores', 'page_stats', 'l1_scores', 'owner_generation',
@@ -242,6 +250,10 @@ def classify_nfa(kernels, *, required_stages=None):
     if missing:
         raise ValueError(f'NFA 算子链缺少阶段: {missing}')
     operator_total = sum(stages.values())
+    for name, tokens in PURE_SCORE_TOKENS.items():
+        stages[name] = sum(
+            row['device_ms'] for kernel, row in kernels.items()
+            if any(token in kernel for token in tokens))
     stages['l1_ms'] = (
         stages['l1_score_ms'] + stages['l1_topk_ms'] + stages['candidate_ms'])
     stages['l2_ms'] = (

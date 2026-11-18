@@ -24,6 +24,9 @@ from exp.vendor_baselines.jssa_vendor.qwen3_jssa_official import (
     bind_jssa_official_runtime,
     register_jssa_official_patch,
 )
+from exp.vendor_baselines.jssa_vendor.qwen3_jssa_nfa_semantic import (
+    JSSANFASemanticRuntime,
+)
 from sparse_attn.scheduler.scheduler import greedy_next_tokens
 
 
@@ -49,6 +52,8 @@ def parse_args():
     parser.add_argument('--jssa-budget', type=int, default=2048)
     parser.add_argument('--jssa-rank', type=int, default=32)
     parser.add_argument('--jssa-page-size', type=int, default=64)
+    parser.add_argument('--selector-implementation', default='official',
+                        choices=('official', 'nfa-semantic'))
     return parser.parse_args()
 
 
@@ -63,6 +68,7 @@ def _source_receipt():
     files = [
         Path(__file__),
         root / 'qwen3_jssa_official.py',
+        root / 'qwen3_jssa_nfa_semantic.py',
         root / 'upstream/patched_src/vllm/v1/attention/ops/triton_jssa_store.py',
         root / 'upstream/patched_src/vllm/v1/attention/ops/triton_jssa_score_topk.py',
         root / 'upstream/patched_src/vllm/v1/attention/ops/triton_jssa_indexed_attend.py',
@@ -78,7 +84,9 @@ def _run(args, model, prompt, eos_ids):
     length = prompt.numel()
     device = prompt.device
     decode_steps = args.max_new_tokens - 1
-    runtime = JSSAQwen3Runtime(
+    runtime_cls = (JSSAQwen3Runtime if args.selector_implementation == 'official'
+                   else JSSANFASemanticRuntime)
+    runtime = runtime_cls(
         model, batch, length, args.max_new_tokens, device=device,
         basis_path=args.jssa_basis_path, budget=args.jssa_budget,
         rank=args.jssa_rank, page_size=args.jssa_page_size)
@@ -135,11 +143,15 @@ def _run(args, model, prompt, eos_ids):
         (decode_steps, batch), dtype=torch.long, device=device)
     steady_decode_start = None
     profiler_started = False
+    host_decode_start = None
     for step in range(decode_steps):
-        if args.measurement_mode == 'operator-profile' and step == args.warmup_steps:
+        if step == args.warmup_steps:
             torch.cuda.synchronize()
-            torch.cuda.profiler.start()
-            profiler_started = True
+            if args.measurement_mode == 'operator-profile':
+                torch.cuda.profiler.start()
+                profiler_started = True
+            else:
+                host_decode_start = common.time.perf_counter()
         if args.measurement_mode == 'clean-e2e' and step >= args.warmup_steps:
             start, end = common._events()
             event_pairs.append((start, end))
@@ -165,6 +177,9 @@ def _run(args, model, prompt, eos_ids):
     if steady_decode_start is None:
         steady_decode_start = common._memory_snapshot()
     torch.cuda.synchronize()
+    decode_host_wall_ms = (
+        (common.time.perf_counter() - host_decode_start) * 1000.0
+        if host_decode_start is not None else None)
     for rows in token_history.cpu().tolist():
         for row in range(batch):
             generated[row].append(int(rows[row]))
@@ -195,7 +210,16 @@ def _run(args, model, prompt, eos_ids):
     }
     if args.measurement_mode == 'clean-e2e':
         step_ms = [start.elapsed_time(end) for start, end in event_pairs]
+        measured_steps = decode_steps - args.warmup_steps
         result.update(common._summary(step_ms, warmup=0))
+        result.update(
+            decode_host_wall_ms=decode_host_wall_ms,
+            decode_host_tpot_ms=decode_host_wall_ms / measured_steps,
+            measured_decode_steps=measured_steps,
+            host_timing_scope=(
+                'host wall from after warmup synchronization through the remaining '
+                'decode loop, token-history writes and final synchronization'),
+        )
     return result
 
 
@@ -222,9 +246,12 @@ def main():
     memory = result['memory']
     memory['model_loaded'] = model_loaded_memory
     result.update(
-        schema='qwen-jssa-official-e2e-v1',
+        schema=('qwen-jssa-official-e2e-v1'
+                if args.selector_implementation == 'official'
+                else 'qwen-jssa-nfa-semantic-e2e-v1'),
         source=_source_receipt(),
-        method='jssa-official',
+        method=('jssa-official' if args.selector_implementation == 'official'
+                else 'jssa-nfa-semantic'),
         execution=args.execution,
         measurement_mode=args.measurement_mode,
         batch_size=args.batch_size,
@@ -241,6 +268,7 @@ def main():
         model_path=str(Path(args.model_path).resolve()),
         basis_path=str(Path(args.jssa_basis_path).resolve()),
         basis_sha256=_sha256(args.jssa_basis_path),
+        selector_implementation=args.selector_implementation,
         input=input_receipt,
         decode_protocol='fixed length; EOS recorded but not used for early stop',
         prefill_batch_execution='serial one-request prefills',

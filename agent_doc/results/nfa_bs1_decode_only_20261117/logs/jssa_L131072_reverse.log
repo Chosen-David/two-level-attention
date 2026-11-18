@@ -1,0 +1,31 @@
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/5 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 5/5 [00:00<00:00, 182.13it/s]
+{
+  "context_length": 131072,
+  "batch_size": 1,
+  "measurement_mode": "clean-e2e",
+  "tpot_ms_median": 12.624480247497559,
+  "jssa_runtime": {
+    "implementation": "official vendored Triton store/score/indexed-attend",
+    "basis_path_independent_artifact": true,
+    "budget": 1024,
+    "rank": 32,
+    "page_size": 64,
+    "kv_cache_layout": "[layer, block, position, H_kv, K|V] BF16",
+    "projected_key_cache": "separate contiguous FP8 E4M3 [layer, block, position, H_kv, rank]",
+    "projected_key_scale": "per-(KV-head,channel) basis row norm folded into proj_q",
+    "score_kernel": "_jssa_score_contig_kernel",
+    "attention_kernel": "official gather-free online-softmax indexed-attend",
+    "local_compatibility_patch": "pad GQA rows to at least 16 in registers for Triton tl.dot; all padded loads/stores are masked",
+    "topk": "official torch.topk fallback with preallocated int64 Graph-safe output",
+    "radix_topk_available": false,
+    "prefill_attention": "HF SDPA with original Qwen3 RoPE",
+    "prefill_store": "official fused project+store for every post-RoPE K/V token",
+    "decode_store_calls_warmup_and_capture": 72,
+    "decode_attention_calls_warmup_and_capture": 72,
+    "decode_indexed_attention_calls": 72,
+    "decode_partial_attention_calls": 0,
+    "short_sequence_policy": "official eager partial: stable-compact valid Top-K rows, then exact dense attention over min(seq_len,budget) real tokens"
+  },
+  "output": "/tmp/nfa-bs1-attribution-20261117/agent_doc/results/nfa_bs1_decode_only_20261117/clean/jssa_L131072_reverse.json"
+}

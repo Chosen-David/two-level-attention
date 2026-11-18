@@ -511,7 +511,8 @@ def run_arm(args, length, batch, arm, source):
             if arm == 'nfa-operator-profile':
                 summary.update({
                     key: row['operator_summary'][key]['mean_ms_per_step']
-                    for key in ('l1_ms', 'l2_ms', 'topk_total_ms',
+                    for key in ('pure_l1_score_ms', 'pure_l2_score_ms',
+                                'l1_ms', 'l2_ms', 'topk_total_ms',
                                 'main_attention_ms', 'nfa_operator_total_ms')})
             elif arm == 'flashinfer-operator-profile':
                 summary.update({

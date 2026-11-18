@@ -1,0 +1,87 @@
+{
+  "schema": "qwen3-lb-subspace-sensitivity-summary-v1",
+  "verification": "pending-independent-verification",
+  "source_head": "9f3e8057acd528a904aa8883b830d541b389e39f",
+  "method": "nfa",
+  "execution": "eager",
+  "gate": "off",
+  "model": "Qwen3-8B",
+  "tasks": [
+    "hotpotqa",
+    "gov_report"
+  ],
+  "dims": [
+    16,
+    32,
+    64,
+    128
+  ],
+  "protocol": "benchmark.efficiency.benchmark_longbench_quality --visible-len 8192, 200 rows/cell",
+  "reference_fullkv": {
+    "source": "agent_doc/results/qwen3_nfa_fi_longbench16_20261115/quality_summary.json",
+    "flashinfer_source_head": "7fac274fda9df13e82caadd95f3cca5c8374a1a3",
+    "scores": {
+      "hotpotqa": 59.42,
+      "gov_report": 33.48
+    }
+  },
+  "cells": {
+    "hotpotqa_dim16": {
+      "task": "hotpotqa",
+      "dim": 16,
+      "subspace": "tail",
+      "mean_score": 59.3171,
+      "rows": 200
+    },
+    "hotpotqa_dim32": {
+      "task": "hotpotqa",
+      "dim": 32,
+      "subspace": "tail",
+      "mean_score": 59.4213,
+      "rows": 200
+    },
+    "hotpotqa_dim64": {
+      "task": "hotpotqa",
+      "dim": 64,
+      "subspace": "tail",
+      "mean_score": 59.3716,
+      "rows": 200
+    },
+    "hotpotqa_dim128": {
+      "task": "hotpotqa",
+      "dim": 128,
+      "subspace": "full",
+      "mean_score": 59.124,
+      "rows": 200
+    },
+    "gov_report_dim16": {
+      "task": "gov_report",
+      "dim": 16,
+      "subspace": "tail",
+      "mean_score": 33.3949,
+      "rows": 200
+    },
+    "gov_report_dim32": {
+      "task": "gov_report",
+      "dim": 32,
+      "subspace": "tail",
+      "mean_score": 33.5313,
+      "rows": 200
+    },
+    "gov_report_dim64": {
+      "task": "gov_report",
+      "dim": 64,
+      "subspace": "tail",
+      "mean_score": 33.5026,
+      "rows": 200
+    },
+    "gov_report_dim128": {
+      "task": "gov_report",
+      "dim": 128,
+      "subspace": "full",
+      "mean_score": 33.6269,
+      "rows": 200
+    }
+  },
+  "paired_vs_fullkv_csv": "sensitivity_paired_vs_fullkv.csv"
+}

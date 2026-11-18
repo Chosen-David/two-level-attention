@@ -1,0 +1,19 @@
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/5 [00:00<?, ?it/s]Loading checkpoint shards:  20%|██        | 1/5 [00:00<00:03,  1.17it/s]Loading checkpoint shards:  40%|████      | 2/5 [00:01<00:02,  1.05it/s]Loading checkpoint shards:  60%|██████    | 3/5 [00:03<00:02,  1.14s/it]Loading checkpoint shards:  80%|████████  | 4/5 [00:04<00:01,  1.16s/it]Loading checkpoint shards: 100%|██████████| 5/5 [00:04<00:00,  1.16it/s]Loading checkpoint shards: 100%|██████████| 5/5 [00:04<00:00,  1.05it/s]
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/tmp/nfa-bs1-attribution-20261117/benchmark/official_baselines/long_context_official.py", line 257, in <module>
+    main()
+  File "/tmp/nfa-bs1-attribution-20261117/benchmark/official_baselines/long_context_official.py", line 154, in main
+    engine = OfficialEngine(args, len(ids) + args.max_new_tokens + 16)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nfa-bs1-attribution-20261117/benchmark/official_baselines/longbench_official.py", line 247, in __init__
+    self._init_quest(max_model_len)
+  File "/tmp/nfa-bs1-attribution-20261117/benchmark/official_baselines/longbench_official.py", line 274, in _init_quest
+    n_patched = enable_quest(
+                ^^^^^^^^^^^^^
+  File "/tmp/nfa-bs1-attribution-20261117/benchmark/official_baselines/qwen3_quest_kernel.py", line 248, in enable_quest
+    controller = quest_utils.InferenceController(
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: InferenceController.__init__() got an unexpected keyword argument 'num_kv_heads'

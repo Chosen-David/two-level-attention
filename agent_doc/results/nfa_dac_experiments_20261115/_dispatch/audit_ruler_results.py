@@ -15,6 +15,7 @@ EXPECTED_HEADS = {
     "b70d8c08dcac64b5bfb4b86c78715a6956640e65",
     "2ddfd7416aedc03f0e43c6ea115c25c7212fa974",
     "233d09afe535a697dc30038b3fe59f06b6304e00",
+    "9f3e8057acd528a904aa8883b830d541b389e39f",
 }
 A_ARMS = {
     "nfa_full_gate_off": ("nfa", "full", "off"),

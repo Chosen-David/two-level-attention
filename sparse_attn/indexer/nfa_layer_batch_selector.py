@@ -431,6 +431,7 @@ if _has_triton():
         OWNER_CAP: tl.constexpr, BS: tl.constexpr,
         K_F: tl.constexpr = 0, K_N: tl.constexpr = 0,
         PACK_WIDTH: tl.constexpr = 0, REGION: tl.constexpr = 0,
+        KV_POSITION_MAJOR: tl.constexpr = False,
     ):
         """按 tile 并行计算 grouped-Q 的 BF16 Logits。"""
         row = tl.program_id(0)
@@ -489,11 +490,18 @@ if _has_triton():
                 BLOCK_TABLE + (layer + LAYER_OFFSET) * MAX_REQ * MAX_BLOCKS
                 + req_id * MAX_BLOCKS + lp,
                 mask=load_r, other=0).to(tl.int64)
-            src = (kv_ptr
-                   + phys[:, None] * HK * PAGE * HEAD_DIM
-                   + kv * PAGE * HEAD_DIM
-                   + off[:, None] * HEAD_DIM
-                   + dim[None, :])
+            if KV_POSITION_MAJOR:
+                src = (kv_ptr
+                       + phys[:, None] * HK * PAGE * HEAD_DIM
+                       + off[:, None] * HK * HEAD_DIM
+                       + kv * HEAD_DIM
+                       + dim[None, :])
+            else:
+                src = (kv_ptr
+                       + phys[:, None] * HK * PAGE * HEAD_DIM
+                       + kv * PAGE * HEAD_DIM
+                       + off[:, None] * HEAD_DIM
+                       + dim[None, :])
             k = tl.load(
                 src, mask=load_r[:, None] & dim_mask[None, :],
                 other=0.0)
@@ -770,6 +778,7 @@ if _has_triton():
         NTILES: tl.constexpr, MERGE_PAD: tl.constexpr, LOG2_K: tl.constexpr,
         S: tl.constexpr, K: tl.constexpr, SINK: tl.constexpr,
         META_GROUP: tl.constexpr, TOKEN_BITS: tl.constexpr,
+        MERGE_DYNAMIC: tl.constexpr = False,
     ):
         h = tl.program_id(0)
         b = 0 if META_GROUP == 0 else h // META_GROUP
@@ -799,21 +808,40 @@ if _has_triton():
             token = tl.load(PART_TOKEN + h * NTILES * K + i)
             key = _nfa_pack_score_token(
                 logits, token, S=S, TOKEN_BITS=TOKEN_BITS)
-            for group in tl.static_range(1, NTILES):
-                reverse = K - 1 - i
-                incoming_logits = tl.load(
-                    PART_SCORE + (h * NTILES + group) * K + reverse)
-                incoming_token = tl.load(
-                    PART_TOKEN + (h * NTILES + group) * K + reverse)
-                incoming = _nfa_pack_score_token(
-                    incoming_logits, incoming_token, S=S, TOKEN_BITS=TOKEN_BITS)
-                key = tl.maximum(key, incoming)
-                for bit in tl.static_range(LOG2_K - 1, -1, -1):
-                    stride = 1 << bit
-                    peer = tl.gather(key, i ^ stride, axis=0)
-                    key = tl.where(
-                        (i & stride) == 0,
-                        tl.maximum(key, peer), tl.minimum(key, peer))
+            if MERGE_DYNAMIC:
+                # 全候选长序列可产生数百个 partial run；运行时循环避免将
+                # NTILES×LOG2_K 排序网络全部展开，归并顺序和数值规则不变。
+                for group in range(1, NTILES):
+                    reverse = K - 1 - i
+                    incoming_logits = tl.load(
+                        PART_SCORE + (h * NTILES + group) * K + reverse)
+                    incoming_token = tl.load(
+                        PART_TOKEN + (h * NTILES + group) * K + reverse)
+                    incoming = _nfa_pack_score_token(
+                        incoming_logits, incoming_token, S=S, TOKEN_BITS=TOKEN_BITS)
+                    key = tl.maximum(key, incoming)
+                    for bit in tl.static_range(LOG2_K - 1, -1, -1):
+                        stride = 1 << bit
+                        peer = tl.gather(key, i ^ stride, axis=0)
+                        key = tl.where(
+                            (i & stride) == 0,
+                            tl.maximum(key, peer), tl.minimum(key, peer))
+            else:
+                for group in tl.static_range(1, NTILES):
+                    reverse = K - 1 - i
+                    incoming_logits = tl.load(
+                        PART_SCORE + (h * NTILES + group) * K + reverse)
+                    incoming_token = tl.load(
+                        PART_TOKEN + (h * NTILES + group) * K + reverse)
+                    incoming = _nfa_pack_score_token(
+                        incoming_logits, incoming_token, S=S, TOKEN_BITS=TOKEN_BITS)
+                    key = tl.maximum(key, incoming)
+                    for bit in tl.static_range(LOG2_K - 1, -1, -1):
+                        stride = 1 << bit
+                        peer = tl.gather(key, i ^ stride, axis=0)
+                        key = tl.where(
+                            (i & stride) == 0,
+                            tl.maximum(key, peer), tl.minimum(key, peer))
         _finish_sorted_logits_key(
             h, key, LOW, HIGH, QUOTA, OUT, COUNT,
             S=S, K=K, SINK=SINK, META_GROUP=META_GROUP,
@@ -2159,7 +2187,7 @@ def _fused_fine_scores_paged(
         cache, req_ids, n_layers, dims, q_fine, cand_idx2, keep2, owners,
         generations, capacity, lower, upper, quota,
         tile=128, num_warps=4, layer_offset=0, workspace=None, bs=64,
-        k_f=0, k_n=0, pack_width=0, region=0):
+        k_f=0, k_n=0, pack_width=0, region=0, kv_position_major=False):
     """Candidate gather -> paged K load -> grouped-Q BF16 Logits/packed key。"""
     if not _has_triton():
         raise FallbackRequired("Triton unavailable")
@@ -2193,13 +2221,15 @@ def _fused_fine_scores_paged(
         MAX_REQ=cache.max_requests, LAYER_OFFSET=layer_offset,
         OWNER_CAP=owners.shape[-1], BS=bs,
         K_F=k_f, K_N=k_n, PACK_WIDTH=pack_width, REGION=region,
+        KV_POSITION_MAJOR=kv_position_major,
         num_warps=num_warps,
     )
     return logits
 
 
 def _nfa_filtered_topk(logits, cand_idx2, lower, upper, quota, capacity, width,
-                       sink, layer_offset=0, workspace=None, name='middle'):
+                       sink, layer_offset=0, workspace=None, name='middle',
+                       merge_dynamic=False):
     """将 grouped-Q Logits 直接转换为 canonical ``TokenSelection``。"""
     m, hkv, r = cand_idx2.shape
     prefix = '' if name == 'middle' else f'{name}_'
@@ -2235,6 +2265,7 @@ def _nfa_filtered_topk(logits, cand_idx2, lower, upper, quota, capacity, width,
         LOG2_K=width.bit_length() - 1,
         S=capacity, K=width, SINK=sink,
         META_GROUP=hkv, TOKEN_BITS=token_bits,
+        MERGE_DYNAMIC=merge_dynamic,
         num_warps=16,
     )
     return TokenSelection(out, count)

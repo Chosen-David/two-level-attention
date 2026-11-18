@@ -229,11 +229,13 @@ def git_identity(path, expected_commit):
 
 
 def validate_official_batch_size(args):
-    """官方 Quest/JSSA 当前均为真实 B1 路径，禁止用串行请求冒充 batch。"""
+    """Quest decode 使用真实 batched CUDA；JSSA 仍只允许官方 B1。"""
     batch_size = getattr(args, "batch_size", 1)
-    if batch_size != 1:
+    supported = (1, 2, 4) if args.method == "quest" else (1,)
+    if batch_size not in supported:
         raise ValueError(
-            f"官方 {args.method} 当前仅支持 batch_size=1；拒绝用串行 B1 冒充 batch"
+            f"官方 {args.method} 支持 batch_size={supported}，收到 {batch_size}；"
+            "拒绝用串行 B1 冒充 batch"
         )
     return batch_size
 
@@ -278,6 +280,7 @@ class OfficialEngine:
             page_size=args.quest_page_size,
             max_seq_len=max(args.quest_max_seq_len, max_model_len),
             rope_mode=rope_mode,
+            batch_size=self.batch_size,
         )
         extension = Path(quest_kernels.__file__).resolve()
         self.runtime = {
@@ -297,6 +300,12 @@ class OfficialEngine:
             ),
             "hf_length_cache_layers": 1,
             "prefill_tokenwise_chunk": 65536,
+            "prefill_tokenwise_chunk_b4_over_64k": 32768,
+            "prefill_execution": (
+                "per-row official B1 kernels" if self.batch_size > 1
+                else "official B1 kernels"
+            ),
+            "decode_execution": "fully batched official CUDA kernels",
             "quest": git_identity(REPO / "third-party/Quest", QUEST_COMMIT),
             "kernel_extension": str(extension),
             "kernel_extension_sha256": sha256_file(extension),
@@ -419,15 +428,19 @@ class OfficialEngine:
 
     def generate(
         self, ids, max_new_tokens, ignore_eos, stop_token_ids=None,
-        min_new_tokens=0, stop_strings=None,
+        min_new_tokens=0, stop_strings=None, collect_decode_events=False,
+        logits_processor=None,
     ):
         if not 0 <= min_new_tokens <= max_new_tokens:
             raise ValueError("min_new_tokens 必须位于 [0, max_new_tokens]")
         if self.args.method == "quest":
-            return self._generate_quest(
+            generated, elapsed, step_ms = self._generate_quest(
                 ids, max_new_tokens, ignore_eos, stop_token_ids, min_new_tokens,
-                stop_strings,
+                stop_strings, collect_decode_events, logits_processor,
             )
+            if collect_decode_events:
+                return generated, elapsed, step_ms
+            return generated, elapsed
         return self._generate_jssa(
             ids, max_new_tokens, ignore_eos, stop_token_ids, min_new_tokens,
             stop_strings,
@@ -435,10 +448,13 @@ class OfficialEngine:
 
     def _generate_quest(
         self, ids, max_new_tokens, ignore_eos, stop_token_ids=None,
-        min_new_tokens=0, stop_strings=None,
+        min_new_tokens=0, stop_strings=None, collect_decode_events=False,
+        logits_processor=None,
     ):
         torch = self.torch
         inputs = torch.tensor([ids], dtype=torch.long, device=self.args.device)
+        if self.batch_size > 1:
+            inputs = inputs.repeat(self.batch_size, 1)
         configured = getattr(self.model.generation_config, "eos_token_id", None)
         if configured is None:
             configured = ()
@@ -451,6 +467,33 @@ class OfficialEngine:
             token for token in eos_ids
             if isinstance(token, int) and not isinstance(token, bool) and token >= 0
         ))
+        decode_events = []
+        handles = []
+
+        def _pre_hook(module, args, kwargs):
+            input_ids = kwargs.get("input_ids")
+            if input_ids is None and args:
+                input_ids = args[0]
+            if input_ids is None or input_ids.ndim != 2 or input_ids.shape[-1] != 1:
+                return
+            start = torch.cuda.Event(enable_timing=True)
+            start.record()
+            module._quest_pending_decode_start = start
+
+        def _post_hook(module, args, output):
+            start = getattr(module, "_quest_pending_decode_start", None)
+            if start is None:
+                return
+            end = torch.cuda.Event(enable_timing=True)
+            end.record()
+            decode_events.append((start, end))
+            module._quest_pending_decode_start = None
+
+        if collect_decode_events:
+            handles = [
+                self.model.register_forward_pre_hook(_pre_hook, with_kwargs=True),
+                self.model.register_forward_hook(_post_hook),
+            ]
         try:
             torch.cuda.synchronize()
             started = time.perf_counter()
@@ -466,13 +509,22 @@ class OfficialEngine:
                     eos_token_id=eos_ids or None,
                     stop_strings=stop_strings or None,
                     tokenizer=self.tokenizer if stop_strings else None,
-                )[0]
+                    logits_processor=logits_processor,
+                )
+                if self.batch_size == 1:
+                    output = output[0]
             torch.cuda.synchronize()
             elapsed = time.perf_counter() - started
         finally:
+            for handle in handles:
+                handle.remove()
             self.model.reset_quest_controller()
-        generated = output[len(ids):].tolist()
-        return generated, elapsed
+        if self.batch_size == 1:
+            generated = output[len(ids):].tolist()
+        else:
+            generated = output[:, len(ids):].tolist()
+        step_ms = [start.elapsed_time(end) for start, end in decode_events]
+        return generated, elapsed, step_ms
 
     def _generate_jssa(
         self, ids, max_new_tokens, ignore_eos, stop_token_ids=None,
