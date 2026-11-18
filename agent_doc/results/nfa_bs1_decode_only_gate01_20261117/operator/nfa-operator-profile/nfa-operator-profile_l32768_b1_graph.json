@@ -1,0 +1,1404 @@
+{
+  "schema": "nfa-selector-and-e2e-v2",
+  "source": {
+    "head": "0fa07ea80b67d8369c6c26359e768f510dd4eef4",
+    "diff_sha256": "06aea24f8e0bf89a503836fc04a0a391e49f0f02a6bff496ac3000ecd91c0776",
+    "harness_sha256": "d4a76ebd77db50175b11b321c1f5ddd59ddb4ccba5fa7b21d3e83e59ad83581b"
+  },
+  "method": "nfa",
+  "measurement_mode": "operator-profile",
+  "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+  "context_length": 32768,
+  "batch_size": 1,
+  "execution": "graph",
+  "subspace": "tail",
+  "l2_subspace": "same",
+  "score_dimensions": {
+    "head_dim": 128,
+    "l1_score_dims": 32,
+    "l2_score_dims": 32
+  },
+  "gate_epsilon": 0.1,
+  "force_skip_mode": "natural",
+  "operator_mode": "off",
+  "task": "niah_multikey_2",
+  "sample_index": 2,
+  "input_provenance": "repeated-needle-body-extension",
+  "visible_len": 8192,
+  "input": {
+    "path": "/tmp/nfa_kernel_inputs/32768/niah_multikey_2.jsonl",
+    "sha256": "073bae295bd94baa1880f33c4b0ccaec3a4d510dac2b31935b3ce488ad698fe8",
+    "sample_index": 2,
+    "sample_id": 0,
+    "file_row_index": 0,
+    "actual_prompt_tokens": 32082,
+    "provenance": "repeated-needle-body-extension",
+    "performance_input_mode": "replicate one prompt across all batch rows"
+  },
+  "warmup_steps": 3,
+  "profile_repeat": 29,
+  "decode_steps": 29,
+  "measured_decode_steps": 0,
+  "profiled_decode_steps": 29,
+  "profiler_clean_e2e_isolated": true,
+  "profile_backend": "nsys-graph-external",
+  "nsys_profile_finalized": true,
+  "operator_time_basis": "nsys/CUPTI graph kernel trace observed time; tracing may significantly perturb short kernels and runtime scheduling",
+  "host_overhead_derivable_by_subtraction": false,
+  "cross_mode_comparison_rule": "Do not subtract profiled nfa_operator_total_ms from clean decode TPOT and do not interpret their difference as Python/host overhead.",
+  "timing_scope": "clean-e2e uses a separate process and CUDA events around complete decode steps, including host scheduling/metadata, model/selector execution and argmax; operator-profile has no clean TPOT",
+  "timing_metric": null,
+  "prefill_seconds": 7.81508032977581,
+  "long_prefill_mlp_chunk_tokens": null,
+  "prefill_decisions": {
+    "0": {
+      "0": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "1": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "2": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "3": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "4": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "5": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "6": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "7": {
+        "skip_near": true,
+        "skip_far": false
+      },
+      "8": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "9": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "10": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "11": {
+        "skip_near": false,
+        "skip_far": true
+      },
+      "12": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "13": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "14": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "15": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "16": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "17": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "18": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "19": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "20": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "21": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "22": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "23": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "24": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "25": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "26": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "27": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "28": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "29": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "30": {
+        "skip_near": true,
+        "skip_far": false
+      },
+      "31": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "32": {
+        "skip_near": true,
+        "skip_far": false
+      },
+      "33": {
+        "skip_near": true,
+        "skip_far": false
+      },
+      "34": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "35": {
+        "skip_near": false,
+        "skip_far": false
+      }
+    }
+  },
+  "skip": {
+    "0": {
+      "n_layers": 36,
+      "near_layers": [
+        7,
+        30,
+        32,
+        33
+      ],
+      "far_layers": [
+        11
+      ],
+      "both_layers": []
+    }
+  },
+  "operator_summary": {
+    "l1_score_ms": {
+      "total_ms": 10.30350799999996,
+      "mean_ms_per_step": 0.35529337931034344
+    },
+    "l1_topk_ms": {
+      "total_ms": 13.429438000000047,
+      "mean_ms_per_step": 0.46308406896551885
+    },
+    "candidate_ms": {
+      "total_ms": 0.0,
+      "mean_ms_per_step": 0.0
+    },
+    "l2_score_ms": {
+      "total_ms": 27.094302999999908,
+      "mean_ms_per_step": 0.9342863103448245
+    },
+    "l2_topk_ms": {
+      "total_ms": 24.83550499999994,
+      "mean_ms_per_step": 0.856396724137929
+    },
+    "selection_union_ms": {
+      "total_ms": 6.761175000000047,
+      "mean_ms_per_step": 0.23314396551724298
+    },
+    "selected_attention_ms": {
+      "total_ms": 29.752225999999958,
+      "mean_ms_per_step": 1.0259388275862054
+    },
+    "pure_l1_score_ms": {
+      "total_ms": 4.173067000000016,
+      "mean_ms_per_step": 0.14389886206896604
+    },
+    "pure_l2_score_ms": {
+      "total_ms": 25.405882999999907,
+      "mean_ms_per_step": 0.8760649310344796
+    },
+    "l1_ms": {
+      "total_ms": 23.732946000000005,
+      "mean_ms_per_step": 0.8183774482758622
+    },
+    "l2_ms": {
+      "total_ms": 58.690982999999896,
+      "mean_ms_per_step": 2.0238269999999963
+    },
+    "topk_total_ms": {
+      "total_ms": 38.26494299999999,
+      "mean_ms_per_step": 1.3194807931034478
+    },
+    "main_attention_ms": {
+      "total_ms": 29.752225999999958,
+      "mean_ms_per_step": 1.0259388275862054
+    },
+    "nfa_operator_total_ms": {
+      "total_ms": 112.17615499999985,
+      "mean_ms_per_step": 3.8681432758620637
+    }
+  },
+  "kernel_summary": {
+    "_final_union_protected_sort_kernel": {
+      "calls_total": 1044,
+      "mean_calls_per_step": 36.0,
+      "total_ms": 1.9607139999999916,
+      "mean_ms_per_step": 0.06761082758620661,
+      "mean_instance_ms": 0.0018780785440613028,
+      "median_instance_ms": 0.001888,
+      "min_instance_ms": 0.001824,
+      "max_instance_ms": 0.002208,
+      "grid_x_values": [
+        8
+      ],
+      "grid_y_values": [
+        1
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": "selection_union_ms"
+    },
+    "_final_union_two_way_merge_kernel": {
+      "calls_total": 1044,
+      "mean_calls_per_step": 36.0,
+      "total_ms": 4.800461000000055,
+      "mean_ms_per_step": 0.16553313793103638,
+      "mean_instance_ms": 0.004598142720306514,
+      "median_instance_ms": 0.004576,
+      "min_instance_ms": 0.00448,
+      "max_instance_ms": 0.005248,
+      "grid_x_values": [
+        8
+      ],
+      "grid_y_values": [
+        1
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": "selection_union_ms"
+    },
+    "_gather_attend_grouped_kernel": {
+      "calls_total": 1044,
+      "mean_calls_per_step": 36.0,
+      "total_ms": 29.752225999999958,
+      "mean_ms_per_step": 1.0259388275862054,
+      "mean_instance_ms": 0.028498300766283523,
+      "median_instance_ms": 0.02848,
+      "min_instance_ms": 0.027872,
+      "max_instance_ms": 0.029568,
+      "grid_x_values": [
+        1
+      ],
+      "grid_y_values": [
+        32
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": "selected_attention_ms"
+    },
+    "_nfa_filtered_topk_merge_kernel": {
+      "calls_total": 1044,
+      "mean_calls_per_step": 36.0,
+      "total_ms": 9.76417499999999,
+      "mean_ms_per_step": 0.33669568965517205,
+      "mean_instance_ms": 0.009352658045977012,
+      "median_instance_ms": 0.009568,
+      "min_instance_ms": 0.00656,
+      "max_instance_ms": 0.009952,
+      "grid_x_values": [
+        8
+      ],
+      "grid_y_values": [
+        1
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": "l2_topk_ms"
+    },
+    "_nfa_filtered_topk_partial_kernel": {
+      "calls_total": 1044,
+      "mean_calls_per_step": 36.0,
+      "total_ms": 15.071329999999952,
+      "mean_ms_per_step": 0.519701034482757,
+      "mean_instance_ms": 0.014436139846743294,
+      "median_instance_ms": 0.014432,
+      "min_instance_ms": 0.014272,
+      "max_instance_ms": 0.014848,
+      "grid_x_values": [
+        8
+      ],
+      "grid_y_values": [
+        2,
+        4,
+        5
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": "l2_topk_ms"
+    },
+    "_nfa_fine_scores_paged_kernel": {
+      "calls_total": 1044,
+      "mean_calls_per_step": 36.0,
+      "total_ms": 25.405882999999907,
+      "mean_ms_per_step": 0.8760649310344796,
+      "mean_instance_ms": 0.024335136973180075,
+      "median_instance_ms": 0.025792,
+      "min_instance_ms": 0.007296,
+      "max_instance_ms": 0.030496,
+      "grid_x_values": [
+        8
+      ],
+      "grid_y_values": [
+        10,
+        26,
+        34
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": "l2_score_ms"
+    },
+    "_nfa_l1_far_scores_kernel": {
+      "calls_total": 116,
+      "mean_calls_per_step": 4.0,
+      "total_ms": 0.42252899999999993,
+      "mean_ms_per_step": 0.014569965517241377,
+      "mean_instance_ms": 0.0036424913793103447,
+      "median_instance_ms": 0.003616,
+      "min_instance_ms": 0.00352,
+      "max_instance_ms": 0.00416,
+      "grid_x_values": [
+        4
+      ],
+      "grid_y_values": [
+        8
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": "l1_score_ms"
+    },
+    "_nfa_l1_near_scores_kernel": {
+      "calls_total": 29,
+      "mean_calls_per_step": 1.0,
+      "total_ms": 0.10108899999999998,
+      "mean_ms_per_step": 0.003485827586206896,
+      "mean_instance_ms": 0.0034858275862068968,
+      "median_instance_ms": 0.003456,
+      "min_instance_ms": 0.003392,
+      "max_instance_ms": 0.00368,
+      "grid_x_values": [
+        2
+      ],
+      "grid_y_values": [
+        8
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": "l1_score_ms"
+    },
+    "_nfa_l1_scores_kernel": {
+      "calls_total": 899,
+      "mean_calls_per_step": 31.0,
+      "total_ms": 3.6494490000000157,
+      "mean_ms_per_step": 0.12584306896551778,
+      "mean_instance_ms": 0.00405945383759733,
+      "median_instance_ms": 0.004032,
+      "min_instance_ms": 0.003904,
+      "max_instance_ms": 0.004768,
+      "grid_x_values": [
+        4
+      ],
+      "grid_y_values": [
+        8
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": "l1_score_ms"
+    },
+    "_nfa_page_stats_prepare_q_kernel": {
+      "calls_total": 1044,
+      "mean_calls_per_step": 36.0,
+      "total_ms": 6.130440999999945,
+      "mean_ms_per_step": 0.21139451724137742,
+      "mean_instance_ms": 0.005872069923371647,
+      "median_instance_ms": 0.005856,
+      "min_instance_ms": 0.005312,
+      "max_instance_ms": 0.006816,
+      "grid_x_values": [
+        40
+      ],
+      "grid_y_values": [
+        1
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": "l1_score_ms"
+    },
+    "_norm_scale_kernel": {
+      "calls_total": 2117,
+      "mean_calls_per_step": 73.0,
+      "total_ms": 3.3432079999999935,
+      "mean_ms_per_step": 0.1152830344827584,
+      "mean_instance_ms": 0.0015792196504487482,
+      "median_instance_ms": 0.001568,
+      "min_instance_ms": 0.001344,
+      "max_instance_ms": 0.002624,
+      "grid_x_values": [
+        1
+      ],
+      "grid_y_values": [
+        1
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": null
+    },
+    "_prepare_q_grouped_kernel": {
+      "calls_total": 1044,
+      "mean_calls_per_step": 36.0,
+      "total_ms": 1.6884200000000007,
+      "mean_ms_per_step": 0.05822137931034485,
+      "mean_instance_ms": 0.0016172605363984674,
+      "median_instance_ms": 0.0016,
+      "min_instance_ms": 0.001472,
+      "max_instance_ms": 0.0024,
+      "grid_x_values": [
+        8
+      ],
+      "grid_y_values": [
+        1
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": "l2_score_ms"
+    },
+    "_qwen3_qk_rope_kernel": {
+      "calls_total": 1044,
+      "mean_calls_per_step": 36.0,
+      "total_ms": 1.423459999999996,
+      "mean_ms_per_step": 0.049084827586206754,
+      "mean_instance_ms": 0.0013634674329501915,
+      "median_instance_ms": 0.001344,
+      "min_instance_ms": 0.001248,
+      "max_instance_ms": 0.002048,
+      "grid_x_values": [
+        40
+      ],
+      "grid_y_values": [
+        1
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": null
+    },
+    "_rmsnorm_single_kernel": {
+      "calls_total": 2088,
+      "mean_calls_per_step": 72.0,
+      "total_ms": 3.150971000000063,
+      "mean_ms_per_step": 0.10865417241379527,
+      "mean_instance_ms": 0.0015090857279693487,
+      "median_instance_ms": 0.001504,
+      "min_instance_ms": 0.001344,
+      "max_instance_ms": 0.0024,
+      "grid_x_values": [
+        8,
+        32
+      ],
+      "grid_y_values": [
+        1
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": null
+    },
+    "_silu_mul_bf16_kernel": {
+      "calls_total": 1044,
+      "mean_calls_per_step": 36.0,
+      "total_ms": 1.7384019999999947,
+      "mean_ms_per_step": 0.059944896551723956,
+      "mean_instance_ms": 0.0016651360153256704,
+      "median_instance_ms": 0.001696,
+      "min_instance_ms": 0.00144,
+      "max_instance_ms": 0.002528,
+      "grid_x_values": [
+        48
+      ],
+      "grid_y_values": [
+        1
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": null
+    },
+    "_square_fp32_kernel": {
+      "calls_total": 2117,
+      "mean_calls_per_step": 73.0,
+      "total_ms": 2.8423740000000133,
+      "mean_ms_per_step": 0.0980128965517246,
+      "mean_instance_ms": 0.001342642418516769,
+      "median_instance_ms": 0.001344,
+      "min_instance_ms": 0.001248,
+      "max_instance_ms": 0.001696,
+      "grid_x_values": [
+        1
+      ],
+      "grid_y_values": [
+        1
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": null
+    },
+    "_topk_candidate_batched_kernel": {
+      "calls_total": 1044,
+      "mean_calls_per_step": 36.0,
+      "total_ms": 13.429438000000047,
+      "mean_ms_per_step": 0.46308406896551885,
+      "mean_instance_ms": 0.012863446360153257,
+      "median_instance_ms": 0.013184,
+      "min_instance_ms": 0.005728,
+      "max_instance_ms": 0.0152,
+      "grid_x_values": [
+        8
+      ],
+      "grid_y_values": [
+        1
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": "l1_topk_ms"
+    },
+    "nvjet_tst_512x8_64x3_2x1_v_bz_TNT": {
+      "calls_total": 29,
+      "mean_calls_per_step": 1.0,
+      "total_ms": 8.822228,
+      "mean_ms_per_step": 0.3042147586206897,
+      "mean_instance_ms": 0.30421475862068964,
+      "median_instance_ms": 0.304192,
+      "min_instance_ms": 0.302208,
+      "max_instance_ms": 0.305984,
+      "grid_x_values": [
+        2
+      ],
+      "grid_y_values": [
+        39
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": null
+    },
+    "nvjet_tst_64x8_64x16_2x1_v_bz_TNT": {
+      "calls_total": 2088,
+      "mean_calls_per_step": 72.0,
+      "total_ms": 24.03914099999994,
+      "mean_ms_per_step": 0.8289358965517221,
+      "mean_instance_ms": 0.01151299856321839,
+      "median_instance_ms": 0.011488,
+      "min_instance_ms": 0.010624,
+      "max_instance_ms": 0.013504,
+      "grid_x_values": [
+        2
+      ],
+      "grid_y_values": [
+        32
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": null
+    },
+    "nvjet_tst_64x8_64x16_2x1_v_bz_splitK_TNT": {
+      "calls_total": 3132,
+      "mean_calls_per_step": 108.0,
+      "total_ms": 84.70926799999994,
+      "mean_ms_per_step": 2.9210092413793083,
+      "mean_instance_ms": 0.027046381864623242,
+      "median_instance_ms": 0.026975,
+      "min_instance_ms": 0.025696,
+      "max_instance_ms": 0.029696,
+      "grid_x_values": [
+        2
+      ],
+      "grid_y_values": [
+        39
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": null
+    },
+    "nvjet_tst_64x8_64x16_4x1_v_bz_splitK_TNT": {
+      "calls_total": 2088,
+      "mean_calls_per_step": 72.0,
+      "total_ms": 11.114097000000019,
+      "mean_ms_per_step": 0.3832447241379317,
+      "mean_instance_ms": 0.005322843390804598,
+      "median_instance_ms": 0.00528,
+      "min_instance_ms": 0.005056,
+      "max_instance_ms": 0.006816,
+      "grid_x_values": [
+        4
+      ],
+      "grid_y_values": [
+        12
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": null
+    },
+    "void <unnamed>::elementwise_kernel_with_index<int, at::native::arange_cuda_out(const c10::Scalar &, const c10::Scalar &, const c10::Scalar &, at::Tensor &)::[lambda() (instance 1)]::operator ()() const::[lambda() (instance 4)]::operator ()() const::[lambda(long) (instance 1)]>(T1, T2, function_traits<T2>::result_type *)": {
+      "calls_total": 29,
+      "mean_calls_per_step": 1.0,
+      "total_ms": 0.032095999999999986,
+      "mean_ms_per_step": 0.0011067586206896546,
+      "mean_instance_ms": 0.001106758620689655,
+      "median_instance_ms": 0.00112,
+      "min_instance_ms": 0.000896,
+      "max_instance_ms": 0.00112,
+      "grid_x_values": [
+        1
+      ],
+      "grid_y_values": [
+        1
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": null
+    },
+    "void at::native::<unnamed>::CatArrayBatchedCopy_alignedK_contig<at::native::<unnamed>::OpaqueType<(unsigned int)4>, unsigned int, (int)3, (int)128, (int)1, (int)16>(T1 *, at::native::<unnamed>::CatArrInputTensorMetadata<T1, T2, T4, T5>, at::native::<unnamed>::TensorSizeStride<T2, (unsigned int)4>, int, T2)": {
+      "calls_total": 29,
+      "mean_calls_per_step": 1.0,
+      "total_ms": 0.03968,
+      "mean_ms_per_step": 0.0013682758620689654,
+      "mean_instance_ms": 0.0013682758620689654,
+      "median_instance_ms": 0.001376,
+      "min_instance_ms": 0.001344,
+      "max_instance_ms": 0.001376,
+      "grid_x_values": [
+        1
+      ],
+      "grid_y_values": [
+        2
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": null
+    },
+    "void at::native::<unnamed>::indexSelectSmallIndex<c10::BFloat16, long, unsigned int, (int)2, (int)2, (int)-2>(at::cuda::detail::TensorInfo<T1, T3>, at::cuda::detail::TensorInfo<const T1, T3>, at::cuda::detail::TensorInfo<const T2, T3>, int, int, T3, long)": {
+      "calls_total": 29,
+      "mean_calls_per_step": 1.0,
+      "total_ms": 0.07599999999999998,
+      "mean_ms_per_step": 0.002620689655172413,
+      "mean_instance_ms": 0.002620689655172414,
+      "median_instance_ms": 0.00256,
+      "min_instance_ms": 0.002464,
+      "max_instance_ms": 0.003008,
+      "grid_x_values": [
+        32
+      ],
+      "grid_y_values": [
+        1
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": null
+    },
+    "void at::native::index_elementwise_kernel<(int)128, (int)4, void at::native::gpu_index_kernel<void at::native::index_kernel_impl<at::native::OpaqueType<(int)1>>(at::TensorIteratorBase &, c10::ArrayRef<long>, c10::ArrayRef<long>)::[lambda(char *, const char *, long) (instance 1)]>(at::TensorIteratorBase &, c10::ArrayRef<long>, c10::ArrayRef<long>, const T1 &, bool)::[lambda(int) (instance 1)]>(long, T3)": {
+      "calls_total": 58,
+      "mean_calls_per_step": 2.0,
+      "total_ms": 0.14960100000000007,
+      "mean_ms_per_step": 0.005158655172413796,
+      "mean_instance_ms": 0.0025793275862068966,
+      "median_instance_ms": 0.0025440000000000003,
+      "min_instance_ms": 0.002176,
+      "max_instance_ms": 0.003136,
+      "grid_x_values": [
+        1
+      ],
+      "grid_y_values": [
+        1
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": null
+    },
+    "void at::native::index_elementwise_kernel<(int)128, (int)4, void at::native::gpu_index_kernel<void at::native::index_kernel_impl<at::native::OpaqueType<(int)8>>(at::TensorIteratorBase &, c10::ArrayRef<long>, c10::ArrayRef<long>)::[lambda(char *, const char *, long) (instance 1)]>(at::TensorIteratorBase &, c10::ArrayRef<long>, c10::ArrayRef<long>, const T1 &, bool)::[lambda(int) (instance 1)]>(long, T3)": {
+      "calls_total": 145,
+      "mean_calls_per_step": 5.0,
+      "total_ms": 0.36694499999999997,
+      "mean_ms_per_step": 0.012653275862068965,
+      "mean_instance_ms": 0.002530655172413793,
+      "median_instance_ms": 0.002528,
+      "min_instance_ms": 0.00192,
+      "max_instance_ms": 0.003296,
+      "grid_x_values": [
+        1
+      ],
+      "grid_y_values": [
+        1
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": null
+    },
+    "void at::native::index_elementwise_kernel<(int)128, (int)4, void at::native::gpu_index_kernel<void at::native::index_put_kernel_impl<at::native::OpaqueType<(int)1>>(at::TensorIterator &, c10::ArrayRef<long>, c10::ArrayRef<long>)::[lambda(char *, const char *, long) (instance 1)]>(at::TensorIteratorBase &, c10::ArrayRef<long>, c10::ArrayRef<long>, const T1 &, bool)::[lambda(int) (instance 1)]>(long, T3)": {
+      "calls_total": 29,
+      "mean_calls_per_step": 1.0,
+      "total_ms": 0.072704,
+      "mean_ms_per_step": 0.002507034482758621,
+      "mean_instance_ms": 0.002507034482758621,
+      "median_instance_ms": 0.002624,
+      "min_instance_ms": 0.002144,
+      "max_instance_ms": 0.00304,
+      "grid_x_values": [
+        1
+      ],
+      "grid_y_values": [
+        1
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": null
+    },
+    "void at::native::index_elementwise_kernel<(int)128, (int)4, void at::native::gpu_index_kernel<void at::native::index_put_kernel_impl<at::native::OpaqueType<(int)8>>(at::TensorIterator &, c10::ArrayRef<long>, c10::ArrayRef<long>)::[lambda(char *, const char *, long) (instance 1)]>(at::TensorIteratorBase &, c10::ArrayRef<long>, c10::ArrayRef<long>, const T1 &, bool)::[lambda(int) (instance 1)]>(long, T3)": {
+      "calls_total": 58,
+      "mean_calls_per_step": 2.0,
+      "total_ms": 0.12944000000000006,
+      "mean_ms_per_step": 0.004463448275862071,
+      "mean_instance_ms": 0.0022317241379310347,
+      "median_instance_ms": 0.00216,
+      "min_instance_ms": 0.001888,
+      "max_instance_ms": 0.002624,
+      "grid_x_values": [
+        1
+      ],
+      "grid_y_values": [
+        1
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": null
+    },
+    "void at::native::reduce_kernel<(int)512, (int)1, at::native::ReduceOp<c10::BFloat16, at::native::ArgMaxOps<float>, unsigned int, long, (int)4, (int)4>>(T3)": {
+      "calls_total": 29,
+      "mean_calls_per_step": 1.0,
+      "total_ms": 0.268257,
+      "mean_ms_per_step": 0.009250241379310346,
+      "mean_instance_ms": 0.009250241379310345,
+      "median_instance_ms": 0.009248,
+      "min_instance_ms": 0.008896,
+      "max_instance_ms": 0.009792,
+      "grid_x_values": [
+        1
+      ],
+      "grid_y_values": [
+        19
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": null
+    },
+    "void at::native::reduce_kernel<(int)512, (int)1, at::native::ReduceOp<float, at::native::MeanOps<float, float, float, float>, unsigned int, float, (int)4, (int)4>>(T3)": {
+      "calls_total": 2117,
+      "mean_calls_per_step": 73.0,
+      "total_ms": 4.89735999999994,
+      "mean_ms_per_step": 0.16887448275861863,
+      "mean_instance_ms": 0.002313349078885215,
+      "median_instance_ms": 0.002304,
+      "min_instance_ms": 0.00224,
+      "max_instance_ms": 0.002848,
+      "grid_x_values": [
+        1
+      ],
+      "grid_y_values": [
+        1
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": null
+    },
+    "void at::native::unrolled_elementwise_kernel<at::native::CUDAFunctor_add<int>, std::array<char *, (unsigned long)3>, (int)4, TrivialOffsetCalculator<(int)2, unsigned int>, TrivialOffsetCalculator<(int)1, unsigned int>, at::native::memory::LoadWithCast<(int)2>, at::native::memory::StoreWithCast<(int)1>>(int, T1, T2, T4, T5, T6, T7)": {
+      "calls_total": 29,
+      "mean_calls_per_step": 1.0,
+      "total_ms": 0.04700800000000001,
+      "mean_ms_per_step": 0.0016209655172413795,
+      "mean_instance_ms": 0.0016209655172413793,
+      "median_instance_ms": 0.001632,
+      "min_instance_ms": 0.001472,
+      "max_instance_ms": 0.001792,
+      "grid_x_values": [
+        1
+      ],
+      "grid_y_values": [
+        1
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": null
+    },
+    "void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda(at::TensorIteratorBase &)::[lambda() (instance 3)]::operator ()() const::[lambda() (instance 4)]::operator ()() const::[lambda(long) (instance 1)], std::array<char *, (unsigned long)2>, (int)4, TrivialOffsetCalculator<(int)1, unsigned int>, TrivialOffsetCalculator<(int)1, unsigned int>, at::native::memory::LoadWithCast<(int)1>, at::native::memory::StoreWithCast<(int)1>>(int, T1, T2, T4, T5, T6, T7)": {
+      "calls_total": 29,
+      "mean_calls_per_step": 1.0,
+      "total_ms": 0.04396799999999999,
+      "mean_ms_per_step": 0.0015161379310344824,
+      "mean_instance_ms": 0.0015161379310344827,
+      "median_instance_ms": 0.001568,
+      "min_instance_ms": 0.001376,
+      "max_instance_ms": 0.001664,
+      "grid_x_values": [
+        1
+      ],
+      "grid_y_values": [
+        1
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": null
+    },
+    "void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda(at::TensorIteratorBase &)::[lambda() (instance 3)]::operator ()() const::[lambda() (instance 7)]::operator ()() const::[lambda(float) (instance 1)], std::array<char *, (unsigned long)2>, (int)4, TrivialOffsetCalculator<(int)1, unsigned int>, TrivialOffsetCalculator<(int)1, unsigned int>, at::native::memory::LoadWithCast<(int)1>, at::native::memory::StoreWithCast<(int)1>>(int, T1, T2, T4, T5, T6, T7)": {
+      "calls_total": 29,
+      "mean_calls_per_step": 1.0,
+      "total_ms": 0.04479999999999999,
+      "mean_ms_per_step": 0.0015448275862068963,
+      "mean_instance_ms": 0.0015448275862068965,
+      "median_instance_ms": 0.001536,
+      "min_instance_ms": 0.001504,
+      "max_instance_ms": 0.001792,
+      "grid_x_values": [
+        1
+      ],
+      "grid_y_values": [
+        1
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": null
+    },
+    "void at::native::vectorized_elementwise_kernel<(int)2, at::native::<unnamed>::masked_fill_kernel(at::TensorIterator &, const c10::Scalar &)::[lambda() (instance 1)]::operator ()() const::[lambda() (instance 4)]::operator ()() const::[lambda(long, bool) (instance 1)], std::array<char *, (unsigned long)3>>(int, T2, T3)": {
+      "calls_total": 58,
+      "mean_calls_per_step": 2.0,
+      "total_ms": 0.08476800000000002,
+      "mean_ms_per_step": 0.0029230344827586214,
+      "mean_instance_ms": 0.0014615172413793103,
+      "median_instance_ms": 0.001472,
+      "min_instance_ms": 0.00128,
+      "max_instance_ms": 0.001792,
+      "grid_x_values": [
+        1
+      ],
+      "grid_y_values": [
+        1
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": null
+    },
+    "void at::native::vectorized_elementwise_kernel<(int)2, at::native::<unnamed>::where_kernel_impl(at::TensorIterator &)::[lambda() (instance 1)]::operator ()() const::[lambda() (instance 8)]::operator ()() const::[lambda(bool, long, long) (instance 1)], std::array<char *, (unsigned long)4>>(int, T2, T3)": {
+      "calls_total": 58,
+      "mean_calls_per_step": 2.0,
+      "total_ms": 0.08537600000000001,
+      "mean_ms_per_step": 0.0029440000000000004,
+      "mean_instance_ms": 0.001472,
+      "median_instance_ms": 0.001472,
+      "min_instance_ms": 0.00128,
+      "max_instance_ms": 0.001824,
+      "grid_x_values": [
+        1
+      ],
+      "grid_y_values": [
+        1
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": null
+    },
+    "void at::native::vectorized_elementwise_kernel<(int)2, at::native::CUDAFunctor_add<long>, std::array<char *, (unsigned long)3>>(int, T2, T3)": {
+      "calls_total": 29,
+      "mean_calls_per_step": 1.0,
+      "total_ms": 0.038015999999999994,
+      "mean_ms_per_step": 0.0013108965517241377,
+      "mean_instance_ms": 0.001310896551724138,
+      "median_instance_ms": 0.00128,
+      "min_instance_ms": 0.001184,
+      "max_instance_ms": 0.001472,
+      "grid_x_values": [
+        1
+      ],
+      "grid_y_values": [
+        1
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": null
+    },
+    "void at::native::vectorized_elementwise_kernel<(int)2, at::native::FillFunctor<long>, std::array<char *, (unsigned long)1>>(int, T2, T3)": {
+      "calls_total": 29,
+      "mean_calls_per_step": 1.0,
+      "total_ms": 0.030912,
+      "mean_ms_per_step": 0.0010659310344827587,
+      "mean_instance_ms": 0.0010659310344827587,
+      "median_instance_ms": 0.001088,
+      "min_instance_ms": 0.000928,
+      "max_instance_ms": 0.001216,
+      "grid_x_values": [
+        1
+      ],
+      "grid_y_values": [
+        1
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": null
+    },
+    "void at::native::vectorized_elementwise_kernel<(int)4, at::native::AUnaryFunctor<float, float, float, at::native::binary_internal::MulFunctor<float>>, std::array<char *, (unsigned long)2>>(int, T2, T3)": {
+      "calls_total": 58,
+      "mean_calls_per_step": 2.0,
+      "total_ms": 0.06940799999999998,
+      "mean_ms_per_step": 0.002393379310344827,
+      "mean_instance_ms": 0.0011966896551724138,
+      "median_instance_ms": 0.001184,
+      "min_instance_ms": 0.001184,
+      "max_instance_ms": 0.001216,
+      "grid_x_values": [
+        1
+      ],
+      "grid_y_values": [
+        1
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": null
+    },
+    "void at::native::vectorized_elementwise_kernel<(int)4, at::native::BinaryFunctor<bool, bool, bool, at::native::BitwiseAndFunctor<bool>>, std::array<char *, (unsigned long)3>>(int, T2, T3)": {
+      "calls_total": 58,
+      "mean_calls_per_step": 2.0,
+      "total_ms": 0.09395300000000001,
+      "mean_ms_per_step": 0.0032397586206896556,
+      "mean_instance_ms": 0.0016198793103448276,
+      "median_instance_ms": 0.001584,
+      "min_instance_ms": 0.00128,
+      "max_instance_ms": 0.002368,
+      "grid_x_values": [
+        1
+      ],
+      "grid_y_values": [
+        1
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": null
+    },
+    "void at::native::vectorized_elementwise_kernel<(int)4, at::native::FillFunctor<bool>, std::array<char *, (unsigned long)1>>(int, T2, T3)": {
+      "calls_total": 29,
+      "mean_calls_per_step": 1.0,
+      "total_ms": 0.036992000000000004,
+      "mean_ms_per_step": 0.001275586206896552,
+      "mean_instance_ms": 0.0012755862068965518,
+      "median_instance_ms": 0.001312,
+      "min_instance_ms": 0.00112,
+      "max_instance_ms": 0.001504,
+      "grid_x_values": [
+        1
+      ],
+      "grid_y_values": [
+        1
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": null
+    },
+    "void at::native::vectorized_elementwise_kernel<(int)4, at::native::bitwise_not_kernel_cuda(at::TensorIteratorBase &)::[lambda(bool) (instance 1)], std::array<char *, (unsigned long)2>>(int, T2, T3)": {
+      "calls_total": 87,
+      "mean_calls_per_step": 3.0,
+      "total_ms": 0.128737,
+      "mean_ms_per_step": 0.004439206896551724,
+      "mean_instance_ms": 0.0014797356321839081,
+      "median_instance_ms": 0.001504,
+      "min_instance_ms": 0.00128,
+      "max_instance_ms": 0.001888,
+      "grid_x_values": [
+        1
+      ],
+      "grid_y_values": [
+        1
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": null
+    },
+    "void at::native::vectorized_elementwise_kernel<(int)4, at::native::cos_kernel_cuda(at::TensorIteratorBase &)::[lambda() (instance 2)]::operator ()() const::[lambda() (instance 2)]::operator ()() const::[lambda(float) (instance 1)], std::array<char *, (unsigned long)2>>(int, T2, T3)": {
+      "calls_total": 29,
+      "mean_calls_per_step": 1.0,
+      "total_ms": 0.04841599999999998,
+      "mean_ms_per_step": 0.0016695172413793097,
+      "mean_instance_ms": 0.0016695172413793103,
+      "median_instance_ms": 0.001664,
+      "min_instance_ms": 0.001664,
+      "max_instance_ms": 0.001696,
+      "grid_x_values": [
+        1
+      ],
+      "grid_y_values": [
+        1
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": null
+    },
+    "void at::native::vectorized_elementwise_kernel<(int)4, at::native::sin_kernel_cuda(at::TensorIteratorBase &)::[lambda() (instance 2)]::operator ()() const::[lambda() (instance 2)]::operator ()() const::[lambda(float) (instance 1)], std::array<char *, (unsigned long)2>>(int, T2, T3)": {
+      "calls_total": 29,
+      "mean_calls_per_step": 1.0,
+      "total_ms": 0.04816099999999999,
+      "mean_ms_per_step": 0.0016607241379310341,
+      "mean_instance_ms": 0.0016607241379310344,
+      "median_instance_ms": 0.001664,
+      "min_instance_ms": 0.001632,
+      "max_instance_ms": 0.001665,
+      "grid_x_values": [
+        1
+      ],
+      "grid_y_values": [
+        1
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": null
+    },
+    "void at::native::vectorized_elementwise_kernel<(int)4, void at::native::compare_scalar_kernel<int>(at::TensorIteratorBase &, at::native::<unnamed>::OpType, T1)::[lambda(int) (instance 1)], std::array<char *, (unsigned long)2>>(int, T2, T3)": {
+      "calls_total": 29,
+      "mean_calls_per_step": 1.0,
+      "total_ms": 0.048608000000000005,
+      "mean_ms_per_step": 0.0016761379310344829,
+      "mean_instance_ms": 0.0016761379310344827,
+      "median_instance_ms": 0.001728,
+      "min_instance_ms": 0.001536,
+      "max_instance_ms": 0.001888,
+      "grid_x_values": [
+        1
+      ],
+      "grid_y_values": [
+        1
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": null
+    },
+    "void at::native::vectorized_elementwise_kernel<(int)4, void at::native::compare_scalar_kernel<long>(at::TensorIteratorBase &, at::native::<unnamed>::OpType, T1)::[lambda(long) (instance 1)], std::array<char *, (unsigned long)2>>(int, T2, T3)": {
+      "calls_total": 87,
+      "mean_calls_per_step": 3.0,
+      "total_ms": 0.14339300000000002,
+      "mean_ms_per_step": 0.004944586206896553,
+      "mean_instance_ms": 0.0016481954022988506,
+      "median_instance_ms": 0.001632,
+      "min_instance_ms": 0.001312,
+      "max_instance_ms": 0.002272,
+      "grid_x_values": [
+        1
+      ],
+      "grid_y_values": [
+        1
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": null
+    },
+    "void at::native::vectorized_elementwise_kernel<(int)8, at::native::CUDAFunctor_add<c10::BFloat16>, std::array<char *, (unsigned long)3>>(int, T2, T3)": {
+      "calls_total": 2088,
+      "mean_calls_per_step": 72.0,
+      "total_ms": 2.9833310000000104,
+      "mean_ms_per_step": 0.10287348275862104,
+      "mean_instance_ms": 0.0014287983716475096,
+      "median_instance_ms": 0.001408,
+      "min_instance_ms": 0.001216,
+      "max_instance_ms": 0.00256,
+      "grid_x_values": [
+        4
+      ],
+      "grid_y_values": [
+        1
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": null
+    },
+    "void at::native::vectorized_elementwise_kernel<(int)8, at::native::bfloat16_copy_kernel_cuda(at::TensorIteratorBase &)::[lambda(float) (instance 1)], std::array<char *, (unsigned long)2>>(int, T2, T3)": {
+      "calls_total": 58,
+      "mean_calls_per_step": 2.0,
+      "total_ms": 0.06502500000000004,
+      "mean_ms_per_step": 0.0022422413793103464,
+      "mean_instance_ms": 0.0011211206896551724,
+      "median_instance_ms": 0.00112,
+      "min_instance_ms": 0.001088,
+      "max_instance_ms": 0.001152,
+      "grid_x_values": [
+        1
+      ],
+      "grid_y_values": [
+        1
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": null
+    },
+    "void at_cuda_detail::cub::DeviceCompactInitKernel<at_cuda_detail::cub::ScanTileState<int, (bool)1>, int *>(T1, int, T2)": {
+      "calls_total": 87,
+      "mean_calls_per_step": 3.0,
+      "total_ms": 0.11007999999999996,
+      "mean_ms_per_step": 0.0037958620689655157,
+      "mean_instance_ms": 0.0012652873563218391,
+      "median_instance_ms": 0.001312,
+      "min_instance_ms": 0.001024,
+      "max_instance_ms": 0.001728,
+      "grid_x_values": [
+        1
+      ],
+      "grid_y_values": [
+        1
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": null
+    },
+    "void at_cuda_detail::cub::DeviceReduceSingleTileKernel<at_cuda_detail::cub::DeviceReducePolicy<int, unsigned long long, cuda::std::__4::plus<void>>::Policy600, at_cuda_detail::cub::TransformInputIterator<bool, at::native::<unnamed>::NonZeroOp<bool>, const bool *, long>, int *, unsigned long long, cuda::std::__4::plus<void>, int, int, cuda::std::__4::__identity>(T2, T3, T4, T5, T6, T8)": {
+      "calls_total": 87,
+      "mean_calls_per_step": 3.0,
+      "total_ms": 0.128288,
+      "mean_ms_per_step": 0.004423724137931035,
+      "mean_instance_ms": 0.0014745747126436782,
+      "median_instance_ms": 0.001504,
+      "min_instance_ms": 0.00128,
+      "max_instance_ms": 0.001856,
+      "grid_x_values": [
+        1
+      ],
+      "grid_y_values": [
+        1
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": null
+    },
+    "void at_cuda_detail::cub::DeviceSelectSweepKernel<at_cuda_detail::cub::detail::device_select_policy_hub<long, bool, int, (bool)0, (bool)0>::Policy900, at_cuda_detail::cub::CountingInputIterator<long, long>, at_cuda_detail::cub::TransformInputIterator<bool, at::native::<unnamed>::NonZeroOp<bool>, const bool *, long>, long *, int *, at_cuda_detail::cub::ScanTileState<int, (bool)1>, at_cuda_detail::cub::NullType, at_cuda_detail::cub::NullType, int, (bool)0, (bool)0>(T2, T3, T4, T5, T6, T7, T8, T9, int, at_cuda_detail::cub::detail::vsmem_t)": {
+      "calls_total": 87,
+      "mean_calls_per_step": 3.0,
+      "total_ms": 0.153184,
+      "mean_ms_per_step": 0.005282206896551724,
+      "mean_instance_ms": 0.0017607356321839081,
+      "median_instance_ms": 0.001792,
+      "min_instance_ms": 0.0016,
+      "max_instance_ms": 0.001952,
+      "grid_x_values": [
+        1
+      ],
+      "grid_y_values": [
+        1
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": null
+    },
+    "void cublasLt::splitKreduce_kernel<(int)32, (int)16, int, float, __nv_bfloat16, float, __nv_bfloat16, (bool)0, float, __nv_bfloat16, __nv_bfloat16, (bool)1, (bool)0, (bool)0>(cublasLt::cublasSplitKParams<T6>, const T4 *, const T10 *, T9 *, T5 *, const T6 *, const T6 *, const T11 *, const T4 *, T11 *, void *, long, T6 *, int *, T6 *, T6 *, const T6 *, const T6 *, const T6 *, const T6 *, const T6 *)": {
+      "calls_total": 5220,
+      "mean_calls_per_step": 180.0,
+      "total_ms": 13.039129000000193,
+      "mean_ms_per_step": 0.44962513793104114,
+      "mean_instance_ms": 0.0024979174329501914,
+      "median_instance_ms": 0.002496,
+      "min_instance_ms": 0.001568,
+      "max_instance_ms": 0.00432,
+      "grid_x_values": [
+        32,
+        128,
+        384
+      ],
+      "grid_y_values": [
+        1
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": null
+    },
+    "void cutlass::Kernel2<cutlass_80_simt_sgemm_128x32_8x5_tn_align1>(T1::Params)": {
+      "calls_total": 29,
+      "mean_calls_per_step": 1.0,
+      "total_ms": 0.08313699999999997,
+      "mean_ms_per_step": 0.002866793103448275,
+      "mean_instance_ms": 0.002866793103448276,
+      "median_instance_ms": 0.002848,
+      "min_instance_ms": 0.002816,
+      "max_instance_ms": 0.002944,
+      "grid_x_values": [
+        1
+      ],
+      "grid_y_values": [
+        1
+      ],
+      "grid_z_values": [
+        1
+      ],
+      "stage": null
+    }
+  },
+  "region_kernel_audit": {
+    "expected_calls_per_step": {
+      "generic_l1": 31,
+      "near_only_l1": 1,
+      "far_only_l1": 4,
+      "active_page_stats": 36,
+      "active_candidate": 36,
+      "active_fine_score": 36
+    },
+    "observed_calls_per_step": {
+      "generic_l1": 31.0,
+      "near_only_l1": 1.0,
+      "far_only_l1": 4.0,
+      "active_page_stats": 36.0,
+      "active_candidate": 36.0,
+      "active_fine_score": 36.0
+    },
+    "passed": true,
+    "interpretation": "calls are per layer for the whole batch, not per request; generic=non-skip or mixed-batch, near_only=skip-far, far_only=skip-near; uniform both-skip contributes zero to every active selector entry"
+  },
+  "timing": null,
+  "generated_token_ids": [
+    [
+      576,
+      3281,
+      10963,
+      1372,
+      369,
+      65202,
+      291,
+      28783,
+      8631,
+      8023,
+      374,
+      220,
+      21,
+      15,
+      22,
+      18,
+      16,
+      21,
+      15,
+      624,
+      32313,
+      11,
+      1077,
+      752,
+      1430,
+      311,
+      7071,
+      700,
+      279,
+      4226,
+      1588,
+      13,
+      576
+    ]
+  ],
+  "graph_capture_count": 1,
+  "graph_replays": 32,
+  "graph_eager_fallbacks": 0,
+  "max_memory_allocated_gib": 23.05976963043213,
+  "max_memory_reserved_gib": 24.103515625,
+  "torch_version": "2.8.0+cu128",
+  "cuda_allocator_config": null,
+  "gpu_hygiene": "clean",
+  "gpu": 0,
+  "arm": "nfa-operator-profile",
+  "skip_validation": "active",
+  "profile_aggregation": "aggregate 29 graph decode steps; total and arithmetic mean per step; kernel instance min/median/max are not per-step distributions",
+  "nsys_receipt": {
+    "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+    "report_path": "/tmp/nfa-bs1-attribution-20261117/agent_doc/results/nfa_bs1_decode_only_gate01_20261117/operator/nfa-operator-profile/nfa-operator-profile_l32768_b1_graph.nsys-rep",
+    "report_sha256": "be8167d46909f7b79be34eb9c54fb3337893b48f334309c676f7a21aa4e38f03",
+    "sqlite_path": "/tmp/nfa-bs1-attribution-20261117/agent_doc/results/nfa_bs1_decode_only_gate01_20261117/operator/nfa-operator-profile/nfa-operator-profile_l32768_b1_graph.sqlite",
+    "sqlite_sha256": "cb165c28b3a92cdd56c78ffda89da90d784fbb4c78e5ccc49415e1c478428894",
+    "trace": "cuda",
+    "cuda_graph_trace": "node",
+    "capture_range": "cudaProfilerApi around steady decode only",
+    "observer_effect": "graph kernel tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+  }
+}

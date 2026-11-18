@@ -278,6 +278,16 @@ class JSSAQwen3Runtime:
         self.decode_attention_calls += 1
         return output
 
+    def _score_topk(self, layer_idx):
+        top_idx, _ = self.ops.score.jssa_score_topk(
+            self.projq_hrc.transpose(0, 1), self.kv_cache[layer_idx],
+            self.block_table, self.seq_lens, n_fac=self.budget,
+            head_size=self.head_dim, cs_h=self.rank,
+            scores_out=self.scores, top_idx_out=self.top_idx,
+            top_scores_out=self.top_scores, use_radix=True,
+            projk_cache=self.projk_cache[layer_idx])
+        return top_idx
+
     def decode_attention(
             self, layer_idx, query_states, key_states, value_states,
             attention_module=None):
@@ -298,13 +308,7 @@ class JSSAQwen3Runtime:
             self.q_kv.transpose(0, 1), basis.transpose(1, 2),
             out=self.projq_hrc)
         self.projq_hrc.mul_(self.projk_scale[layer_idx].unsqueeze(1))
-        top_idx, _ = self.ops.score.jssa_score_topk(
-            self.projq_hrc.transpose(0, 1), self.kv_cache[layer_idx],
-            self.block_table, self.seq_lens, n_fac=self.budget,
-            head_size=self.head_dim, cs_h=self.rank,
-            scores_out=self.scores, top_idx_out=self.top_idx,
-            top_scores_out=self.top_scores, use_radix=True,
-            projk_cache=self.projk_cache[layer_idx])
+        top_idx = self._score_topk(layer_idx)
         if (not torch.cuda.is_current_stream_capturing()
                 and bool((self.seq_lens < top_idx.shape[-1]).any().item())):
             if attention_module is None:

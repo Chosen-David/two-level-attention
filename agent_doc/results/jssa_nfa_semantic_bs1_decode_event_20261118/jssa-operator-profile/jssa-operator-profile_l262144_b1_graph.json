@@ -1,0 +1,639 @@
+{
+  "prefill_seconds": 254.2142223343253,
+  "generated_token_ids": [
+    [
+      576,
+      3281,
+      10963,
+      1372,
+      369,
+      34563,
+      12,
+      25208,
+      374,
+      220,
+      21,
+      18,
+      21,
+      15,
+      16,
+      22,
+      15,
+      13,
+      4710,
+      10061,
+      752,
+      1779,
+      429,
+      1549,
+      13,
+      576,
+      1467,
+      2727,
+      25,
+      330,
+      3966,
+      315,
+      279
+    ]
+  ],
+  "graph_capture_count": 1,
+  "graph_replays": 32,
+  "graph_eager_fallbacks": 0,
+  "jssa_runtime": {
+    "implementation": "JSSA paper performance semantics with NFA selector kernels",
+    "basis_path_independent_artifact": true,
+    "budget": 1024,
+    "rank": 32,
+    "page_size": 64,
+    "kv_cache_layout": "[layer, block, position, H_kv, K|V] BF16",
+    "projected_key_cache": "separate contiguous FP8 E4M3 [layer, block, position, H_kv, rank]",
+    "projected_key_scale": "per-(KV-head,channel) basis row norm folded into proj_q",
+    "score_kernel": "_nfa_fine_scores_paged_kernel",
+    "attention_kernel": "official gather-free online-softmax indexed-attend",
+    "local_compatibility_patch": "pad GQA rows to at least 16 in registers for Triton tl.dot; all padded loads/stores are masked",
+    "topk": "NFA exact two-stage filtered Top-K, sorted logical-token output",
+    "radix_topk_available": false,
+    "prefill_attention": "HF SDPA with original Qwen3 RoPE",
+    "prefill_store": "official fused project+store for every post-RoPE K/V token",
+    "decode_store_calls_warmup_and_capture": 72,
+    "decode_attention_calls_warmup_and_capture": 72,
+    "decode_indexed_attention_calls": 72,
+    "decode_partial_attention_calls": 0,
+    "short_sequence_policy": "official eager partial: stable-compact valid Top-K rows, then exact dense attention over min(seq_len,budget) real tokens",
+    "selection_implementation": "nfa-full-candidate-score-topk",
+    "score_candidate_scope": "every logical token in [0, seq_len), no L1 pruning",
+    "score_dtype": "FP8 projected-K and BF16 projected-Q, FP32 dot, BF16 logits",
+    "topk_budget_per_kv_head": 1024,
+    "nfa_l1_or_region_gate": false
+  },
+  "memory": {
+    "prefill_end": {
+      "allocated_bytes": 57492188160,
+      "reserved_bytes": 77500252160,
+      "max_allocated_bytes": 74861621760,
+      "max_reserved_bytes": 77500252160
+    },
+    "decode_ready": {
+      "allocated_bytes": 57536699392,
+      "reserved_bytes": 57558433792,
+      "max_allocated_bytes": 74861621760,
+      "max_reserved_bytes": 77500252160
+    },
+    "steady_decode_start": {
+      "allocated_bytes": 57536699904,
+      "reserved_bytes": 57558433792,
+      "max_allocated_bytes": 74861621760,
+      "max_reserved_bytes": 77500252160
+    },
+    "decode_end": {
+      "allocated_bytes": 57536699904,
+      "reserved_bytes": 57558433792,
+      "max_allocated_bytes": 74861621760,
+      "max_reserved_bytes": 77500252160
+    },
+    "model_loaded": {
+      "allocated_bytes": 16417139712,
+      "reserved_bytes": 16422797312,
+      "max_allocated_bytes": 16417152000,
+      "max_reserved_bytes": 16422797312
+    }
+  },
+  "schema": "qwen-jssa-nfa-semantic-e2e-v1",
+  "source": {
+    "head": "0fa07ea80b67d8369c6c26359e768f510dd4eef4",
+    "diff_sha256": "06aea24f8e0bf89a503836fc04a0a391e49f0f02a6bff496ac3000ecd91c0776",
+    "harness_sha256": "bb3cac4ca0c7a55fbd42636da2d09a00ebf148676f143986d850fae628c00706",
+    "jssa_vendor_files_sha256": {
+      "benchmark/efficiency/benchmark_jssa_official.py": "80e644bb6f6e838acbc1b46d33a5fc45ee4d7c38ab1056e2e6cc9e1613a6628a",
+      "exp/vendor_baselines/jssa_vendor/qwen3_jssa_official.py": "781c7a146cae3f114ca6474b3150a84f16e270ffc03369a9e8e0664c154a4059",
+      "exp/vendor_baselines/jssa_vendor/qwen3_jssa_nfa_semantic.py": "29d03982f1cc04fb2802ecc5cb585c00fc19cafe1d143a9ef5ce97dee3770af9",
+      "exp/vendor_baselines/jssa_vendor/upstream/patched_src/vllm/v1/attention/ops/triton_jssa_store.py": "82d1cd0722936ac41906537a8e351bbf6de881bbe1742f549cae0ed25b2b579f",
+      "exp/vendor_baselines/jssa_vendor/upstream/patched_src/vllm/v1/attention/ops/triton_jssa_score_topk.py": "e8fb015a34ae3a2afd239a08bc7b0962ece8c2672e80fd630e4f6d03b96b1190",
+      "exp/vendor_baselines/jssa_vendor/upstream/patched_src/vllm/v1/attention/ops/triton_jssa_indexed_attend.py": "23d4a1dae78a1e5a7f757d111586b276acf1e52a139fba5847e171f1574afa08"
+    }
+  },
+  "method": "jssa-nfa-semantic",
+  "execution": "graph",
+  "measurement_mode": "operator-profile",
+  "batch_size": 1,
+  "context_length": 262144,
+  "max_new_tokens": 33,
+  "warmup_steps": 3,
+  "profiled_decode_steps": 29,
+  "visible_len": 8192,
+  "task": "niah_multikey_2",
+  "sample_index": 2,
+  "input_provenance": "repeated-needle-body-extension",
+  "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+  "basis_path": "/tmp/nfa-bs1-attribution-20261117/bases/qwen3_8b.pt",
+  "basis_sha256": "c0642d54a676d94f9e0f2227f364eda24c3655382f7e0c2c3b9199f19e315a22",
+  "selector_implementation": "nfa-semantic",
+  "input": {
+    "path": "/tmp/nfa_kernel_inputs/262144/niah_multikey_2.jsonl",
+    "sha256": "0f8b39583d1df5e267c1750da44300322a2b5359cf6b2fe89b45b56efe028b30",
+    "sample_index": 2,
+    "sample_id": 2,
+    "file_row_index": 0,
+    "actual_prompt_tokens": 261935,
+    "provenance": "repeated-needle-body-extension",
+    "performance_input_mode": "replicate one prompt across all batch rows"
+  },
+  "decode_protocol": "fixed length; EOS recorded but not used for early stop",
+  "prefill_batch_execution": "serial one-request prefills",
+  "timing_scope": "CUDA-event elapsed time around each complete steady decode step: input/position/page metadata updates, model and argmax",
+  "timing_metric": null,
+  "host_readback_in_decode_loop": false,
+  "token_history_copy_inside_timed_events": false,
+  "final_token_readback": "one D2H after all decode steps",
+  "profiler_clean_e2e_isolated": true,
+  "profile_backend": "nsys-cuda-graph-node-external",
+  "nsys_profile_finalized": true,
+  "host_overhead_derivable_by_subtraction": false,
+  "gpu_hygiene": "clean",
+  "torch_version": "2.8.0+cu128",
+  "transformers_version": "4.56.2",
+  "gpu": 1,
+  "arm": "jssa-operator-profile",
+  "operator_summary": {
+    "all_observed_model_kernels_ms": {
+      "calls_total": 70789,
+      "mean_calls_per_step": 2441.0,
+      "total_ms": 1202.5050230000109,
+      "mean_ms_per_step": 41.465690448276234
+    },
+    "store_ms": {
+      "calls_total": 1044,
+      "mean_calls_per_step": 36.0,
+      "total_ms": 2.4493640000000014,
+      "mean_ms_per_step": 0.08446082758620695
+    },
+    "score_ms": {
+      "calls_total": 1044,
+      "mean_calls_per_step": 36.0,
+      "total_ms": 517.5035170000007,
+      "mean_ms_per_step": 17.84494886206899
+    },
+    "topk_ms": {
+      "calls_total": 2088,
+      "mean_calls_per_step": 72.0,
+      "total_ms": 439.40873999999934,
+      "mean_ms_per_step": 15.152025517241357
+    },
+    "score_topk_ms": {
+      "calls_total": 3132,
+      "mean_calls_per_step": 108.0,
+      "total_ms": 956.9122570000046,
+      "mean_ms_per_step": 32.9969743793105
+    },
+    "selection_with_store_ms": {
+      "calls_total": 4176,
+      "mean_calls_per_step": 144.0,
+      "total_ms": 959.3616210000033,
+      "mean_ms_per_step": 33.081435206896664
+    },
+    "selected_attention_ms": {
+      "calls_total": 2088,
+      "mean_calls_per_step": 72.0,
+      "total_ms": 10.62613100000043,
+      "mean_ms_per_step": 0.36641831034484246
+    },
+    "named_operator_total_ms": {
+      "calls_total": 6264,
+      "mean_calls_per_step": 216.0,
+      "total_ms": 969.987752000004,
+      "mean_ms_per_step": 33.44785351724152
+    },
+    "scope": "JSSA official project/store and indexed-attend plus NFA full-candidate fine-score and exact two-stage filtered Top-K. Query group-mean/projection/scale kernels remain in kernel_summary but are not attributed to named totals.",
+    "topk_implementation": "NFA exact two-stage filtered Top-K; no torch.topk fallback",
+    "topk_members": [
+      "_nfa_filtered_topk_merge_kernel",
+      "_nfa_filtered_topk_partial_kernel"
+    ]
+  },
+  "kernel_summary": {
+    "_jssa_project_store_contig_fp8_kernel": {
+      "calls_total": 1044,
+      "mean_calls_per_step": 36.0,
+      "total_ms": 2.4493640000000014,
+      "mean_ms_per_step": 0.08446082758620695,
+      "mean_instance_ms": 0.0023461340996168583,
+      "median_instance_ms": 0.002336,
+      "min_instance_ms": 0.002112,
+      "max_instance_ms": 0.003168
+    },
+    "_nfa_filtered_topk_merge_kernel": {
+      "calls_total": 1044,
+      "mean_calls_per_step": 36.0,
+      "total_ms": 205.6119949999998,
+      "mean_ms_per_step": 7.090068793103442,
+      "mean_instance_ms": 0.19694635536398467,
+      "median_instance_ms": 0.196929,
+      "min_instance_ms": 0.196002,
+      "max_instance_ms": 0.198466
+    },
+    "_nfa_filtered_topk_partial_kernel": {
+      "calls_total": 1044,
+      "mean_calls_per_step": 36.0,
+      "total_ms": 233.79674499999982,
+      "mean_ms_per_step": 8.061956724137925,
+      "mean_instance_ms": 0.22394324233716476,
+      "median_instance_ms": 0.223938,
+      "min_instance_ms": 0.223489,
+      "max_instance_ms": 0.225729
+    },
+    "_nfa_fine_scores_paged_kernel": {
+      "calls_total": 1044,
+      "mean_calls_per_step": 36.0,
+      "total_ms": 517.5035170000007,
+      "mean_ms_per_step": 17.84494886206899,
+      "mean_instance_ms": 0.49569302394636017,
+      "median_instance_ms": 0.495652,
+      "min_instance_ms": 0.491299,
+      "max_instance_ms": 0.500772
+    },
+    "_split_attend_kernel": {
+      "calls_total": 1044,
+      "mean_calls_per_step": 36.0,
+      "total_ms": 8.881444999999955,
+      "mean_ms_per_step": 0.3062567241379295,
+      "mean_instance_ms": 0.00850713122605364,
+      "median_instance_ms": 0.008481,
+      "min_instance_ms": 0.008224,
+      "max_instance_ms": 0.009088
+    },
+    "_split_reduce_kernel": {
+      "calls_total": 1044,
+      "mean_calls_per_step": 36.0,
+      "total_ms": 1.7446860000000075,
+      "mean_ms_per_step": 0.06016158620689681,
+      "mean_instance_ms": 0.001671155172413793,
+      "median_instance_ms": 0.001664,
+      "min_instance_ms": 0.0016,
+      "max_instance_ms": 0.001729
+    },
+    "nvjet_tst_512x8_64x3_2x1_v_bz_TNT": {
+      "calls_total": 29,
+      "mean_calls_per_step": 1.0,
+      "total_ms": 8.863746999999998,
+      "mean_ms_per_step": 0.305646448275862,
+      "mean_instance_ms": 0.30564644827586207,
+      "median_instance_ms": 0.305698,
+      "min_instance_ms": 0.30381,
+      "max_instance_ms": 0.30781
+    },
+    "nvjet_tst_64x8_64x16_2x1_v_bz_TNT": {
+      "calls_total": 2088,
+      "mean_calls_per_step": 72.0,
+      "total_ms": 24.22206499999997,
+      "mean_ms_per_step": 0.8352436206896541,
+      "mean_instance_ms": 0.011600605842911877,
+      "median_instance_ms": 0.011744,
+      "min_instance_ms": 0.01056,
+      "max_instance_ms": 0.013504
+    },
+    "nvjet_tst_64x8_64x16_2x1_v_bz_splitK_TNT": {
+      "calls_total": 3132,
+      "mean_calls_per_step": 108.0,
+      "total_ms": 85.09276599999997,
+      "mean_ms_per_step": 2.9342333103448266,
+      "mean_instance_ms": 0.02716882694763729,
+      "median_instance_ms": 0.027231,
+      "min_instance_ms": 0.025503,
+      "max_instance_ms": 0.029375
+    },
+    "nvjet_tst_64x8_64x16_4x1_v_bz_splitK_TNT": {
+      "calls_total": 2088,
+      "mean_calls_per_step": 72.0,
+      "total_ms": 11.073940000000029,
+      "mean_ms_per_step": 0.381860000000001,
+      "mean_instance_ms": 0.005303611111111111,
+      "median_instance_ms": 0.00528,
+      "min_instance_ms": 0.005056,
+      "max_instance_ms": 0.0064
+    },
+    "nvjet_tst_8x64_64x16_4x1_v_bz_TNN": {
+      "calls_total": 1044,
+      "mean_calls_per_step": 36.0,
+      "total_ms": 2.4689110000000074,
+      "mean_ms_per_step": 0.08513486206896577,
+      "mean_instance_ms": 0.0023648572796934864,
+      "median_instance_ms": 0.002336,
+      "min_instance_ms": 0.002272,
+      "max_instance_ms": 0.00288
+    },
+    "void at::native::<unnamed>::CatArrayBatchedCopy<at::native::<unnamed>::OpaqueType<(unsigned int)2>, unsigned int, (int)4, (int)64, (int)64>(T1 *, at::native::<unnamed>::CatArrInputTensorMetadata<T1, T2, T4, T5>, at::native::<unnamed>::TensorSizeStride<T2, (unsigned int)4>, int, T2)": {
+      "calls_total": 2088,
+      "mean_calls_per_step": 72.0,
+      "total_ms": 3.8686420000000825,
+      "mean_ms_per_step": 0.13340144827586492,
+      "mean_instance_ms": 0.0018527978927203065,
+      "median_instance_ms": 0.001856,
+      "min_instance_ms": 0.00176,
+      "max_instance_ms": 0.002304
+    },
+    "void at::native::<unnamed>::CatArrayBatchedCopy_alignedK_contig<at::native::<unnamed>::OpaqueType<(unsigned int)4>, unsigned int, (int)3, (int)128, (int)1, (int)16>(T1 *, at::native::<unnamed>::CatArrInputTensorMetadata<T1, T2, T4, T5>, at::native::<unnamed>::TensorSizeStride<T2, (unsigned int)4>, int, T2)": {
+      "calls_total": 29,
+      "mean_calls_per_step": 1.0,
+      "total_ms": 0.053759999999999995,
+      "mean_ms_per_step": 0.0018537931034482756,
+      "mean_instance_ms": 0.0018537931034482758,
+      "median_instance_ms": 0.001856,
+      "min_instance_ms": 0.001568,
+      "max_instance_ms": 0.00208
+    },
+    "void at::native::<unnamed>::indexSelectSmallIndex<c10::BFloat16, long, unsigned int, (int)2, (int)2, (int)-2>(at::cuda::detail::TensorInfo<T1, T3>, at::cuda::detail::TensorInfo<const T1, T3>, at::cuda::detail::TensorInfo<const T2, T3>, int, int, T3, long)": {
+      "calls_total": 29,
+      "mean_calls_per_step": 1.0,
+      "total_ms": 0.07468799999999999,
+      "mean_ms_per_step": 0.0025754482758620686,
+      "mean_instance_ms": 0.002575448275862069,
+      "median_instance_ms": 0.00256,
+      "min_instance_ms": 0.002432,
+      "max_instance_ms": 0.00304
+    },
+    "void at::native::elementwise_kernel<(int)128, (int)2, void at::native::gpu_kernel_impl_nocast<at::native::BinaryFunctor<float, float, float, at::native::binary_internal::MulFunctor<float>>>(at::TensorIteratorBase &, const T1 &)::[lambda(int) (instance 1)]>(int, T3)": {
+      "calls_total": 4205,
+      "mean_calls_per_step": 145.0,
+      "total_ms": 6.814803999999686,
+      "mean_ms_per_step": 0.23499324137929953,
+      "mean_instance_ms": 0.0016206430439952438,
+      "median_instance_ms": 0.001632,
+      "min_instance_ms": 0.00144,
+      "max_instance_ms": 0.002432
+    },
+    "void at::native::elementwise_kernel<(int)128, (int)4, void at::native::gpu_kernel_impl_nocast<at::native::<unnamed>::where_kernel_impl(at::TensorIterator &)::[lambda() (instance 1)]::operator ()() const::[lambda() (instance 3)]::operator ()() const::[lambda(bool, c10::BFloat16, c10::BFloat16) (instance 1)]>(at::TensorIteratorBase &, const T1 &)::[lambda(int) (instance 1)]>(int, T3)": {
+      "calls_total": 29,
+      "mean_calls_per_step": 1.0,
+      "total_ms": 0.06480000000000001,
+      "mean_ms_per_step": 0.00223448275862069,
+      "mean_instance_ms": 0.0022344827586206896,
+      "median_instance_ms": 0.002272,
+      "min_instance_ms": 0.002048,
+      "max_instance_ms": 0.00256
+    },
+    "void at::native::elementwise_kernel<(int)128, (int)4, void at::native::gpu_kernel_impl_nocast<at::native::BinaryFunctor<c10::BFloat16, c10::BFloat16, c10::BFloat16, at::native::binary_internal::MulFunctor<float>>>(at::TensorIteratorBase &, const T1 &)::[lambda(int) (instance 1)]>(int, T3)": {
+      "calls_total": 6264,
+      "mean_calls_per_step": 216.0,
+      "total_ms": 13.297575999999966,
+      "mean_ms_per_step": 0.4585371034482747,
+      "mean_instance_ms": 0.0021228569604086847,
+      "median_instance_ms": 0.002144,
+      "min_instance_ms": 0.001824,
+      "max_instance_ms": 0.003232
+    },
+    "void at::native::elementwise_kernel<(int)128, (int)4, void at::native::gpu_kernel_impl_nocast<at::native::neg_kernel_cuda(at::TensorIteratorBase &)::[lambda() (instance 2)]::operator ()() const::[lambda() (instance 9)]::operator ()() const::[lambda(c10::BFloat16) (instance 1)]>(at::TensorIteratorBase &, const T1 &)::[lambda(int) (instance 1)]>(int, T3)": {
+      "calls_total": 2088,
+      "mean_calls_per_step": 72.0,
+      "total_ms": 4.01337500000009,
+      "mean_ms_per_step": 0.13839224137931344,
+      "mean_instance_ms": 0.0019221144636015325,
+      "median_instance_ms": 0.00192,
+      "min_instance_ms": 0.00176,
+      "max_instance_ms": 0.002464
+    },
+    "void at::native::index_elementwise_kernel<(int)128, (int)4, void at::native::gpu_index_kernel<void at::native::index_kernel_impl<at::native::OpaqueType<(int)2>>(at::TensorIteratorBase &, c10::ArrayRef<long>, c10::ArrayRef<long>)::[lambda(char *, const char *, long) (instance 1)]>(at::TensorIteratorBase &, c10::ArrayRef<long>, c10::ArrayRef<long>, const T1 &, bool)::[lambda(int) (instance 1)]>(long, T3)": {
+      "calls_total": 29,
+      "mean_calls_per_step": 1.0,
+      "total_ms": 0.07737599999999999,
+      "mean_ms_per_step": 0.0026681379310344823,
+      "mean_instance_ms": 0.0026681379310344827,
+      "median_instance_ms": 0.00272,
+      "min_instance_ms": 0.002464,
+      "max_instance_ms": 0.002976
+    },
+    "void at::native::index_elementwise_kernel<(int)128, (int)4, void at::native::gpu_index_kernel<void at::native::index_put_kernel_impl<at::native::OpaqueType<(int)2>>(at::TensorIterator &, c10::ArrayRef<long>, c10::ArrayRef<long>)::[lambda(char *, const char *, long) (instance 1)]>(at::TensorIteratorBase &, c10::ArrayRef<long>, c10::ArrayRef<long>, const T1 &, bool)::[lambda(int) (instance 1)]>(long, T3)": {
+      "calls_total": 29,
+      "mean_calls_per_step": 1.0,
+      "total_ms": 0.078592,
+      "mean_ms_per_step": 0.002710068965517241,
+      "mean_instance_ms": 0.002710068965517241,
+      "median_instance_ms": 0.002688,
+      "min_instance_ms": 0.0024,
+      "max_instance_ms": 0.003136
+    },
+    "void at::native::reduce_kernel<(int)128, (int)4, at::native::ReduceOp<c10::BFloat16, at::native::MeanOps<c10::BFloat16, float, float, c10::BFloat16>, unsigned int, c10::BFloat16, (int)4, (int)4>>(T3)": {
+      "calls_total": 1044,
+      "mean_calls_per_step": 36.0,
+      "total_ms": 4.862475000000026,
+      "mean_ms_per_step": 0.1676715517241388,
+      "mean_instance_ms": 0.004657543103448276,
+      "median_instance_ms": 0.004608,
+      "min_instance_ms": 0.00432,
+      "max_instance_ms": 0.005632
+    },
+    "void at::native::reduce_kernel<(int)512, (int)1, at::native::ReduceOp<c10::BFloat16, at::native::ArgMaxOps<float>, unsigned int, long, (int)4, (int)4>>(T3)": {
+      "calls_total": 29,
+      "mean_calls_per_step": 1.0,
+      "total_ms": 0.244928,
+      "mean_ms_per_step": 0.008445793103448276,
+      "mean_instance_ms": 0.008445793103448276,
+      "median_instance_ms": 0.00848,
+      "min_instance_ms": 0.008128,
+      "max_instance_ms": 0.008864
+    },
+    "void at::native::reduce_kernel<(int)512, (int)1, at::native::ReduceOp<float, at::native::MeanOps<float, float, float, float>, unsigned int, float, (int)4, (int)4>>(T3)": {
+      "calls_total": 4205,
+      "mean_calls_per_step": 145.0,
+      "total_ms": 9.608996000000088,
+      "mean_ms_per_step": 0.33134468965517544,
+      "mean_instance_ms": 0.002285135790725327,
+      "median_instance_ms": 0.002272,
+      "min_instance_ms": 0.00208,
+      "max_instance_ms": 0.00336
+    },
+    "void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda(at::TensorIteratorBase &)::[lambda() (instance 3)]::operator ()() const::[lambda() (instance 7)]::operator ()() const::[lambda(float) (instance 1)], std::array<char *, (unsigned long)2>, (int)4, TrivialOffsetCalculator<(int)1, unsigned int>, TrivialOffsetCalculator<(int)1, unsigned int>, at::native::memory::LoadWithCast<(int)1>, at::native::memory::StoreWithCast<(int)1>>(int, T1, T2, T4, T5, T6, T7)": {
+      "calls_total": 4234,
+      "mean_calls_per_step": 146.0,
+      "total_ms": 10.670953999999924,
+      "mean_ms_per_step": 0.3679639310344801,
+      "mean_instance_ms": 0.0025203008974964574,
+      "median_instance_ms": 0.002528,
+      "min_instance_ms": 0.001568,
+      "max_instance_ms": 0.003168
+    },
+    "void at::native::vectorized_elementwise_kernel<(int)2, at::native::FillFunctor<long>, std::array<char *, (unsigned long)1>>(int, T2, T3)": {
+      "calls_total": 58,
+      "mean_calls_per_step": 2.0,
+      "total_ms": 0.06233599999999999,
+      "mean_ms_per_step": 0.00214951724137931,
+      "mean_instance_ms": 0.0010747586206896551,
+      "median_instance_ms": 0.00112,
+      "min_instance_ms": 0.00096,
+      "max_instance_ms": 0.001184
+    },
+    "void at::native::vectorized_elementwise_kernel<(int)4, at::native::AUnaryFunctor<float, float, float, at::native::binary_internal::MulFunctor<float>>, std::array<char *, (unsigned long)2>>(int, T2, T3)": {
+      "calls_total": 58,
+      "mean_calls_per_step": 2.0,
+      "total_ms": 0.06374400000000004,
+      "mean_ms_per_step": 0.0021980689655172426,
+      "mean_instance_ms": 0.0010990344827586207,
+      "median_instance_ms": 0.00112,
+      "min_instance_ms": 0.001024,
+      "max_instance_ms": 0.001152
+    },
+    "void at::native::vectorized_elementwise_kernel<(int)4, at::native::CUDAFunctorOnSelf_add<float>, std::array<char *, (unsigned long)2>>(int, T2, T3)": {
+      "calls_total": 4205,
+      "mean_calls_per_step": 145.0,
+      "total_ms": 4.990028000000117,
+      "mean_ms_per_step": 0.17206993103448678,
+      "mean_instance_ms": 0.001186689179548157,
+      "median_instance_ms": 0.001184,
+      "min_instance_ms": 0.001024,
+      "max_instance_ms": 0.002624
+    },
+    "void at::native::vectorized_elementwise_kernel<(int)4, at::native::CUDAFunctorOnSelf_add<int>, std::array<char *, (unsigned long)2>>(int, T2, T3)": {
+      "calls_total": 29,
+      "mean_calls_per_step": 1.0,
+      "total_ms": 0.041791999999999996,
+      "mean_ms_per_step": 0.001441103448275862,
+      "mean_instance_ms": 0.001441103448275862,
+      "median_instance_ms": 0.001504,
+      "min_instance_ms": 0.001312,
+      "max_instance_ms": 0.001568
+    },
+    "void at::native::vectorized_elementwise_kernel<(int)4, at::native::FillFunctor<int>, std::array<char *, (unsigned long)1>>(int, T2, T3)": {
+      "calls_total": 29,
+      "mean_calls_per_step": 1.0,
+      "total_ms": 0.031329,
+      "mean_ms_per_step": 0.0010803103448275863,
+      "mean_instance_ms": 0.0010803103448275863,
+      "median_instance_ms": 0.001088,
+      "min_instance_ms": 0.00096,
+      "max_instance_ms": 0.001184
+    },
+    "void at::native::vectorized_elementwise_kernel<(int)4, at::native::cos_kernel_cuda(at::TensorIteratorBase &)::[lambda() (instance 2)]::operator ()() const::[lambda() (instance 2)]::operator ()() const::[lambda(float) (instance 1)], std::array<char *, (unsigned long)2>>(int, T2, T3)": {
+      "calls_total": 29,
+      "mean_calls_per_step": 1.0,
+      "total_ms": 0.07110400000000004,
+      "mean_ms_per_step": 0.0024518620689655186,
+      "mean_instance_ms": 0.0024518620689655173,
+      "median_instance_ms": 0.002432,
+      "min_instance_ms": 0.002336,
+      "max_instance_ms": 0.00272
+    },
+    "void at::native::vectorized_elementwise_kernel<(int)4, at::native::rsqrt_kernel_cuda(at::TensorIteratorBase &)::[lambda() (instance 2)]::operator ()() const::[lambda() (instance 2)]::operator ()() const::[lambda(float) (instance 1)], std::array<char *, (unsigned long)2>>(int, T2, T3)": {
+      "calls_total": 4205,
+      "mean_calls_per_step": 145.0,
+      "total_ms": 5.450951000000038,
+      "mean_ms_per_step": 0.18796382758620822,
+      "mean_instance_ms": 0.00129630225921522,
+      "median_instance_ms": 0.00128,
+      "min_instance_ms": 0.00112,
+      "max_instance_ms": 0.002016
+    },
+    "void at::native::vectorized_elementwise_kernel<(int)4, at::native::sin_kernel_cuda(at::TensorIteratorBase &)::[lambda() (instance 2)]::operator ()() const::[lambda() (instance 2)]::operator ()() const::[lambda(float) (instance 1)], std::array<char *, (unsigned long)2>>(int, T2, T3)": {
+      "calls_total": 29,
+      "mean_calls_per_step": 1.0,
+      "total_ms": 0.06950400000000001,
+      "mean_ms_per_step": 0.002396689655172414,
+      "mean_instance_ms": 0.0023966896551724137,
+      "median_instance_ms": 0.002368,
+      "min_instance_ms": 0.002272,
+      "max_instance_ms": 0.002592
+    },
+    "void at::native::vectorized_elementwise_kernel<(int)4, void at::native::<unnamed>::pow_tensor_scalar_kernel_impl<float, float>(at::TensorIteratorBase &, T2)::[lambda(float) (instance 1)], std::array<char *, (unsigned long)2>>(int, T2, T3)": {
+      "calls_total": 4205,
+      "mean_calls_per_step": 145.0,
+      "total_ms": 4.816552999999996,
+      "mean_ms_per_step": 0.1660880344827585,
+      "mean_instance_ms": 0.001145434720570749,
+      "median_instance_ms": 0.001152,
+      "min_instance_ms": 0.001056,
+      "max_instance_ms": 0.001984
+    },
+    "void at::native::vectorized_elementwise_kernel<(int)4, void at::native::compare_scalar_kernel<long>(at::TensorIteratorBase &, at::native::<unnamed>::OpType, T1)::[lambda(long) (instance 1)], std::array<char *, (unsigned long)2>>(int, T2, T3)": {
+      "calls_total": 29,
+      "mean_calls_per_step": 1.0,
+      "total_ms": 0.05216,
+      "mean_ms_per_step": 0.0017986206896551723,
+      "mean_instance_ms": 0.0017986206896551725,
+      "median_instance_ms": 0.001792,
+      "min_instance_ms": 0.001632,
+      "max_instance_ms": 0.002048
+    },
+    "void at::native::vectorized_elementwise_kernel<(int)8, at::native::<unnamed>::silu_kernel(at::TensorIteratorBase &)::[lambda() (instance 1)]::operator ()() const::[lambda() (instance 6)]::operator ()() const::[lambda(c10::BFloat16) (instance 1)], std::array<char *, (unsigned long)2>>(int, T2, T3)": {
+      "calls_total": 1044,
+      "mean_calls_per_step": 36.0,
+      "total_ms": 1.8474719999999956,
+      "mean_ms_per_step": 0.0637059310344826,
+      "mean_instance_ms": 0.0017696091954022988,
+      "median_instance_ms": 0.00176,
+      "min_instance_ms": 0.001696,
+      "max_instance_ms": 0.002272
+    },
+    "void at::native::vectorized_elementwise_kernel<(int)8, at::native::BinaryFunctor<c10::BFloat16, c10::BFloat16, c10::BFloat16, at::native::binary_internal::MulFunctor<float>>, std::array<char *, (unsigned long)3>>(int, T2, T3)": {
+      "calls_total": 4205,
+      "mean_calls_per_step": 145.0,
+      "total_ms": 6.128082999999828,
+      "mean_ms_per_step": 0.21131320689654579,
+      "mean_instance_ms": 0.001457332461355529,
+      "median_instance_ms": 0.00144,
+      "min_instance_ms": 0.001152,
+      "max_instance_ms": 0.002656
+    },
+    "void at::native::vectorized_elementwise_kernel<(int)8, at::native::CUDAFunctor_add<c10::BFloat16>, std::array<char *, (unsigned long)3>>(int, T2, T3)": {
+      "calls_total": 4176,
+      "mean_calls_per_step": 144.0,
+      "total_ms": 5.355376000000086,
+      "mean_ms_per_step": 0.18466813793103745,
+      "mean_instance_ms": 0.0012824176245210728,
+      "median_instance_ms": 0.00128,
+      "min_instance_ms": 0.001024,
+      "max_instance_ms": 0.002368
+    },
+    "void at::native::vectorized_elementwise_kernel<(int)8, at::native::FillFunctor<c10::BFloat16>, std::array<char *, (unsigned long)1>>(int, T2, T3)": {
+      "calls_total": 29,
+      "mean_calls_per_step": 1.0,
+      "total_ms": 0.035777,
+      "mean_ms_per_step": 0.001233689655172414,
+      "mean_instance_ms": 0.0012336896551724138,
+      "median_instance_ms": 0.001248,
+      "min_instance_ms": 0.001088,
+      "max_instance_ms": 0.001568
+    },
+    "void at::native::vectorized_elementwise_kernel<(int)8, at::native::bfloat16_copy_kernel_cuda(at::TensorIteratorBase &)::[lambda(float) (instance 1)], std::array<char *, (unsigned long)2>>(int, T2, T3)": {
+      "calls_total": 4263,
+      "mean_calls_per_step": 147.0,
+      "total_ms": 5.01251600000003,
+      "mean_ms_per_step": 0.17284537931034585,
+      "mean_instance_ms": 0.0011758189068730941,
+      "median_instance_ms": 0.001184,
+      "min_instance_ms": 0.001056,
+      "max_instance_ms": 0.0016
+    },
+    "void cublasLt::splitKreduce_kernel<(int)32, (int)16, int, float, __nv_bfloat16, float, __nv_bfloat16, (bool)0, float, __nv_bfloat16, __nv_bfloat16, (bool)1, (bool)0, (bool)0>(cublasLt::cublasSplitKParams<T6>, const T4 *, const T10 *, T9 *, T5 *, const T6 *, const T6 *, const T11 *, const T4 *, T11 *, void *, long, T6 *, int *, T6 *, T6 *, const T6 *, const T6 *, const T6 *, const T6 *, const T6 *)": {
+      "calls_total": 5220,
+      "mean_calls_per_step": 180.0,
+      "total_ms": 12.941559000000137,
+      "mean_ms_per_step": 0.44626065517241853,
+      "mean_instance_ms": 0.0024792258620689655,
+      "median_instance_ms": 0.002528,
+      "min_instance_ms": 0.001568,
+      "max_instance_ms": 0.004384
+    },
+    "void cutlass::Kernel2<cutlass_80_simt_sgemm_128x32_8x5_tn_align1>(T1::Params)": {
+      "calls_total": 29,
+      "mean_calls_per_step": 1.0,
+      "total_ms": 0.09459200000000001,
+      "mean_ms_per_step": 0.0032617931034482762,
+      "mean_instance_ms": 0.003261793103448276,
+      "median_instance_ms": 0.003264,
+      "min_instance_ms": 0.00304,
+      "max_instance_ms": 0.003328
+    }
+  },
+  "profile_aggregation": "aggregate 29 steady Graph replay steps; total and arithmetic mean per step; kernel instance statistics are not per-step distributions",
+  "cross_mode_comparison_rule": "Do not subtract profiled kernel totals from clean decode TPOT and do not interpret their difference as Python/host overhead.",
+  "nsys_receipt": {
+    "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+    "report_path": "/tmp/nfa-bs1-attribution-20261117/agent_doc/results/jssa_nfa_semantic_bs1_decode_event_20261118/jssa-operator-profile/jssa-operator-profile_l262144_b1_graph.nsys-rep",
+    "report_sha256": "7509aa8a1a901a3e0f9d2cce4ace2cf322fd1cb4bdc34c8ca7e3a74d2c431cf8",
+    "sqlite_path": "/tmp/nfa-bs1-attribution-20261117/agent_doc/results/jssa_nfa_semantic_bs1_decode_event_20261118/jssa-operator-profile/jssa-operator-profile_l262144_b1_graph.sqlite",
+    "sqlite_sha256": "5a00ab21b8244981a839312ddd852b1e3d1b5b99498fbde1ce41f8b337b50464",
+    "trace": "cuda",
+    "cuda_graph_trace": "node",
+    "capture_range": "cudaProfilerApi around steady decode only",
+    "observer_effect": "Graph node tracing may perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+  }
+}

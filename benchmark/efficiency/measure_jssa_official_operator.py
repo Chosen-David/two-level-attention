@@ -27,17 +27,28 @@ def finalize(result, sqlite_path):
     expected = repeat * layers
     categories = defaultdict(list)
     topk_members = set()
+    nfa_semantic = result.get('selector_implementation') == 'nfa-semantic'
+    score_kernel = ('_nfa_fine_scores_paged_kernel' if nfa_semantic
+                    else '_jssa_score_contig_kernel')
+    nfa_topk_kernels = {
+        '_nfa_filtered_topk_partial_kernel',
+        '_nfa_filtered_topk_merge_kernel',
+    }
     for name, values in instances.items():
         if name == '_jssa_project_store_contig_fp8_kernel':
             categories['store'].extend(values)
-        elif name == '_jssa_score_contig_kernel':
+        elif name == score_kernel:
             categories['score'].extend(values)
         elif name in ('_indexed_attend_kv_kernel', '_split_attend_kernel',
                       '_split_reduce_kernel'):
             categories['attention'].extend(values)
-        elif ('at::native::mbtopk::' in name
-              or 'at::native::radixSortKVInPlace' in name
-              or 'at_cuda_detail::cub::DeviceScanByKey' in name):
+        elif nfa_semantic and name in nfa_topk_kernels:
+            categories['topk'].extend(values)
+            topk_members.add(name)
+        elif (not nfa_semantic
+              and ('at::native::mbtopk::' in name
+                   or 'at::native::radixSortKVInPlace' in name
+                   or 'at_cuda_detail::cub::DeviceScanByKey' in name)):
             categories['topk'].extend(values)
             topk_members.add(name)
     for name in ('store', 'score', 'attention'):
@@ -47,15 +58,25 @@ def finalize(result, sqlite_path):
         raise RuntimeError(
             f'JSSA store/score counts must be {expected}: '
             f"{len(categories['store'])}/{len(categories['score'])}")
-    if result['jssa_runtime']['radix_topk_available']:
-        raise RuntimeError('this classifier currently requires disclosed torch.topk fallback')
-    if not categories['topk']:
-        raise RuntimeError('JSSA torch.topk fallback kernels were not observed')
+    if nfa_semantic:
+        for name in nfa_topk_kernels:
+            if len(instances.get(name, ())) != expected:
+                raise RuntimeError(
+                    f'JSSA/NFA {name} count must be {expected}: '
+                    f"{len(instances.get(name, ()))}")
+    else:
+        if result['jssa_runtime']['radix_topk_available']:
+            raise RuntimeError(
+                'this classifier currently requires disclosed torch.topk fallback')
+        if not categories['topk']:
+            raise RuntimeError('JSSA torch.topk fallback kernels were not observed')
 
     score_topk = categories['score'] + categories['topk']
     selection_with_store = score_topk + categories['store']
     named_total = selection_with_store + categories['attention']
     all_kernels = [value for values in instances.values() for value in values]
+    total_key = ('named_operator_total_ms' if nfa_semantic
+                 else 'official_named_operator_total_ms')
     result['operator_summary'] = {
         'all_observed_model_kernels_ms': _timing(all_kernels, repeat),
         'store_ms': _timing(categories['store'], repeat),
@@ -64,12 +85,18 @@ def finalize(result, sqlite_path):
         'score_topk_ms': _timing(score_topk, repeat),
         'selection_with_store_ms': _timing(selection_with_store, repeat),
         'selected_attention_ms': _timing(categories['attention'], repeat),
-        'official_named_operator_total_ms': _timing(named_total, repeat),
+        total_key: _timing(named_total, repeat),
         'scope': (
+            'JSSA official project/store and indexed-attend plus NFA full-candidate '
+            'fine-score and exact two-stage filtered Top-K. Query '
+            'group-mean/projection/scale kernels remain in kernel_summary but are '
+            'not attributed to named totals.' if nfa_semantic else
             'Official named store/score/indexed-attend plus the complete observed '
             'torch.topk kernel family. Query group-mean/projection/scale kernels '
             'remain in kernel_summary but are not attributed to named totals.'),
-        'topk_implementation': 'official torch.topk fallback; not vLLM radix',
+        'topk_implementation': (
+            'NFA exact two-stage filtered Top-K; no torch.topk fallback'
+            if nfa_semantic else 'official torch.topk fallback; not vLLM radix'),
         'topk_members': sorted(topk_members),
     }
     result['kernel_summary'] = {

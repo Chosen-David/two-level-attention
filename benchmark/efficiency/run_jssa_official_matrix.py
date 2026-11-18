@@ -43,6 +43,10 @@ def parse_args():
     parser.add_argument('--budget', type=int, default=2048)
     parser.add_argument('--rank', type=int, default=32)
     parser.add_argument('--page-size', type=int, default=64)
+    parser.add_argument('--selector-implementation', default='official',
+                        choices=('official', 'nfa-semantic'))
+    parser.add_argument('--input-provenance',
+                        choices=('native-ruler', 'repeated-needle-body-extension'))
     parser.add_argument('--max-attempts', type=int, default=2)
     parser.add_argument('--summarize-only', action='store_true')
     return parser.parse_args()
@@ -52,20 +56,27 @@ def arm_path(args, length, batch, arm):
     return args.output_dir / arm / f'{arm}_l{length}_b{batch}_graph.json'
 
 
+def provenance(args, length):
+    return (args.input_provenance or
+            ('native-ruler' if length <= 131072
+             else 'repeated-needle-body-extension'))
+
+
 def expected(args, length, batch, arm):
     profile = arm == 'jssa-operator-profile'
+    nfa_semantic = args.selector_implementation == 'nfa-semantic'
     return {
-        'schema': 'qwen-jssa-official-e2e-v1',
-        'method': 'jssa-official',
+        'schema': ('qwen-jssa-nfa-semantic-e2e-v1' if nfa_semantic
+                   else 'qwen-jssa-official-e2e-v1'),
+        'method': 'jssa-nfa-semantic' if nfa_semantic else 'jssa-official',
+        'selector_implementation': args.selector_implementation,
         'execution': 'graph',
         'measurement_mode': 'operator-profile' if profile else 'clean-e2e',
         'context_length': length,
         'batch_size': batch,
         'task': args.task,
         'sample_index': args.sample_index,
-        'input_provenance': (
-            'native-ruler' if length <= 131072
-            else 'repeated-needle-body-extension'),
+        'input_provenance': provenance(args, length),
         'visible_len': args.visible_len,
         'warmup_steps': args.warmup_steps,
         'max_new_tokens': args.warmup_steps + (
@@ -96,8 +107,12 @@ def valid_existing(args, length, batch, arm, source):
             or row.get('graph_eager_fallbacks') != 0
             or runtime.get('budget') != args.budget
             or runtime.get('rank') != args.rank
-            or runtime.get('page_size') != args.page_size
-            or runtime.get('radix_topk_available') is not False):
+            or runtime.get('page_size') != args.page_size):
+        return False
+    if args.selector_implementation == 'official':
+        if runtime.get('radix_topk_available') is not False:
+            return False
+    elif runtime.get('selection_implementation') != 'nfa-full-candidate-score-topk':
         return False
     if arm == 'jssa-clean-e2e':
         return row.get('tpot_ms_median', 0) > 0
@@ -125,8 +140,7 @@ def command(args, length, batch, arm, output):
         '--batch-size', str(batch),
         '--execution', 'graph',
         '--sample-index', str(args.sample_index),
-        '--input-provenance',
-        'native-ruler' if length <= 131072 else 'repeated-needle-body-extension',
+        '--input-provenance', provenance(args, length),
         '--max-new-tokens', str(args.warmup_steps + repeat + 1),
         '--warmup-steps', str(args.warmup_steps),
         '--visible-len', str(args.visible_len),
@@ -135,6 +149,7 @@ def command(args, length, batch, arm, output):
         '--jssa-budget', str(args.budget),
         '--jssa-rank', str(args.rank),
         '--jssa-page-size', str(args.page_size),
+        '--selector-implementation', args.selector_implementation,
     ]
     if not profile:
         return base
@@ -216,11 +231,13 @@ def run_arm(args, length, batch, arm, source):
             if arm == 'jssa-clean-e2e':
                 summary['tpot_ms'] = row['tpot_ms_median']
             else:
+                total_key = ('named_operator_total_ms'
+                             if args.selector_implementation == 'nfa-semantic'
+                             else 'official_named_operator_total_ms')
                 summary.update({
                     key: row['operator_summary'][key]['mean_ms_per_step']
                     for key in ('store_ms', 'score_ms', 'topk_ms',
-                                'selected_attention_ms',
-                                'official_named_operator_total_ms')})
+                                'selected_attention_ms', total_key)})
             print(json.dumps(summary), flush=True)
             return
         print(f'WARNING {output.name} 检测到其他 GPU 进程，作废重跑', flush=True)
@@ -274,19 +291,31 @@ def summarize(args):
         records.append(record)
     if missing:
         raise RuntimeError('JSSA 矩阵尚缺臂或回执无效:\n' + '\n'.join(missing[:30]))
+    nfa_semantic = args.selector_implementation == 'nfa-semantic'
     result = {
-        'schema': 'qwen-jssa-official-graph-performance-v1',
+        'schema': ('qwen-jssa-nfa-semantic-graph-performance-v1' if nfa_semantic
+                   else 'qwen-jssa-official-graph-performance-v1'),
         'validation_status': 'pending-independent-verification',
         'source': source,
         'matrix_driver_sha256': sha256(Path(__file__)),
         'arguments': {key: str(value) if isinstance(value, Path) else value
                       for key, value in vars(args).items()},
         'semantics': {
-            'implementation': 'official vendored Triton store/score/indexed-attend',
+            'implementation': (
+                'JSSA paper performance semantics: official project/store and '
+                'indexed-attend plus NFA full-candidate 32-D score and exact Top-K'
+                if nfa_semantic else
+                'official vendored Triton store/score/indexed-attend'),
+            'selector_implementation': args.selector_implementation,
+            'score_candidate_scope': (
+                'every logical token in [0, seq_len), no L1 pruning'
+                if nfa_semantic else 'official JSSA score'),
             'budget_per_token_per_kv_head': args.budget,
             'rank': args.rank,
             'page_size': args.page_size,
-            'topk': 'official torch.topk fallback; vLLM radix unavailable',
+            'topk': (
+                'NFA exact two-stage filtered Top-K' if nfa_semantic else
+                'official torch.topk fallback; vLLM radix unavailable'),
             'local_compatibility_patch': (
                 'register-only GQA padding to M>=16 for Triton tl.dot; '
                 'all padded loads/stores masked'),
@@ -297,7 +326,9 @@ def summarize(args):
             'operator': 'separate nsys CUDA Graph node trace process',
             'clean_e2e': 'separate process without nsys or torch.profiler',
             'host_overhead_derivable_by_subtraction': False,
-            'timing_metric': 'end-to-end decode TPOT, not pure attention latency',
+            'timing_metric': (
+                'median per-step CUDA Event elapsed decode TPOT; prefill, '
+                'Graph capture and warmup excluded; not pure attention latency'),
         },
         'records': records,
         'infeasible_memory_cells': infeasible,

@@ -1,0 +1,85 @@
+{
+  "arguments": {
+    "repo": "/tmp/nfa-bs1-attribution-20261117",
+    "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+    "data_root": "/tmp/nfa_kernel_inputs",
+    "basis_path": "/tmp/nfa-bs1-attribution-20261117/bases/qwen3_8b.pt",
+    "output_dir": "/tmp/nfa-bs1-attribution-20261117/agent_doc/results/jssa_nfa_semantic_bs1_decode_event_20261118",
+    "gpu": 0,
+    "shard_index": 0,
+    "num_shards": 1,
+    "arms": [
+      "jssa-clean-e2e"
+    ],
+    "lengths": [
+      32768,
+      65536,
+      131072,
+      262144,
+      524288
+    ],
+    "batches": [
+      1
+    ],
+    "task": "niah_multikey_2",
+    "sample_index": 2,
+    "visible_len": 8192,
+    "warmup_steps": 3,
+    "profile_repeat": 29,
+    "decode_steps": 29,
+    "budget": 1024,
+    "rank": 32,
+    "page_size": 64,
+    "selector_implementation": "nfa-semantic",
+    "input_provenance": "repeated-needle-body-extension",
+    "max_attempts": 1,
+    "summarize_only": false
+  },
+  "source": {
+    "head": "0fa07ea80b67d8369c6c26359e768f510dd4eef4",
+    "diff_sha256": "06aea24f8e0bf89a503836fc04a0a391e49f0f02a6bff496ac3000ecd91c0776",
+    "harness_sha256": "bb3cac4ca0c7a55fbd42636da2d09a00ebf148676f143986d850fae628c00706",
+    "jssa_vendor_files_sha256": {
+      "benchmark/efficiency/benchmark_jssa_official.py": "80e644bb6f6e838acbc1b46d33a5fc45ee4d7c38ab1056e2e6cc9e1613a6628a",
+      "exp/vendor_baselines/jssa_vendor/qwen3_jssa_official.py": "781c7a146cae3f114ca6474b3150a84f16e270ffc03369a9e8e0664c154a4059",
+      "exp/vendor_baselines/jssa_vendor/qwen3_jssa_nfa_semantic.py": "29d03982f1cc04fb2802ecc5cb585c00fc19cafe1d143a9ef5ce97dee3770af9",
+      "exp/vendor_baselines/jssa_vendor/upstream/patched_src/vllm/v1/attention/ops/triton_jssa_store.py": "82d1cd0722936ac41906537a8e351bbf6de881bbe1742f549cae0ed25b2b579f",
+      "exp/vendor_baselines/jssa_vendor/upstream/patched_src/vllm/v1/attention/ops/triton_jssa_score_topk.py": "e8fb015a34ae3a2afd239a08bc7b0962ece8c2672e80fd630e4f6d03b96b1190",
+      "exp/vendor_baselines/jssa_vendor/upstream/patched_src/vllm/v1/attention/ops/triton_jssa_indexed_attend.py": "23d4a1dae78a1e5a7f757d111586b276acf1e52a139fba5847e171f1574afa08"
+    }
+  },
+  "matrix_driver_sha256": "c18288f37207eeb08393bed0430acca578bb068b11c9f7533bc36c87a984fe4b",
+  "events": [
+    {
+      "length": 524288,
+      "batch": 1,
+      "arm": "jssa-clean-e2e",
+      "output": "/tmp/nfa-bs1-attribution-20261117/agent_doc/results/jssa_nfa_semantic_bs1_decode_event_20261118/jssa-clean-e2e/jssa-clean-e2e_l524288_b1_graph.json"
+    },
+    {
+      "length": 262144,
+      "batch": 1,
+      "arm": "jssa-clean-e2e",
+      "output": "/tmp/nfa-bs1-attribution-20261117/agent_doc/results/jssa_nfa_semantic_bs1_decode_event_20261118/jssa-clean-e2e/jssa-clean-e2e_l262144_b1_graph.json"
+    },
+    {
+      "length": 131072,
+      "batch": 1,
+      "arm": "jssa-clean-e2e",
+      "output": "/tmp/nfa-bs1-attribution-20261117/agent_doc/results/jssa_nfa_semantic_bs1_decode_event_20261118/jssa-clean-e2e/jssa-clean-e2e_l131072_b1_graph.json"
+    },
+    {
+      "length": 65536,
+      "batch": 1,
+      "arm": "jssa-clean-e2e",
+      "output": "/tmp/nfa-bs1-attribution-20261117/agent_doc/results/jssa_nfa_semantic_bs1_decode_event_20261118/jssa-clean-e2e/jssa-clean-e2e_l65536_b1_graph.json"
+    },
+    {
+      "length": 32768,
+      "batch": 1,
+      "arm": "jssa-clean-e2e",
+      "output": "/tmp/nfa-bs1-attribution-20261117/agent_doc/results/jssa_nfa_semantic_bs1_decode_event_20261118/jssa-clean-e2e/jssa-clean-e2e_l32768_b1_graph.json"
+    }
+  ],
+  "infeasible": []
+}

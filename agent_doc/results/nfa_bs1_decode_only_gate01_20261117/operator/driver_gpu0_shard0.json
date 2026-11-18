@@ -1,0 +1,87 @@
+{
+  "arguments": {
+    "repo": "/tmp/nfa-bs1-attribution-20261117",
+    "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+    "data_root": "/tmp/nfa_kernel_inputs",
+    "task": "niah_multikey_2",
+    "sample_index": 2,
+    "input_provenance": "repeated-needle-body-extension",
+    "longbench_data": "/home/wangyuanshuo02/datasets/LongBench/data",
+    "output_dir": "/tmp/nfa-bs1-attribution-20261117/agent_doc/results/nfa_bs1_decode_only_gate01_20261117/operator",
+    "gpu": 0,
+    "shard_index": 0,
+    "num_shards": 2,
+    "arms": [
+      "nfa-operator-profile"
+    ],
+    "lengths": [
+      32768,
+      65536,
+      131072,
+      262144,
+      524288
+    ],
+    "batches": [
+      1
+    ],
+    "execution": "graph",
+    "warmup_steps": 3,
+    "profile_repeat": 29,
+    "decode_steps": 29,
+    "visible_len": 8192,
+    "subspace": "tail",
+    "l2_subspace": "same",
+    "gate_epsilon": 0.1,
+    "force_skip_mode": "natural",
+    "max_attempts": 1,
+    "prepare_only": false,
+    "summarize_only": false
+  },
+  "source_by_arm": {
+    "nfa-operator-profile": {
+      "head": "0fa07ea80b67d8369c6c26359e768f510dd4eef4",
+      "diff_sha256": "06aea24f8e0bf89a503836fc04a0a391e49f0f02a6bff496ac3000ecd91c0776",
+      "harness_sha256": "d4a76ebd77db50175b11b321c1f5ddd59ddb4ccba5fa7b21d3e83e59ad83581b"
+    },
+    "nfa-clean-e2e": {
+      "head": "0fa07ea80b67d8369c6c26359e768f510dd4eef4",
+      "diff_sha256": "06aea24f8e0bf89a503836fc04a0a391e49f0f02a6bff496ac3000ecd91c0776",
+      "harness_sha256": "d4a76ebd77db50175b11b321c1f5ddd59ddb4ccba5fa7b21d3e83e59ad83581b"
+    },
+    "flashinfer-operator-profile": {
+      "head": "0fa07ea80b67d8369c6c26359e768f510dd4eef4",
+      "diff_sha256": "06aea24f8e0bf89a503836fc04a0a391e49f0f02a6bff496ac3000ecd91c0776",
+      "harness_sha256": "003485049371ab321c26c18f0bf32f3e905dd819530924a11ed3fbf4f84d71ae"
+    },
+    "flashinfer-e2e": {
+      "head": "0fa07ea80b67d8369c6c26359e768f510dd4eef4",
+      "diff_sha256": "06aea24f8e0bf89a503836fc04a0a391e49f0f02a6bff496ac3000ecd91c0776",
+      "harness_sha256": "bb3cac4ca0c7a55fbd42636da2d09a00ebf148676f143986d850fae628c00706"
+    }
+  },
+  "matrix_driver_sha256": "f13a1d8ce5b76c0c23765b0797913b00f729c4910ab0c77d2abc9da117c8be76",
+  "events": [
+    {
+      "length": 524288,
+      "batch": 1,
+      "arm": "nfa-operator-profile",
+      "status": "ran",
+      "output": "/tmp/nfa-bs1-attribution-20261117/agent_doc/results/nfa_bs1_decode_only_gate01_20261117/operator/nfa-operator-profile/nfa-operator-profile_l524288_b1_graph.json"
+    },
+    {
+      "length": 131072,
+      "batch": 1,
+      "arm": "nfa-operator-profile",
+      "status": "ran",
+      "output": "/tmp/nfa-bs1-attribution-20261117/agent_doc/results/nfa_bs1_decode_only_gate01_20261117/operator/nfa-operator-profile/nfa-operator-profile_l131072_b1_graph.json"
+    },
+    {
+      "length": 32768,
+      "batch": 1,
+      "arm": "nfa-operator-profile",
+      "status": "ran",
+      "output": "/tmp/nfa-bs1-attribution-20261117/agent_doc/results/nfa_bs1_decode_only_gate01_20261117/operator/nfa-operator-profile/nfa-operator-profile_l32768_b1_graph.json"
+    }
+  ],
+  "infeasible": []
+}
