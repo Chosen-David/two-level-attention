@@ -1,5 +1,9 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+## 2026-11-17
+
+- [x] [TL-NFA-K2-SENSITIVITY-20261117] Qwen3-8B × LongBench v1 HotpotQA/GovReport 的 gate epsilon=0.01/0.05/0.1/0.2/0.5 × K2=256/512/1024/2048 二维网格已闭集：40质量格共8000源请求及40独立 eager L1+L2/main-attention 算子格，20组合均含官方精度、四类gate计数与算子耗时；固定 producer=`ebcae298`，最终联合审计与1210项证据哈希复核通过。RULER保持暂停，结果独立验收前保持 pending。([详情](task_details/TL-NFA-K2-SENSITIVITY-20261117.md)；[汇总](../results/nfa_k2_sensitivity_20261117/summary.json))
+
 ## 2026-11-15
 
 - [ ] [TL-NFA-DAC-EXPERIMENTS-20261115] 恢复 NFA 投稿 DAC 消融、敏感性与统一性能数据；303 行可复现 inventory 已验证，旧 B 2000 条限定协议可复用。真实调用链修正后仅复用 FullKV HotpotQA/GovReport 共 400 请求；旧 NFA prefill epsilon0.05 不是新 gate-off，新 A 逻辑剩余 3100 请求。所有新 NFA 默认点显式登记 `near_tokens=off`，旧 host-wall 与新 CUDA-event 分组；结果独立验收前保持 pending。([详情](task_details/TL-NFA-DAC-EXPERIMENTS-20261115.md)；[inventory](../results/nfa_dac_experiments_20261115/inventory.csv))

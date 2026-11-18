@@ -1,0 +1,347 @@
+{
+  "schema": "nfa-gate-epsilon-k2-grid-dispatch-plan-v2",
+  "producer": "ebcae298297c18f68ec224de611dc8b922ab9e95",
+  "verification": "pending-independent-verification",
+  "updated_at": "2026-11-18T18:27:37+08:00",
+  "output_root_per_host": "~/ak_verify_results/nfa_k2_sensitivity_ebcae298_20261117",
+  "grid": {
+    "epsilon": [0.01, 0.05, 0.1, 0.2, 0.5],
+    "level2_topk": [256, 512, 1024, 2048],
+    "tasks": ["hotpotqa", "gov_report"],
+    "quality_cells": 40,
+    "quality_requests": 8000,
+    "operator_cells": 40
+  },
+  "closed_before_this_dispatch": {
+    "quality_cells": 8,
+    "quality_scope": "epsilon=0.1；GovReport 四档在 pc02，HotpotQA K2=256/512 在 pc40、K2=1024/2048 在 pc31",
+    "operator_cells": 1,
+    "operator_scope": "pc32 GovReport epsilon=0.1 K2=256"
+  },
+  "script_sha256": {
+    "run_quality_grid_cell.sh": "5c178d984746db3f485e210960208545892c0f0f95fedbf7a66b7abb9568b1a6",
+    "run_operator_grid_cell.sh": "918567856be6fc7b5de42ecaa430f1f14d2a9f6c75460cb760b9f7491dce3f4d",
+    "queue_grid_cells.sh": "3a378aba5a817596e6828dc5bff357296605eadbd598e66ff9ba4d6ebbc364db",
+    "audit_results.py": "c59fdac375e9dda742db22411a10f66668d3220a17802a2788f3e8d897b0b920"
+  },
+  "queues": [
+    {
+      "host": "pc02",
+      "address": "10.238.122.187",
+      "gpu": 0,
+      "mode": "quality",
+      "cells": ["0.01:256:gov_report", "0.05:256:gov_report", "0.2:256:gov_report", "0.5:256:gov_report", "0.01:512:gov_report", "0.05:512:gov_report", "0.2:512:gov_report", "0.5:512:gov_report"],
+      "queue_pid": 2222815,
+      "ignition": "triple-verified"
+    },
+    {
+      "host": "pc02",
+      "address": "10.238.122.187",
+      "gpu": 1,
+      "mode": "quality",
+      "cells": ["0.01:1024:gov_report", "0.05:1024:gov_report", "0.2:1024:gov_report", "0.5:1024:gov_report", "0.01:2048:gov_report", "0.05:2048:gov_report", "0.2:2048:gov_report", "0.5:2048:gov_report"],
+      "queue_pid": 2223166,
+      "ignition": "triple-verified"
+    },
+    {
+      "host": "pc02",
+      "address": "10.238.122.187",
+      "gpu": 2,
+      "mode": "quality",
+      "cells": ["0.01:256:hotpotqa", "0.05:256:hotpotqa", "0.2:256:hotpotqa", "0.5:256:hotpotqa", "0.01:512:hotpotqa", "0.05:512:hotpotqa", "0.2:512:hotpotqa", "0.5:512:hotpotqa"],
+      "queue_pid": 2223514,
+      "ignition": "triple-verified"
+    },
+    {
+      "host": "pc02",
+      "address": "10.238.122.187",
+      "gpu": 3,
+      "mode": "quality",
+      "cells": ["0.01:1024:hotpotqa", "0.05:1024:hotpotqa", "0.2:1024:hotpotqa", "0.5:1024:hotpotqa", "0.01:2048:hotpotqa", "0.05:2048:hotpotqa", "0.2:2048:hotpotqa", "0.5:2048:hotpotqa"],
+      "queue_pid": 2223841,
+      "ignition": "triple-verified"
+    },
+    {
+      "host": "pc33",
+      "address": "local",
+      "repo": "/tmp/nfa-k2-grid-producer-ebcae298",
+      "gpu": 0,
+      "mode": "operator",
+      "cells": ["0.01:256:gov_report", "0.05:256:gov_report", "0.2:256:gov_report", "0.5:256:gov_report", "0.01:512:gov_report", "0.05:512:gov_report", "0.1:512:gov_report", "0.2:512:gov_report", "0.5:512:gov_report", "0.01:1024:gov_report", "0.05:1024:gov_report", "0.1:1024:gov_report", "0.2:1024:gov_report", "0.5:1024:gov_report", "0.01:2048:gov_report", "0.05:2048:gov_report", "0.1:2048:gov_report", "0.2:2048:gov_report", "0.5:2048:gov_report"],
+      "queue_pid": 2940949,
+      "ignition": "triple-verified"
+    },
+    {
+      "host": "pc33",
+      "address": "local",
+      "repo": "/tmp/nfa-k2-grid-producer-ebcae298",
+      "gpu": 1,
+      "mode": "operator",
+      "cells": ["0.01:256:hotpotqa", "0.05:256:hotpotqa", "0.1:256:hotpotqa", "0.2:256:hotpotqa", "0.5:256:hotpotqa", "0.01:512:hotpotqa", "0.05:512:hotpotqa", "0.1:512:hotpotqa", "0.2:512:hotpotqa", "0.5:512:hotpotqa", "0.01:1024:hotpotqa", "0.05:1024:hotpotqa", "0.1:1024:hotpotqa", "0.2:1024:hotpotqa", "0.5:1024:hotpotqa", "0.01:2048:hotpotqa", "0.05:2048:hotpotqa", "0.1:2048:hotpotqa", "0.2:2048:hotpotqa", "0.5:2048:hotpotqa"],
+      "queue_pid": 2942420,
+      "ignition": "triple-verified"
+    }
+  ],
+  "additional_queues": [
+    {
+      "host": "pc33",
+      "repo": "/tmp/nfa-k2-grid-producer-ebcae298",
+      "gpu": 0,
+      "mode": "operator",
+      "cells": ["0.1:256:gov_report", "0.1:512:gov_report", "0.1:1024:gov_report", "0.1:2048:gov_report", "0.2:512:gov_report", "0.2:1024:gov_report", "0.2:2048:gov_report"],
+      "queue_pid": 3218694,
+      "ignition": "triple-verified"
+    },
+    {
+      "host": "pc33",
+      "repo": "/tmp/nfa-k2-grid-producer-ebcae298",
+      "gpu": 1,
+      "mode": "operator",
+      "cells": ["0.01:1024:gov_report", "0.01:2048:gov_report", "0.05:1024:gov_report", "0.05:2048:gov_report", "0.5:512:gov_report", "0.5:1024:gov_report", "0.5:2048:gov_report"],
+      "queue_pid": 3219833,
+      "ignition": "triple-verified"
+    },
+    {
+      "host": "pc31",
+      "address": "10.245.58.57",
+      "repo": "/tmp/nfa-k2-sensitivity-20261117",
+      "gpu": 0,
+      "mode": "operator",
+      "cells": ["0.01:1024:hotpotqa", "0.01:2048:hotpotqa", "0.05:1024:hotpotqa", "0.05:2048:hotpotqa", "0.1:512:hotpotqa", "0.1:1024:hotpotqa", "0.1:2048:hotpotqa"],
+      "queue_pid": 2536072,
+      "ignition": "triple-verified"
+    },
+    {
+      "host": "pc31",
+      "address": "10.245.58.57",
+      "repo": "/tmp/nfa-k2-sensitivity-20261117",
+      "gpu": 1,
+      "mode": "operator",
+      "cells": ["0.2:512:hotpotqa", "0.2:1024:hotpotqa", "0.2:2048:hotpotqa", "0.5:512:hotpotqa", "0.5:1024:hotpotqa", "0.5:2048:hotpotqa"],
+      "queue_pid": 2536514,
+      "ignition": "triple-verified"
+    }
+  ],
+  "quality_rebalance": {
+    "at": "2026-11-18T10:45:02+08:00",
+    "reason": "40个算子格全部闭集后pc31/pc33空闲；冻结pc02原队列的后续点火，只重分片尚未启动的10个质量格",
+    "frozen_original_queue_parent_pids": [2222815, 2223166, 2223841],
+    "preserved_inflight": [
+      {"host": "pc02", "gpu": 0, "cell": "0.5:256:gov_report", "runner_pid": 2545945},
+      {"host": "pc02", "gpu": 1, "cell": "0.5:1024:gov_report", "runner_pid": 2476419}
+    ],
+    "completed_before_freeze": "0.05:2048:hotpotqa 已形成完整manifest并通过正式审计，未重复派发",
+    "queues": [
+      {
+        "host": "pc02", "repo": "/tmp/nfa-k2-sensitivity-20261117", "gpu": 2,
+        "cells": ["0.01:512:gov_report", "0.05:512:gov_report"],
+        "queue_pid": 2581459, "ignition": "triple-verified"
+      },
+      {
+        "host": "pc33", "repo": "/tmp/nfa-k2-grid-producer-ebcae298", "gpu": 0,
+        "cells": ["0.2:512:gov_report", "0.5:512:gov_report"],
+        "queue_pid": 3347988, "ignition": "triple-verified"
+      },
+      {
+        "host": "pc33", "repo": "/tmp/nfa-k2-grid-producer-ebcae298", "gpu": 1,
+        "cells": ["0.01:2048:gov_report", "0.05:2048:gov_report"],
+        "queue_pid": 3347989, "ignition": "triple-verified"
+      },
+      {
+        "host": "pc31", "repo": "/tmp/nfa-k2-sensitivity-20261117", "gpu": 0,
+        "cells": ["0.2:2048:gov_report", "0.5:2048:gov_report"],
+        "queue_pid": 2565919, "ignition": "triple-verified"
+      },
+      {
+        "host": "pc31", "repo": "/tmp/nfa-k2-sensitivity-20261117", "gpu": 1,
+        "cells": ["0.2:2048:hotpotqa", "0.5:2048:hotpotqa"],
+        "queue_pid": 2565920, "ignition": "triple-verified"
+      }
+    ]
+  },
+  "quality_rebalance_round5": {
+    "at": "2026-11-18T11:21:49+08:00",
+    "reason": "两个pc02保留在飞格已闭集并审计，GPU0/1释放；仅转移两个原队列中尚未点火的后续格",
+    "frozen_queue_parents": [
+      {"host": "pc02", "queue_pid": 2581459},
+      {"host": "pc33", "queue_pid": 3347988}
+    ],
+    "preserved_inflight": [
+      {"host": "pc02", "gpu": 2, "cell": "0.01:512:gov_report", "runner_pid": 2581466},
+      {"host": "pc33", "gpu": 0, "cell": "0.2:512:gov_report", "runner_pid": 3348047}
+    ],
+    "new_queues": [
+      {"host": "pc02", "gpu": 0, "cells": ["0.05:512:gov_report"], "queue_pid": 2656049, "ignition": "triple-verified"},
+      {"host": "pc02", "gpu": 1, "cells": ["0.5:512:gov_report"], "queue_pid": 2656050, "ignition": "triple-verified"}
+    ],
+    "unchanged_queues": [
+      {"host": "pc33", "gpu": 1, "queue_pid": 3347989, "cells": ["0.01:2048:gov_report", "0.05:2048:gov_report"]},
+      {"host": "pc31", "gpu": 0, "queue_pid": 2565919, "cells": ["0.2:2048:gov_report", "0.5:2048:gov_report"]},
+      {"host": "pc31", "gpu": 1, "queue_pid": 2565920, "cells": ["0.2:2048:hotpotqa", "0.5:2048:hotpotqa"]}
+    ],
+    "ownership": "剩余10格=7个正在测量+3个在未冻结队列中等待；无跨机重复"
+  },
+  "quality_rebalance_round6": {
+    "at": "2026-11-18T12:31:36+08:00",
+    "reason": "第六轮34个唯一质量格全部通过正式审计；pc02四卡空闲，只转移两个仍等待且尚未点火的后续格",
+    "duplicate_race_disclosure": "第四轮首次冻结pc02原队列时，HotpotQA 0.2:2048在父队列接力与重派之间发生时间竞争，pc02与pc31各产生一份完整结果；两份保留但只计pc31为canonical，修正此前无重复测量的表述",
+    "frozen_queue_parents": [
+      {"host": "pc33", "queue_pid": 3347989, "preserved_runner_pid": 3348023, "preserved_cell": "0.01:2048:gov_report"},
+      {"host": "pc31", "queue_pid": 2565919, "preserved_runner_pid": 2565933, "preserved_cell": "0.2:2048:gov_report"}
+    ],
+    "post_freeze_full_process_inventory": "逐机清点全部run_quality_grid_cell.sh与queue_grid_cells.sh；两个转移格均未点火，当前runner继续测量，无隐藏接力",
+    "new_queues": [
+      {"host": "pc02", "gpu": 0, "cells": ["0.05:2048:gov_report"], "queue_pid": 2688483, "runner_pid": 2688498, "memory_mib": 16248, "compute_apps": 1, "ignition": "triple-verified"},
+      {"host": "pc02", "gpu": 1, "cells": ["0.5:2048:gov_report"], "queue_pid": 2688484, "runner_pid": 2688500, "memory_mib": 16248, "compute_apps": 1, "ignition": "triple-verified"}
+    ],
+    "unchanged_inflight": [
+      {"host": "pc33", "gpu": 0, "cell": "0.2:512:gov_report", "runner_pid": 3348047},
+      {"host": "pc31", "gpu": 1, "cell": "0.5:2048:hotpotqa", "queue_pid": 2565920, "runner_pid": 2763296}
+    ],
+    "ownership": "剩余6格均有唯一owner；pc02 GPU2/3空闲但没有未owned格，不重复派发"
+  },
+  "quality_round7": {
+    "at": "2026-11-18T13:13:32+08:00",
+    "new_closed_cells": [
+      {"host": "pc31", "cell": "0.5:2048:hotpotqa", "official_score": 41.26, "gate_counts": {"keep": 20, "near": 167, "far": 12, "both": 7001}, "audit": "_audits/quality_audit_round7_pc31.json", "full_audit": "pass"}
+    ],
+    "remaining_inflight": [
+      {"host": "pc33", "gpu": 0, "cell": "0.2:512:gov_report", "runner_pid": 3348047},
+      {"host": "pc33", "gpu": 1, "cell": "0.01:2048:gov_report", "runner_pid": 3348023},
+      {"host": "pc31", "gpu": 0, "cell": "0.2:2048:gov_report", "runner_pid": 2565933},
+      {"host": "pc02", "gpu": 0, "cell": "0.05:2048:gov_report", "queue_pid": 2688483, "runner_pid": 2688498},
+      {"host": "pc02", "gpu": 1, "cell": "0.5:2048:gov_report", "queue_pid": 2688484, "runner_pid": 2688500}
+    ],
+    "dispatch": "HotpotQA已20/20闭集；剩余5格均为GovReport且均有活动runner，pc02 GPU2/3与pc31 GPU1空闲但不重复派发"
+  },
+  "quality_round8": {
+    "at": "2026-11-18T14:15:15+08:00",
+    "new_closed_cells": [
+      {"host": "pc02", "cell": "0.05:2048:gov_report", "official_score": 33.48, "gate_counts": {"keep": 6158, "near": 1, "far": 1041, "both": 0}, "audit": "_audits/quality_audit_round8_pc02.json", "full_audit": "pass"},
+      {"host": "pc02", "cell": "0.5:2048:gov_report", "official_score": 15.98, "gate_counts": {"keep": 91, "near": 769, "far": 54, "both": 6286}, "audit": "_audits/quality_audit_round8_pc02.json", "full_audit": "pass"},
+      {"host": "pc31", "cell": "0.2:2048:gov_report", "official_score": 28.98, "gate_counts": {"keep": 1945, "near": 1259, "far": 2041, "both": 1955}, "audit": "_audits/quality_audit_round8_pc31.json", "full_audit": "pass"}
+    ],
+    "remaining_inflight": [
+      {"host": "pc33", "gpu": 0, "cell": "0.2:512:gov_report", "runner_pid": 3348047},
+      {"host": "pc33", "gpu": 1, "cell": "0.01:2048:gov_report", "runner_pid": 3348023}
+    ],
+    "dispatch": "pc02与pc31质量runner全部正常结束且卡已释放；仅剩pc33两个活动runner，其他空卡不重复派发"
+  },
+  "quality_round9": {
+    "at": "2026-11-18T15:13:14+08:00",
+    "new_closed_cells": [],
+    "remaining_inflight": [
+      {"host": "pc33", "gpu": 0, "cell": "0.2:512:gov_report", "runner_pid": 3348047, "completed_requests": 167, "expected_requests": 200, "log": "logs/quality_gov_report_eps0.2_k2512.log"},
+      {"host": "pc33", "gpu": 1, "cell": "0.01:2048:gov_report", "runner_pid": 3348023, "completed_requests": 106, "expected_requests": 200, "log": "logs/quality_gov_report_eps0.01_k22048.log"}
+    ],
+    "dispatch": "两格均持续产生新请求且有活跃runner/单一compute app；pc02三十二份物理manifest、pc31五份不变，空卡不重复派发"
+  },
+  "quality_round10": {
+    "at": "2026-11-18T16:19:31+08:00",
+    "new_closed_cells": [
+      {"host": "pc33", "cell": "0.2:512:gov_report", "official_score": 29.42, "gate_counts": {"keep": 1945, "near": 1259, "far": 2041, "both": 1955}, "audit": "_audits/quality_audit_round10_pc33.json", "full_audit": "pass", "ordered_input_sha256": "cdf8eb4e8e259acc4c6ec2c307457f7ff920ea47748d9043b96650d9519e013d"}
+    ],
+    "remaining_inflight": [
+      {"host": "pc33", "gpu": 1, "cell": "0.01:2048:gov_report", "runner_pid": 3348023, "compute_app_pid": 1525576, "completed_requests": 146, "expected_requests": 200, "log": "logs/quality_gov_report_eps0.01_k22048.log"}
+    ],
+    "dispatch": "39个唯一质量格与40个算子格均已正式审计；最后一格仍有唯一活动owner并持续推进，pc33 GPU0及其他空卡不重复派发"
+  },
+  "quality_round11": {
+    "at": "2026-11-18T17:22:44+08:00",
+    "new_closed_cells": [],
+    "remaining_inflight": [
+      {"host": "pc33", "gpu": 1, "cell": "0.01:2048:gov_report", "runner_pid": 3348023, "compute_app_pid": 1525576, "completed_requests": 174, "expected_requests": 200, "log": "logs/quality_gov_report_eps0.01_k22048.log"}
+    ],
+    "remote_inventory": {
+      "pc02": {"physical_quality_manifests": 32, "canonical_quality_cells": 31, "operator_cells": 0, "gpu_state": "all-empty"},
+      "pc40": {"physical_quality_manifests": 2, "canonical_quality_cells": 2, "operator_cells": 0, "gpu_state": "all-empty"},
+      "pc31": {"physical_quality_manifests": 5, "canonical_quality_cells": 5, "operator_cells": 13, "gpu_state": "all-empty"},
+      "pc32": {"physical_quality_manifests": 0, "operator_summaries": 0, "gpu_state": "all-empty", "note": "旧polluted-rerun仍无效且不计闭集"}
+    },
+    "dispatch": "最后一格有唯一活动owner并推进到174/200；其他空卡没有未owned缺失格，不重复派发"
+  },
+  "unified_harvest": {
+    "at": "2026-11-18T17:22:44+08:00",
+    "root": "~/ak_verify_results/nfa_k2_sensitivity_ebcae298_20261117",
+    "staging_root": "~/ak_verify_results/nfa_k2_sensitivity_ebcae298_20261117/_canonical",
+    "quality_cells_harvested": 39,
+    "operator_cells_harvested": 40,
+    "quality_by_task": {"hotpotqa": 20, "gov_report": 19},
+    "duplicate_action": "pc02的HotpotQA 0.2:2048未收入canonical，只收pc31来源",
+    "absolute_nsys_paths": "40份operator receipt的report/SQLite均存在于统一原始根目录",
+    "missing_nsys_artifacts": 0,
+    "remaining": "最后一格完成后只需将pc33本地cell纳入同一root并运行最终联合审计",
+    "audit_fix": "per_sample_input_sha256列表改用canonical JSON字符串做跨格集合比较；py_compile通过，审计器SHA256已更新"
+  },
+  "final_closure": {
+    "at": "2026-11-18T18:27:37+08:00",
+    "last_closed_cell": {"host": "pc33", "cell": "0.01:2048:gov_report", "rows": 200, "official_score": 33.49, "gate_counts": {"keep": 7108, "near": 0, "far": 92, "both": 0}, "ordered_input_sha256": "cdf8eb4e8e259acc4c6ec2c307457f7ff920ea47748d9043b96650d9519e013d"},
+    "joint_audit": "pass-production-side",
+    "quality_cells": 40,
+    "quality_requests": 8000,
+    "operator_cells": 40,
+    "arms": 20,
+    "paired_quality_input_identity": "pass",
+    "paired_operator_input_identity": "pass",
+    "evidence_files": 1210,
+    "evidence_hash_recheck": "1210/1210 pass",
+    "summary": "agent_doc/results/nfa_k2_sensitivity_20261117/summary.json",
+    "summary_sha256": "4a2276a79d05efdfc595973af31585845f20f4809984d61f63a8ddc3438b2433",
+    "evidence_manifest_sha256": "439e7fb9274c24d33b4ce4c77ad7c779206746d4b11eac4edb856440f031edd6",
+    "gpu_state": "全部测量runner正常结束，pc33双卡释放",
+    "delivery": "最终审计已完成；合并最新origin/main并通过聚焦回归后正常提交推送"
+  },
+  "excluded_hosts": {
+    "pc14": "10.238.9.187:8416 第三次 SSH ConnectTimeout，未部署、未派单",
+    "pc40_pc32": "本轮实测有其他 compute apps，不抢占、不新增队列"
+  },
+  "supervision": {
+    "cron_job_id": "76fe7d8e",
+    "cron": "7 * * * *",
+    "rule": "每小时收割、修复、实测空卡并只补缺失格；RULER保持暂停"
+  },
+  "invalid_cells": [
+    {
+      "host": "pc32",
+      "mode": "operator",
+      "cell": "0.1:256:gov_report",
+      "reason": "gpu_hygiene=polluted-rerun；nsys_profile_finalized=false；无operator/kernel summary及nsys report/SQLite receipt",
+      "action": "旧记录不计闭集、不复用；2026-11-18第三轮已在pc33 GPU0重测并通过完整审计",
+      "status": "repaired-on-pc33"
+    }
+  ],
+  "duplicate_cells": [
+    {
+      "mode": "quality",
+      "cell": "0.2:2048:hotpotqa",
+      "canonical_host": "pc31",
+      "excluded_host": "pc02",
+      "reason": "第四轮父队列接力与跨机重派竞态；两端均通过完整audit_quality_cell，但只计一个唯一组合",
+      "official_score": 57.63,
+      "gate_counts": {"keep": 2137, "near": 1894, "far": 1201, "both": 1968},
+      "ordered_input_sha256": "be1da2fa86c93e321479e167d10cba804da0076be419879cfedc35703db12d08",
+      "prediction_sha256_both": "9978d1c6aeca272a3382cbc73d04675a4b8fd013912346ac7896206fdcdae0e9",
+      "receipts_sha256_both": "f701b5e9a68b9042687a3ba3474ef7033e6f128828fb3339bb70e01aced3d185",
+      "manifest_sha256_both": "ecae4c03bdb2116d7fc896ae1110c14acf01da42c8393fd10dd491248ee656eb",
+      "canonical_audit": "_audits/quality_audit_round6_pc31.json",
+      "excluded_audit": "_audits/quality_audit_round6_pc02.json",
+      "action": "两份原始产物保留；最终收割只收pc31 canonical，pc02标记duplicate/excluded"
+    }
+  ],
+  "last_inventory": {
+    "at": "2026-11-18T18:27:37+08:00",
+    "quality_closed": 40,
+    "quality_missing": 0,
+    "quality_physical_manifests": 41,
+    "quality_duplicate_combinations": 1,
+    "operator_closed": 40,
+    "operator_missing": 0,
+    "quality_cells_full_audit_passed": 40,
+    "operator_cells_full_audit_passed": 40,
+    "quality_detail": "40个唯一质量格全部闭集：HotpotQA二十格、GovReport二十格，共8000请求；pc02一份重复HotpotQA完整产物仍排除计数",
+    "operator_detail": "pc33二十七格 + pc31十三格；40格均通过完整身份/nsys/SHA/kernel审计，跨机40组合齐全且逐任务输入身份一致",
+    "unified_harvest": "40个canonical质量格与40个算子格均在统一原始根目录；40份nsys report/SQLite与1210项证据哈希全部复核通过",
+    "queues": "全部质量与算子runner正常结束，无待补格、无活动测量队列"
+  },
+  "status": "40质量+40算子全部闭集并通过最终联合审计；20个epsilon×K2组合的官方精度、gate计数和L1/L2/main-attention汇总已归档，待合并main、回归并正常推送"
+}
