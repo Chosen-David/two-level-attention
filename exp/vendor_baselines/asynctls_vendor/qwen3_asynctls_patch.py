@@ -23,8 +23,8 @@
   论文未声明前层 dense，本复现全层稀疏（layer 0 也走稀疏）。
 
 已知近似（语义复现边界，均写入 _baseline_identity）：
-  - GQA 组内平均：Qwen3 每 KV 组 4 个 query head，块打分与细筛均先组内
-    逐 query 算再平均（论文 MQA/MLA 场景无此细节）。
+  - GQA：每个 KV group 独立选择块和 token；细筛按组内 query 的
+    softmax 概率平均，不在 KV 组间进一步聚合选集。
   - INT4 量化-反量化不压缩足迹（只复现精度行为）。
   - channel 校准数据集采用与 FASA 同口径的 held-out 样本（见
     identify_channel.py），非论文原始 Dcal。
@@ -101,9 +101,9 @@ def _padded_key(key_states, block_size):
     pad = (block_size - key_states.shape[2] % block_size) % block_size
     if not pad:
         return key_states
-    key_pad = torch.zeros(
-        1, key_states.shape[1], pad, key_states.shape[-1],
-        device=key_states.device, dtype=key_states.dtype)
+    # Score-only padding must not alter the real partial-block extrema.
+    # Candidate construction still clips IDs to the real cache length.
+    key_pad = key_states[..., -1:, :].expand(-1, -1, pad, -1)
     return torch.cat([key_states, key_pad], dim=2)
 
 
